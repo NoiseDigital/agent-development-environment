@@ -23,11 +23,12 @@ from google.genai.types import (
                                 SafetySetting,
                                 ThinkingConfig
                                 )
-from google.adk.agents import LlmAgent
+from google.adk.agents import Agent
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.models import LlmResponse, LlmRequest
 from google.adk.planners import BuiltInPlanner
 from google.adk.tools.agent_tool import AgentTool
+from google.adk.tools import FunctionTool
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from shared.config_env import prepare_environment
@@ -39,7 +40,7 @@ from tools.data_engineer import data_engineer
 from tools.utils import get_gemini_model
 
 
-ROOT_AGENT_MODEL_ID = "gemini-2.5-pro-preview-06-05" # "gemini-2.5-pro-preview-05-06"
+ROOT_AGENT_MODEL_ID = "gemini-2.5-pro-preview-06-05"
 
 
 async def before_model_callback(callback_context: CallbackContext,
@@ -65,19 +66,19 @@ async def after_model_callback(callback_context: CallbackContext,
 ########################### AGENT ###########################
 prepare_environment()
 
-root_agent = LlmAgent(
+root_agent = Agent(
     model=get_gemini_model(ROOT_AGENT_MODEL_ID),
     name="data_agent",
     output_key="output",
-    description="CRM Data Analytics Consultant",
+    description="Data Analytics Consultant",
     instruction=root_agent_instruction,
     before_model_callback=before_model_callback,
     after_model_callback=after_model_callback,
     before_agent_callback=before_agent_callback,
     tools=[
         AgentTool(crm_business_analyst_agent),
-        data_engineer,
-        bi_engineer_tool,
+        FunctionTool(data_engineer),
+        FunctionTool(bi_engineer_tool),
     ],
     planner=BuiltInPlanner(
         thinking_config=ThinkingConfig(thinking_budget=32768)

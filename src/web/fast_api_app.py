@@ -53,12 +53,7 @@ from google.adk.artifacts import BaseArtifactService, InMemoryArtifactService
 from google.adk.events.event import Event
 from google.adk.memory import InMemoryMemoryService
 from google.adk.runners import Runner
-from google.adk.sessions import Session
-
-sys.path.append(str(Path(__file__).parent.parent))
-from shared.firestore_session_service import (
-    FirestoreSessionService as SessionService
-)
+from google.adk.sessions import Session, VertexAiSessionService as SessionService
 
 logger = logging.getLogger(__name__)
 
@@ -161,8 +156,9 @@ def get_fast_api_app(
 
     # Build the Session service
     session_service = SessionService(
-        database=os.environ["FIRESTORE_SESSION_DATABASE"],
-        sessions_collection=os.getenv("FIRESTORE_SESSION_COLLECTION", "/")
+        project=os.environ["GOOGLE_CLOUD_PROJECT"],
+        location=os.environ.get("GOOGLE_CLOUD_LOCATION", "global"),
+        agent_engine_id=os.environ["AGENT_ENGINE_ID"], ## TODO: Update to fetch ID dynamically based on {app_name}
     )
 
 

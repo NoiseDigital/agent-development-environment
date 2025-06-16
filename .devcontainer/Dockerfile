@@ -1,7 +1,9 @@
 # Python Devcontainer Dockerfile
 FROM mcr.microsoft.com/devcontainers/python:3.11
 
-ENV PROJECT_ID=chef-e
+ENV GOOGLE_CLOUD_PROJECT=probable-summer-238718
+ENV GOOGLE_CLOUD_LOCATION=us-central1
+ENV AI_STORAGE_BUCKET=noise-adk-artifacts
 
 RUN apt-get update && \
     apt-get install -y curl apt-transport-https ca-certificates gnupg && \
