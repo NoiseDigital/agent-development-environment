@@ -1,16 +1,3 @@
-# Copyright 2025 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# You may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 """
 Deploy the data_agent to Vertex AI Agent Engine.
 """
@@ -18,7 +5,11 @@ Deploy the data_agent to Vertex AI Agent Engine.
 import os
 import vertexai
 from vertexai import agent_engines
-from agent import root_agent
+import sys
+from pathlib import Path
+# Add the parent of 'agents' (which is 'src') to sys.path
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
+from src.agents.hello_world_agent.agent import root_agent
 
 # Load environment variables
 PROJECT_ID = os.environ["GOOGLE_CLOUD_PROJECT"]
@@ -38,7 +29,11 @@ requirements = [
 ]
 
 # Include the entire agents directory
-# extra_packages = ["../../agents"]
+extra_packages = ["src/agents/hello_world_agent/tools",
+                  "src/agents/hello_world_agent/prompts",
+                  "src/agents/hello_world_agent",
+                  "src/agents",
+                  ]
 
 # Optionally, set environment variables required by your agent
 # env_vars = {"MY_ENV_VAR": "my_value"}
@@ -58,7 +53,7 @@ if __name__ == "__main__":
     remote_agent = agent_engines.create(
         root_agent,
         requirements=requirements,
-        # extra_packages=extra_packages,
+        extra_packages=extra_packages,
         gcs_dir_name=gcs_dir_name,
         display_name=display_name,
         description=description,
