@@ -18,5 +18,5 @@ PYTHON=python3
 UVICORN=uvicorn
 
 pushd "${SCRIPT_DIR}/src" &> /dev/null || exit
-"$UVICORN" --app-dir web fast_api_runner:api_app --port 8000 & "$PYTHON" web/main.py "agents/data_agent" "local" & wait
+"$UVICORN" --app-dir app fast_api_runner:api_app --port 8000
 popd &> /dev/null || exit

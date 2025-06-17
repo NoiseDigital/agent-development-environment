@@ -87,7 +87,7 @@ class AgentRunRequest(BaseModel):
     new_message: types.Content
     streaming: bool = False
 
-
+# TODO: Update so agent_dir points to resource engine instances
 def get_fast_api_app(
     *,
     agent_dir: str,

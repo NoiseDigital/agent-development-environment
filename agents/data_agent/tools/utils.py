@@ -59,6 +59,7 @@ class _GlobalGemini(Gemini):
         original_client = super().api_client
         return genai.Client(
             vertexai=original_client.vertexai,
+            project=os.environ["GOOGLE_CLOUD_PROJECT"],
             location="global",
         )
 

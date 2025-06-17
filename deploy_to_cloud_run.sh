@@ -16,7 +16,7 @@
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 pushd "${SCRIPT_DIR}" &> /dev/null || exit
 
-SERVICE_NAME="crm-data-agent"
+SERVICE_NAME="agent-engine-service"
 python3 utils/deploy_to_cloud_run.py "${SERVICE_NAME}"
 
 
