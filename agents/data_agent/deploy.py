@@ -21,14 +21,15 @@ from vertexai import agent_engines
 import vertexai
 import os
 
-sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
-from src.agents.data_agent.agent import root_agent
-from src.agents.data_agent.utils.constants import (
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
+from agents.data_agent.agent import root_agent
+from agents.data_agent.utils.constants import (
     get_resource_engine_id,
     get_agent_name,
     get_agent_display_name,
     get_agent_display_description
 )
+from src.shared.vertex_agent_deploy import deploy_or_update_agent
 
 # Load environment variables
 PROJECT_ID = os.environ["GOOGLE_CLOUD_PROJECT"]
@@ -44,7 +45,7 @@ requirements = [
 
 # Include the entire agents directory
 extra_packages = [
-    "src/agents/data_agent",
+    "agents/data_agent",
 ]
 
 # Optionally, set environment variables required by your agent
@@ -58,57 +59,16 @@ gcs_dir_name = f"uat/{get_agent_name()}"
 display_name = get_agent_display_name()
 description = get_agent_display_description()
 
-
-def main():
-    action = input(
-        "Type 'deploy' to deploy a new agent or 'update' to update an existing agent: ").strip().lower()
-    if action not in ("deploy", "update"):
-        print("Invalid action. Exiting.")
-        sys.exit(1)
-
-    vertexai.init(
-        project=PROJECT_ID,
-        location=LOCATION,
-        staging_bucket=STAGING_BUCKET,
-    )
-
-    if action == "deploy":
-        print("Deploying agent to Vertex AI Agent Engine...")
-        remote_agent = agent_engines.create(
-            agent_engine=root_agent,
-            requirements=requirements,
-            display_name=display_name,
-            description=description,
-            gcs_dir_name=gcs_dir_name,
-            extra_packages=extra_packages,
-            env_vars=env_vars,
-        )
-        print("Deployment complete.")
-        print(f"Agent resource name: {remote_agent.resource_name}")
-    if action == "update":
-        resource_name = RESOURCE_ENGINE_ID
-        if not resource_name:
-            print(
-                "RESOURCE_ENGINE_ID variable is not set. Cannot update agent.")
-            print(
-                "If this is your first deployment, you must deploy first to create a new agent.")
-            print("Run this script again and choose 'deploy' to deploy a new agent. After deployment, save the printed resource name as RESOURCE_ENGINE_ID for future updates.")
-            sys.exit(1)
-        print(f"Updating agent {resource_name} on Vertex AI Agent Engine...")
-        agent_engines.update(
-            resource_name=resource_name,
-            agent_engine=root_agent,
-            requirements=requirements,
-            display_name=display_name,
-            description=description,
-            gcs_dir_name=gcs_dir_name,
-            extra_packages=extra_packages,
-            env_vars=env_vars,
-        )
-        print("Update complete.")
-    else:
-        print("No action taken. Exiting.")
-
-
-if __name__ == "__main__":
-    main()
+deploy_or_update_agent(
+    root_agent=root_agent,
+    requirements=requirements,
+    display_name=display_name,
+    description=description,
+    gcs_dir_name=gcs_dir_name,
+    extra_packages=extra_packages,
+    env_vars=env_vars,
+    resource_engine_id=RESOURCE_ENGINE_ID,
+    project_id=PROJECT_ID,
+    location=LOCATION,
+    staging_bucket=STAGING_BUCKET,
+)

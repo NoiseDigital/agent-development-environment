@@ -1,3 +1,0 @@
-google-cloud-bigquery
-# google-cloud-secret-manager
-simple-salesforce

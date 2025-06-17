@@ -1,0 +1,4 @@
+fastapi==0.115.12
+uvicorn==0.34.3
+google-cloud-aiplatform==1.97.0
+google-cloud-aiplatform[adk,agent_engines]==1.97.0

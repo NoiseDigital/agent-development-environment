@@ -5,3 +5,4 @@ data
 .env
 .vscode/
 .DS_Store
+terraform/.terraform/providers/registry.terraform.io/hashicorp/google/6.40.0/linux_amd64/terraform-provider-google_v6.40.0_x5

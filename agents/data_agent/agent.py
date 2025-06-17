@@ -31,13 +31,13 @@ from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools import FunctionTool
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
-from shared.config_env import prepare_environment
+from src.shared.config_env import prepare_environment
 
-from prompts.root_agent import system_instruction as root_agent_instruction
-from tools.bi_engineer import bi_engineer_tool
-from tools.crm_business_analyst import crm_business_analyst_agent
-from tools.data_engineer import data_engineer
-from tools.utils import get_gemini_model
+from agents.data_agent.prompts.root_agent import system_instruction as root_agent_instruction
+from agents.data_agent.tools.bi_engineer import bi_engineer_tool
+from agents.data_agent.tools.crm_business_analyst import crm_business_analyst_agent
+from agents.data_agent.tools.data_engineer import data_engineer
+from agents.data_agent.tools.utils import get_gemini_model
 
 
 ROOT_AGENT_MODEL_ID = "gemini-2.5-pro-preview-06-05"
