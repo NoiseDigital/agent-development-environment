@@ -10,3 +10,9 @@ Work directly in the agents/ directory.
 Your Agent is now built and deployed to a cloud environment, where the runtime is fully managed. The Agent can always be tested locally, but is now accessible to remote endpoints, meaning it is much easier to build into a web application. 
 
 
+# Working on Web App? 
+
+## Local Server
+
+- Run `uvicorn main:app` to start up a local server for FastAPI
+- Go to http://127.0.0.1:8000/docs to test API via swagger

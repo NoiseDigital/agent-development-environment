@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Body
-from vertexai import agent_engines
+from src.app.utils.remote_agent import get_remote_agent
 
 router = APIRouter()
 
-GOOGLE_CLOUD_PROJECT = "probable-summer-238718"
-GOOGLE_CLOUD_LOCATION = "us-central1"
+
 
 # TODO: Update with a full set of routes for interacting with Agent Engine resources
 @router.get("/")
@@ -13,9 +12,7 @@ def root():
 
 @router.post("/create_session")
 async def create_session(user_id: str = Body(..., embed=True), reasoning_engine_id: str = Body(..., embed=True)):
-    remote_agent = agent_engines.get(
-        f"projects/{GOOGLE_CLOUD_PROJECT}/locations/{GOOGLE_CLOUD_LOCATION}/reasoningEngines/{reasoning_engine_id}"
-    )
+    remote_agent = get_remote_agent(reasoning_engine_id)
     remote_session = remote_agent.create_session(user_id=user_id)
     return remote_session
 
@@ -26,9 +23,7 @@ async def chat_with_agent(
     message: str = Body(..., embed=True),
     reasoning_engine_id: str = Body(..., embed=True)
 ):
-    remote_agent = agent_engines.get(
-        f"projects/{GOOGLE_CLOUD_PROJECT}/locations/{GOOGLE_CLOUD_LOCATION}/reasoningEngines/{reasoning_engine_id}"
-    )
+    remote_agent = get_remote_agent(reasoning_engine_id)
     response = remote_agent.stream_query(
         user_id=user_id,
         session_id=session_id,
