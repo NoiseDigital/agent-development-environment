@@ -16,3 +16,7 @@ Your Agent is now built and deployed to a cloud environment, where the runtime i
 
 - Run `uvicorn main:app` to start up a local server for FastAPI
 - Go to http://127.0.0.1:8000/docs to test API via swagger
+
+## Cloud Run Deployment
+
+- Cloud Build triggers are setup to deploy when main/ has changes on remote
