@@ -28,18 +28,22 @@ from google.genai.types import (Content,
                                 GenerateContentConfig,
                                 Part,
                                 SafetySetting)
+from google.genai import Client as GenaiClient
+
 from google.adk.tools import ToolContext
 
-from .utils import get_genai_client
 from prompts.data_engineer import (system_instruction
                                    as data_engineer_instruction,
                                    prompt as data_engineer_prompt)
 from prompts.sql_correction import (instruction as sql_correction_instruction,
                                     prompt as sql_correction_prompt)
 
-DATA_ENGINEER_AGENT_MODEL_ID = "gemini-2.5-pro-preview-06-05" # "gemini-2.5-pro-preview-05-06"
-SQL_VALIDATOR_MODEL_ID =  "gemini-2.5-pro-preview-06-05" # "gemini-2.5-pro-preview-05-06"
+# "gemini-2.5-pro-preview-05-06"
+DATA_ENGINEER_AGENT_MODEL_ID = "gemini-2.5-pro-preview-06-05"
+# "gemini-2.5-pro-preview-05-06"
+SQL_VALIDATOR_MODEL_ID = "gemini-2.5-pro-preview-06-05"
 _DEFAULT_METADATA_FILE = "sfdc_metadata.json"
+
 
 @cache
 def _init_environment():
@@ -51,11 +55,11 @@ def _init_environment():
     _location = os.environ["BQ_LOCATION"]
     _dataset = os.environ["SFDC_BQ_DATASET"]
     _sfdc_metadata_path = os.environ.get("SFDC_METADATA_FILE",
-                                        _DEFAULT_METADATA_FILE)
+                                         _DEFAULT_METADATA_FILE)
     if not Path(_sfdc_metadata_path).exists():
         if "/" not in _sfdc_metadata_path:
             _sfdc_metadata_path = str(Path(__file__).parent.parent /
-                                    _sfdc_metadata_path)
+                                      _sfdc_metadata_path)
 
     _sfdc_metadata = Path(_sfdc_metadata_path).read_text(encoding="utf-8")
     _sfdc_metadata_dict = json.loads(_sfdc_metadata)
@@ -68,7 +72,7 @@ def _init_environment():
             table_dict = _sfdc_metadata_dict[table.table_id]
             _final_dict[table.table_id] = table_dict
             table_obj = client.get_table(f"{_data_project_id}.{_dataset}."
-                                        f"{table.table_id}")
+                                         f"{table.table_id}")
             for f in table_obj.schema:
                 if f.name in table_dict["columns"]:
                     table_dict["columns"][f.name]["field_type"] = f.field_type
@@ -91,7 +95,7 @@ def _sql_validator(sql_code: str) -> Tuple[str, str]:
     """
     print("Running SQL validator.")
     sql_code_to_run = sql_code
-    for k,v in _sfdc_metadata_dict.items():
+    for k, v in _sfdc_metadata_dict.items():
         sfdc_name = v["salesforce_name"]
         full_name = f"`{_data_project_id}.{_dataset}.{sfdc_name}`"
         sql_code_to_run = sql_code_to_run.replace(
@@ -102,7 +106,7 @@ def _sql_validator(sql_code: str) -> Tuple[str, str]:
     client = Client(project=_bq_project_id, location=_location)
     try:
         dataset_location = client.get_dataset(
-                                f"{_data_project_id}.{_dataset}").location
+            f"{_data_project_id}.{_dataset}").location
         job_config = QueryJobConfig(dry_run=True, use_query_cache=False)
         client.query(sql_code,
                      job_config=job_config,
@@ -137,7 +141,12 @@ async def data_engineer(request: str, tool_context: ToolContext) -> SQLResult:
         sfdc_metadata=_sfdc_metadata
     )
 
-    sql_code_result = get_genai_client().models.generate_content(
+    genai_client = GenaiClient(
+        vertexai=True,
+        project="probable-summer-238718",
+        location="global",
+    )
+    sql_code_result = genai_client.models.generate_content(
         model=DATA_ENGINEER_AGENT_MODEL_ID,
         contents=Content(
             role="user",
@@ -154,13 +163,13 @@ async def data_engineer(request: str, tool_context: ToolContext) -> SQLResult:
             seed=1,
             safety_settings=[
                 SafetySetting(
-                    category="HARM_CATEGORY_DANGEROUS_CONTENT", # type: ignore
-                    threshold="BLOCK_ONLY_HIGH", # type: ignore
+                    category="HARM_CATEGORY_DANGEROUS_CONTENT",  # type: ignore
+                    threshold="BLOCK_ONLY_HIGH",  # type: ignore
                 ),
             ]
         )
     )
-    sql_result: SQLResult = sql_code_result.parsed # type: ignore
+    sql_result: SQLResult = sql_code_result.parsed  # type: ignore
     sql = sql_result.sql_code
 
     print(f"SQL Query candidate: {sql}")
@@ -178,7 +187,7 @@ async def data_engineer(request: str, tool_context: ToolContext) -> SQLResult:
             break
         print(f"ERROR: {validator_result}")
         if not chat_session:
-            chat_session = get_genai_client().chats.create(
+            chat_session = genai_client.chats.create(
                 model=SQL_VALIDATOR_MODEL_ID,
                 config=GenerateContentConfig(
                     response_schema=SQLResult,
@@ -193,8 +202,8 @@ async def data_engineer(request: str, tool_context: ToolContext) -> SQLResult:
                     seed=0,
                     safety_settings=[
                         SafetySetting(
-                            category="HARM_CATEGORY_DANGEROUS_CONTENT", # type: ignore
-                            threshold="BLOCK_ONLY_HIGH", # type: ignore
+                            category="HARM_CATEGORY_DANGEROUS_CONTENT",  # type: ignore
+                            threshold="BLOCK_ONLY_HIGH",  # type: ignore
                         ),
                     ]
                 )
@@ -204,7 +213,7 @@ async def data_engineer(request: str, tool_context: ToolContext) -> SQLResult:
             validator_result=validator_result
         )
         corr_result = chat_session.send_message(correcting_prompt).parsed
-        validating_query = corr_result.sql_code # type: ignore
+        validating_query = corr_result.sql_code  # type: ignore
     if is_good:
         print(f"Final result: {validating_query}")
         # sql_markdown = f"```sql\n{validating_query}\n```"
@@ -232,4 +241,4 @@ async def data_engineer(request: str, tool_context: ToolContext) -> SQLResult:
             sql_code="-- no query",
             sql_code_file_name="none.sql",
             error=f"## Could not create a valid query in {MAX_FIX_ATTEMPTS}"
-                   " attempts.")
+            " attempts.")

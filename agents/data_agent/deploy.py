@@ -38,12 +38,23 @@ STAGING_BUCKET = f"gs://{os.environ['AI_STORAGE_BUCKET']}"
 # Define requirements (pin versions as needed)
 requirements = [
     "google-cloud-aiplatform[agent_engines,adk]==1.97.0",
-    "google-genai==1.19.*"
+    "google-genai==1.19.*",
+    "altair==5.5.*",
+    "pillow",
+    "pandas",
+    "google-cloud-bigquery[pandas]",
+    "google-cloud-bigquery-storage",
+    "yfinance",
+    "matplotlib",
+    "scikit-learn",
+    "tabulate",
+    "platformdirs"
 ]
 
 # Include the entire agents directory
 extra_packages = [
     "agents/data_agent",
+    "src"
 ]
 
 # Optionally, set environment variables required by your agent

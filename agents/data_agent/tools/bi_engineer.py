@@ -28,6 +28,7 @@ from google.genai.types import (
     SafetySetting,
     ThinkingConfig
 )
+from google.genai import Client as GenaiClient
 from google.cloud.bigquery import Client, QueryJobConfig
 from google.cloud.exceptions import BadRequest, NotFound
 
@@ -35,7 +36,6 @@ import altair as alt
 from altair.vegalite.schema import core as alt_core
 import pandas as pd
 
-from .utils import get_genai_client
 from prompts.bi_engineer import prompt as bi_engineer_prompt
 from tools.chart_evaluator import evaluate_chart
 
@@ -106,7 +106,12 @@ def _enhance_parameters(vega_chart: dict, df: pd.DataFrame) -> dict:
 
 
 def _create_chat(model: str, history: list, max_thinking: bool = False):
-    return get_genai_client().chats.create(
+    genai_client = GenaiClient(
+        vertexai=True,
+        project="probable-summer-238718",
+        location="global",
+    )
+    return genai_client.chats.create(
         model=model,
         config=GenerateContentConfig(
             temperature=0.1,

@@ -14,11 +14,11 @@
 """Chart Evaluator Sub-tool"""
 
 from google.adk.tools import ToolContext
+from google.genai import Client as GenaiClient
 from google.genai.types import Content, GenerateContentConfig, Part, SafetySetting
 
 from pydantic import BaseModel
 
-from .utils import get_genai_client
 from prompts.chart_evaluator import prompt as chart_evaluator_prompt
 
 
@@ -49,7 +49,12 @@ def evaluate_chart(png_image: bytes,
                                             question=question)
 
     image_part = Part.from_bytes(mime_type="image/png", data=png_image)
-    eval_result = get_genai_client().models.generate_content(
+    genai_client = GenaiClient(
+        vertexai=True,
+        project="probable-summer-238718",
+        location="global",
+    )
+    eval_result = genai_client.models.generate_content(
         model=CHART_EVALUATOR_MODEL_ID,
         contents=Content(
             role="user",

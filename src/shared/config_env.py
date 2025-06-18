@@ -34,6 +34,7 @@ _env_requirements = {
 }
 _prepared = False
 
+# TODO: Point path to agents dir
 def _get_dotenv_file() -> str:
     dotenv_path = Path(__file__).parent.parent / ".env"
     if not dotenv_path.exists():
