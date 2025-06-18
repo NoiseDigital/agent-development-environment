@@ -3,7 +3,7 @@
 Work directly in the agents/ directory. 
 
 - run `command_placeholder` to generate a new agent subdirectory within agents/
-- Use helpful ADK cli tools like `adk server` and `adk web` for a live testing environment of your Agent functionality
+- Use helpful ADK cli tools like `adk server` and `adk web agents/` for a live testing environment of your Agent functionality
 - Run the deploy.py script in your agents directory to push the agent to Agent Engine
     - Note the Resource ID of your Agent Engine instance, and add it to your utils/constants.py file for when you want to update a deployed Agent Engine instance. 
 

@@ -17,8 +17,6 @@ Deploy the data_agent to Vertex AI Agent Engine.
 
 from pathlib import Path
 import sys
-from vertexai import agent_engines
-import vertexai
 import os
 
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent))

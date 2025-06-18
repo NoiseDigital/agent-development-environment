@@ -7,8 +7,8 @@ import sys
 import os
 
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
-from agents.hello_world_agent.agent import root_agent
-from agents.hello_world_agent.utils.constants import (
+from agents.timesheet_agent.agent import root_agent
+from agents.timesheet_agent.utils.constants import (
     get_resource_engine_id,
     get_agent_name,
     get_agent_display_name,
@@ -30,7 +30,7 @@ requirements = [
 
 # Optionally include additional directories
 extra_packages = [
-    "agents/hello_world_agent",
+    "agents/timesheet_agent",
 ]
 
 # Optionally, set environment variables required by your agent

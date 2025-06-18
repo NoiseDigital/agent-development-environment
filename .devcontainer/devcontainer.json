@@ -12,7 +12,8 @@
             "extensions": [
                 "ms-python.python",
                 "ms-python.vscode-pylance",
-                "HashiCorp.terraform"
+                "HashiCorp.terraform",
+                "hediet.vscode-drawio"
             ]
         }
     },
