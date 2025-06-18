@@ -1,5 +1,12 @@
-# Redeploy Agent Engine Service
+# Working on Agents?
 
-- `Rebuild Image` -> gcloud builds submit --tag us-central1-docker.pkg.dev/probable-summer-238718/fastapi-repo/agent-engine-service:latest .
+Work directly in the agents/ directory. 
 
-- `Push Image` -> terraform apply
+- run `command_placeholder` to generate a new agent subdirectory within agents/
+- Use helpful ADK cli tools like `adk server` and `adk web` for a live testing environment of your Agent functionality
+- Run the deploy.py script in your agents directory to push the agent to Agent Engine
+    - Note the Resource ID of your Agent Engine instance, and add it to your utils/constants.py file for when you want to update a deployed Agent Engine instance. 
+
+Your Agent is now built and deployed to a cloud environment, where the runtime is fully managed. The Agent can always be tested locally, but is now accessible to remote endpoints, meaning it is much easier to build into a web application. 
+
+

@@ -6,6 +6,7 @@ router = APIRouter()
 GOOGLE_CLOUD_PROJECT = "probable-summer-238718"
 GOOGLE_CLOUD_LOCATION = "us-central1"
 
+# TODO: Update with a full set of routes for interacting with Agent Engine resources
 @router.get("/")
 def root():
     return {"message": "Welcome to the Agent Engine Service API!"}
