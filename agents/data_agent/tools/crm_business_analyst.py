@@ -31,7 +31,7 @@ from prompts.crm_business_analyst import (system_instruction
                                           as crm_business_analyst_instruction)
 
 
-BUSINESS_ANALYST_AGENT_MODEL_ID = "gemini-2.5-pro-preview-06-05" # "gemini-2.5-pro-preview-05-06"
+BUSINESS_ANALYST_AGENT_MODEL_ID = "gemini-2.5-pro"
 
 
 async def after_model_callback(callback_context: CallbackContext,
@@ -50,7 +50,7 @@ async def after_model_callback(callback_context: CallbackContext,
 
 
 crm_business_analyst_agent = LlmAgent(
-    model="gemini-2.0-flash",
+    model="gemini-2.5-pro",
     name="crm_business_analyst",
     description="""
         This is your Senior Business Analyst.

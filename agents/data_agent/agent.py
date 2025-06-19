@@ -66,7 +66,7 @@ async def after_model_callback(callback_context: CallbackContext,
 prepare_environment()
 
 root_agent = Agent(
-    model="gemini-2.0-flash",
+    model="gemini-2.5-pro",
     name="data_agent",
     output_key="output",
     description="Data Analytics Consultant",
