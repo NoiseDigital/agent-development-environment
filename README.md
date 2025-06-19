@@ -20,3 +20,4 @@ Your Agent is now built and deployed to a cloud environment, where the runtime i
 ## Cloud Run Deployment
 
 - Cloud Build triggers are setup to deploy when main/ has changes on remote
+- Redeploy image with gcloud builds submit --tag us-central1-docker.pkg.dev/nd-agentspace-sbx/fastapi-repo/agent-engine-service:latest .

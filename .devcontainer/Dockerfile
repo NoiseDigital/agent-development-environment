@@ -1,7 +1,7 @@
 # Python Devcontainer Dockerfile
 FROM mcr.microsoft.com/devcontainers/python:3.11
 
-ENV GOOGLE_CLOUD_PROJECT=probable-summer-238718
+ENV GOOGLE_CLOUD_PROJECT=nd-agentspace-sbx
 ENV GOOGLE_CLOUD_LOCATION=us-central1
 ENV AI_STORAGE_BUCKET=noise-adk-artifacts
 

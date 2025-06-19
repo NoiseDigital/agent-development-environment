@@ -1,3 +1,3 @@
-variable "project_id" { default = "probable-summer-238718"}
+variable "project_id" { default = "nd-agentspace-sbx"}
 variable "region" { default = "us-central1" }
-variable "image_url" { default = "us-central1-docker.pkg.dev/probable-summer-238718/fastapi-repo/agent-engine-service:latest"}
+variable "image_url" { default = "us-central1-docker.pkg.dev/nd-agentspace-sbx/fastapi-repo/agent-engine-service:latest"}
