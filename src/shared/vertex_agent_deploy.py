@@ -1,3 +1,5 @@
+from vertexai.preview.reasoning_engines import AdkApp
+
 def deploy_or_update_agent(
     root_agent,
     requirements,
@@ -29,8 +31,9 @@ def deploy_or_update_agent(
 
     if action == "deploy":
         print("Deploying agent to Vertex AI Agent Engine...")
+        app = AdkApp(agent=root_agent, enable_tracing=True)
         remote_agent = agent_engines.create(
-            agent_engine=root_agent,
+            agent_engine=app,
             requirements=requirements,
             display_name=display_name,
             description=description,
