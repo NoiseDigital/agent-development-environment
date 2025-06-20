@@ -1,12 +1,10 @@
 def get_outlook_calendar_events(
-    user_id: str = "me",
     start_date: str = "",
     end_date: str = "",
 ):
     """Mock function to retrieve Outlook calendar events for a user, with docket IDs in the meeting title.
 
     Args:
-        user_id: The Outlook user ID or 'me' for the current user. Defaults to 'me'.
         start_date: The start date (YYYY-MM-DD) to filter events. Defaults to None (no filter).
         end_date: The end date (YYYY-MM-DD) to filter events. Defaults to None (no filter).
 
@@ -21,8 +19,8 @@ def get_outlook_calendar_events(
             "start": "2025-06-18T09:00:00",
             "end": "2025-06-18T09:30:00",
             "location": "Conference Room A",
-            "organizer": user_id,
-            "attendees": [user_id, "alice@example.com"],
+            "organizer": "MockUser123",
+            "attendees": ["MockUser123", "alice@example.com"],
         },
         {
             "id": "evt-002",
@@ -30,8 +28,8 @@ def get_outlook_calendar_events(
             "start": "2025-06-18T11:00:00",
             "end": "2025-06-18T12:00:00",
             "location": "Zoom",
-            "organizer": user_id,
-            "attendees": [user_id, "bob@example.com"],
+            "organizer": "MockUser123",
+            "attendees": ["MockUser123", "bob@example.com"],
         },
         {
             "id": "evt-003",
@@ -39,13 +37,13 @@ def get_outlook_calendar_events(
             "start": "2025-06-19T14:00:00",
             "end": "2025-06-19T15:00:00",
             "location": "Teams",
-            "organizer": user_id,
-            "attendees": [user_id, "carol@example.com"],
+            "organizer": "MockUser123",
+            "attendees": ["MockUser123", "carol@example.com"],
         },
     ]
     return {
         "data": events,
-        "user_id": user_id,
+        "user_id": "MockUser123",
         "start_date": start_date,
         "end_date": end_date,
     }

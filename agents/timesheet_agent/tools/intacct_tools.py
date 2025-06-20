@@ -1,6 +1,6 @@
 from typing import List
 
-def get_user_docket_ids(user_id: str = "me") -> List[str]:
+def get_user_docket_ids() -> List[str]:
     """Mock function to fetch Docket IDs the user can submit hours to.
 
     Args:
@@ -14,7 +14,6 @@ def get_user_docket_ids(user_id: str = "me") -> List[str]:
 
 
 def build_timesheet_xml(
-    employee_id: str,
     begin_date: str,
     entries: list,
     description: str = "",
@@ -22,7 +21,6 @@ def build_timesheet_xml(
     """Builds an XML timesheet for submission to Intacct.
 
     Args:
-        employee_id: The employee ID submitting the timesheet.
         begin_date: The start date of the timesheet (MM/DD/YYYY).
         entries: A list of dicts, each representing a timesheet entry.
         description: Optional description for the timesheet.
@@ -46,7 +44,7 @@ def build_timesheet_xml(
     xml = f"""
 <create>
     <TIMESHEET>
-        <EMPLOYEEID>{employee_id}</EMPLOYEEID>
+        <EMPLOYEEID>MockUser123</EMPLOYEEID>
         <BEGINDATE>{begin_date}</BEGINDATE>
         <GLPOSTDATE></GLPOSTDATE>
         <DESCRIPTION>{description}</DESCRIPTION>
@@ -58,3 +56,18 @@ def build_timesheet_xml(
     </TIMESHEET>
 </create>"""
     return xml.strip()
+
+
+def submit_timesheet_xml(xml_string: str) -> str:
+    """Mock function to submit the XML timesheet to Intacct.
+
+    Args:
+        xml_string: The XML string representing the timesheet.
+
+    Returns:
+        str: Submission status message.
+    """
+    # In a real implementation, this would POST to Intacct's API.
+    print("Submitting timesheet to Intacct...")
+    print(xml_string)
+    return "submitted"
