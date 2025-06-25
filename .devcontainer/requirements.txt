@@ -4,8 +4,8 @@ cloudpickle==3.1.1
 fastapi==0.115.12
 Flask
 git+https://github.com/google/adk-python.git@main
-google-cloud-aiplatform[adk,agent_engines]==1.97.0
-google-cloud-aiplatform==1.97.0
+google-cloud-aiplatform[adk,agent_engines]==1.99.0
+google-cloud-aiplatform==1.99.0
 google-cloud-bigquery
 google-cloud-bigquery[pandas]
 google-cloud-bigquery-storage
@@ -14,7 +14,7 @@ google-cloud-logging
 google-cloud-pubsub
 google-cloud-secret-manager
 google-cloud-storage
-google-genai==1.19.*
+google-genai==1.21.1
 gunicorn
 matplotlib
 pandas
@@ -29,3 +29,4 @@ tabulate
 uvicorn==0.34.3
 vl-convert-python
 yfinance
+toolbox-core

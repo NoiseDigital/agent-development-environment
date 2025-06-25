@@ -1,0 +1,121 @@
+sources:
+ my-bq-source:
+   kind: bigquery
+   project: nd-agentspace-sbx
+
+tools:
+ search_release_notes_bq:
+   kind: bigquery-sql
+   source: my-bq-source
+   statement: |
+    SELECT
+     product_name,description,published_at
+    FROM
+      `bigquery-public-data`.`google_cloud_release_notes`.`release_notes`
+    WHERE
+     DATE(published_at) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
+    GROUP BY product_name,description,published_at
+    ORDER BY published_at DESC
+   description: |
+    Use this tool to get information on Google Cloud Release Notes.
+ analyze_media_performance:
+    kind: bigquery-sql
+    source: my-bq-source
+    statement: |
+      SELECT
+        date,
+        ad_campaign,
+        platform,
+        SUM(impressions) AS total_impressions,
+        SUM(sales) AS total_sales,
+        SAFE_DIVIDE(SUM(sales), NULLIF(SUM(impressions), 0)) AS sales_per_impression
+      FROM
+        `nd-agentspace-sbx.media_performance.performance`
+      GROUP BY date, ad_campaign, platform
+      ORDER BY date DESC, total_sales DESC
+    description: |
+      Analyze media performance by campaign and platform, aggregating impressions and sales, and calculating sales per impression.
+ summarize_media_performance:
+    kind: bigquery-sql
+    source: my-bq-source
+    statement: |
+      SELECT
+        SUM(impressions) AS total_impressions,
+        SUM(sales) AS total_sales,
+        COUNT(DISTINCT ad_campaign) AS campaign_count,
+        COUNT(DISTINCT platform) AS platform_count
+      FROM `nd-agentspace-sbx.media_performance.performance`
+    description: |
+      Summarize overall media performance: total impressions, total sales, number of campaigns, and platforms.
+
+ top_campaigns_by_sales:
+    kind: bigquery-sql
+    source: my-bq-source
+    statement: |
+      SELECT
+        ad_campaign,
+        SUM(impressions) AS total_impressions,
+        SUM(sales) AS total_sales
+      FROM `nd-agentspace-sbx.media_performance.performance`
+      GROUP BY ad_campaign
+      ORDER BY total_sales DESC
+      LIMIT 10
+    description: |
+      List the top 10 campaigns by total sales.
+
+ platform_performance_breakdown:
+    kind: bigquery-sql
+    source: my-bq-source
+    statement: |
+      SELECT
+        platform,
+        SUM(impressions) AS total_impressions,
+        SUM(sales) AS total_sales,
+        SAFE_DIVIDE(SUM(sales), NULLIF(SUM(impressions), 0)) AS sales_per_impression
+      FROM `nd-agentspace-sbx.media_performance.performance`
+      GROUP BY platform
+      ORDER BY total_sales DESC
+    description: |
+      Show performance breakdown by platform, including sales per impression.
+
+ daily_performance_trend:
+    kind: bigquery-sql
+    source: my-bq-source
+    statement: |
+      SELECT
+        date,
+        SUM(impressions) AS total_impressions,
+        SUM(sales) AS total_sales
+      FROM `nd-agentspace-sbx.media_performance.performance`
+      GROUP BY date
+      ORDER BY date DESC
+    description: |
+      Show daily trend of impressions and sales.
+
+ campaign_details:
+    kind: bigquery-sql
+    source: my-bq-source
+    statement: |
+      SELECT
+        date,
+        ad_campaign,
+        ad_id,
+        platform,
+        impressions,
+        sales
+      FROM `nd-agentspace-sbx.media_performance.performance`
+      ORDER BY date DESC, ad_campaign
+      LIMIT 100
+    description: |
+      Show detailed records for recent campaign performance (last 100 rows).
+
+toolsets:
+ public_bq_toolset:
+   - search_release_notes_bq
+ media_performance_toolset:
+   - analyze_media_performance
+   - summarize_media_performance
+   - top_campaigns_by_sales
+   - platform_performance_breakdown
+   - daily_performance_trend
+   - campaign_details

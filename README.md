@@ -94,3 +94,26 @@ curl -X DELETE \
 
 - Cloud Build triggers are setup to deploy when main/ has changes on remote
 - Redeploy image with gcloud builds submit --tag us-central1-docker.pkg.dev/{GOOGLE_CLOUD_PROJECT}/fastapi-repo/agent-engine-service:latest .
+
+
+# Working on Tools? 
+
+## Deploy MCP Toolbox to Cloud Run
+https://googleapis.github.io/genai-toolbox/how-to/deploy_toolbox/
+
+### Run MCP Toolbox Server locally before deployment
+- `cd tools/mcp-toolbox ./toolbox --tools-file "tools.yaml" --port 8080`
+
+### Update MCP Toolbox on Cloud Run
+- cd to tools/mcp-toolbox
+- Update deployed tools secret: `gcloud secrets versions add tools --data-file=tools.yaml`
+- Add image to env variable: `export IMAGE=us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:latest`
+- Redeploy Cloud Run service: 
+```curl
+gcloud run deploy toolbox \
+    --image $IMAGE \
+    --service-account toolbox-identity \
+    --region us-central1 \
+    --set-secrets "/app/tools.yaml=tools:latest" \
+    --args="--tools-file=/app/tools.yaml","--address=0.0.0.0","--port=8080"
+```
