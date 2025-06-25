@@ -97,14 +97,19 @@ curl -X DELETE \
 
 
 # Working on Tools? 
+# Custom MCP Servers
+## Guide
+- https://cloud.google.com/blog/topics/developers-practitioners/build-and-deploy-a-remote-mcp-server-to-google-cloud-run-in-under-10-minutes
 
-## Deploy MCP Toolbox to Cloud Run
+## MCP Toolbox
+### Deploy MCP Toolbox to Cloud Run
 https://googleapis.github.io/genai-toolbox/how-to/deploy_toolbox/
 
-### Run MCP Toolbox Server locally before deployment
+#### Run MCP Toolbox Server locally before deployment
 - `cd tools/mcp-toolbox ./toolbox --tools-file "tools.yaml" --port 8080`
+- NOTE: Cannot deploy agent to agent engine with toolbox-core library as MCP handler (pickling issue)
 
-### Update MCP Toolbox on Cloud Run
+#### Update MCP Toolbox on Cloud Run
 - cd to tools/mcp-toolbox
 - Update deployed tools secret: `gcloud secrets versions add tools --data-file=tools.yaml`
 - Add image to env variable: `export IMAGE=us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:latest`

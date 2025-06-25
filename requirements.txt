@@ -24,3 +24,5 @@ pydantic==2.11.*
 yfinance
 matplotlib
 toolbox-core
+uv
+fastmcp==2.6.1

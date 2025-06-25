@@ -30,3 +30,5 @@ uvicorn==0.34.3
 vl-convert-python
 yfinance
 toolbox-core
+uv
+fastmcp==2.6.1
