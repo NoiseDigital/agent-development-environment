@@ -26,6 +26,7 @@ STAGING_BUCKET = f"gs://{os.environ['AI_STORAGE_BUCKET']}"
 # Define requirements (pin versions as needed)
 requirements = [
     "google-cloud-aiplatform[agent_engines,adk]==1.97.0",
+    "google-adk==1.4.2"
 ]
 
 # Optionally include additional directories
