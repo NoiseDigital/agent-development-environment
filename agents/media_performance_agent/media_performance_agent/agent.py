@@ -6,7 +6,7 @@ from toolbox_core import ToolboxSyncClient
 # TOOLBOX_ENDPOINT = "http://localhost:8080"
 
 # Remote URL (deployed Cloud Run MCP Toolbox)
-TOOLBOX_ENDPOINT = "https://toolbox-192748761045.us-central1.run.app"
+TOOLBOX_ENDPOINT = "https://mcp-toolbox-192748761045.us-central1.run.app"
 
 toolbox = ToolboxSyncClient(TOOLBOX_ENDPOINT)
 tools = toolbox.load_toolset("media_performance_toolset")
