@@ -5,7 +5,7 @@ from google.adk.tools.mcp_tool.mcp_session_manager import SseConnectionParams
 # Local URL (after running cd tools/mcp-on-cloudrun python server.py)
 # MCP_SERVER_URL = "http://0.0.0.0:8080/sse"
 
-# Remote URL (deployed Cloud Run MCP Toolbox)
+# Remote URL (deployed Cloud Run MCP Server)
 MCP_SERVER_URL = "https://mcp-math-192748761045.us-central1.run.app/sse"
 
 # NOTE: Must set errlog=None to deploy to Agent Engine

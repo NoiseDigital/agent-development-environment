@@ -42,6 +42,7 @@ async def list_tools() -> list[mcp_types.Tool]:
     print(f"MCP Server: Received list_tools request.\nMCP Server: Advertising tool: {mcp_tool_schema_add.name} and {mcp_tool_schema_subtract.name}")
     return [mcp_tool_schema_add, mcp_tool_schema_subtract]
 
+
 @app.call_tool()
 async def call_tool(
     name: str, arguments: dict

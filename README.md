@@ -202,7 +202,7 @@ root_agent = LlmAgent(
 https://googleapis.github.io/genai-toolbox/how-to/deploy_toolbox/
 
 ### Run MCP Toolbox Server locally
-- `cd tools/mcp-toolbox ./toolbox --tools-file "tools.yaml" --port 8080`
+- `cd tools/mcp/mcp-toolbox && ./toolbox --tools-file "tools.yaml" --port 8080`
 NOTE: Cannot deploy agent to Agent Engine with toolbox-core library as MCP handler (pickling issue)
 
 ### Deploy MCP Toolbox to Cloud Run [container image]
