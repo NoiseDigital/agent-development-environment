@@ -23,9 +23,9 @@
  */
 
 // Connect the server with a WebSocket connection
-const sessionId = Math.random().toString().substring(10);
+const userId = "mockUser";
 const ws_url =
-  "wss://" + window.location.host + "/ws/" + sessionId;
+  "ws://" + window.location.host + "/ws/" + userId; // Must be wss if deploying to cloud run
 let websocket = null;
 let is_audio = false;
 

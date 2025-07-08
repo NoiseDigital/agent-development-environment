@@ -26,5 +26,5 @@ root_agent = Agent(
    # Instructions to set the agent's behavior.
    instruction="Answer the question using the Google Search tool.",
    # Add google_search tool to perform grounding with Google search.
-   tools=[google_search],
+   tools=[],
 )
