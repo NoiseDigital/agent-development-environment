@@ -239,7 +239,10 @@ root_agent = Agent(
 )
 ```
 --------------------
-
+# Working on A2A?
+## Guide: Converting ADK agents for A2A
+https://cloud.google.com/blog/products/ai-machine-learning/unlock-ai-agent-collaboration-convert-adk-agents-for-a2a
+--------------------
 # Working on Web App?
 This repo contains a FastAPI app to list and query all Agent Engine instances.
 

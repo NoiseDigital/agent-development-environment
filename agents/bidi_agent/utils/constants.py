@@ -1,12 +1,12 @@
 ### AGENT CONSTANTS ###
 
 def get_agent_name():
-    return "hello_world_agent"
+    return "bidi_agent"
 
 
 def get_agent_description():
     return """
-    A simple agent that responds to greetings and provides exchange rates.
+    A simple Bidi agent that can do google searches.
     """
 
 
@@ -17,11 +17,11 @@ def get_root_agent_model():
 ### DEPLOYMENT CONSTANTS ###
 
 def get_agent_display_name():
-    return "Hello World Agent"
+    return "Bidi Agent"
 
 def get_agent_display_description():
     return """
-    A simple agent that responds to greetings and provides exchange rates.
+    A simple Bidi agent that can do google searches.
     """
 
 # To be populated after first deployment
