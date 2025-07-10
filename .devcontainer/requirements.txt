@@ -32,3 +32,29 @@ yfinance
 toolbox-core
 uv
 fastmcp==2.6.1
+# Core A2A and Agent SDK packages
+google_adk==1.4.2
+mcp==1.8.0
+
+# Web framework and server
+starlette==0.46.2
+sse-starlette==2.3.6
+
+# HTTP clients and async utilities
+httpx==0.28.1
+httpx-sse==0.4.1
+asyncclick==8.1.8.0
+click==8.2.1
+requests==2.32.4
+
+# Data validation and configuration
+pydantic-core==2.33.2
+pydantic-settings==2.10.1
+python-dotenv==1.1.1
+
+# Web scraping and parsing
+beautifulsoup4==4.12.3
+html2text==2024.2.26
+
+# Utilities
+deprecated

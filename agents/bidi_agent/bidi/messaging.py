@@ -16,7 +16,7 @@ from google.adk.runners import InMemoryRunner, Runner
 from google.adk.agents import LiveRequestQueue
 from google.adk.agents.run_config import RunConfig
 from google.adk.artifacts import GcsArtifactService
-from google.adk.sessions import VertexAiSessionService
+from google.adk.sessions import VertexAiSessionService, InMemorySessionService, DatabaseSessionService
 #
 # ADK Streaming
 #
@@ -43,6 +43,11 @@ try:
 except Exception as e:
     print(f"Error initializing Python VertexAiSessionService: {e}")
 
+try:
+    sqlite_session_service = DatabaseSessionService(db_url="sqlite:///./sessions.db")
+    print(f"Python SQLiteSessionService initialized.")
+except Exception as e:
+    print(f"Error initializing Python SQLiteSessionService: {e}")
 
 def now():
     return time.time()
@@ -56,10 +61,10 @@ async def start_agent_session(user_id, is_audio=False):
     #     agent=root_agent,
     # )
     runner = Runner(
-        app_name=APP_NAME,
+        app_name="test",
         agent=root_agent,
         artifact_service=gcs_service,
-        session_service=vertex_ai_session_service
+        session_service=sqlite_session_service,  # Use SQLite for local testing
     )
     print(f"[DEBUG] Runner created at {now()}")
 
@@ -79,7 +84,7 @@ async def start_agent_session(user_id, is_audio=False):
 
     print(f"[DEBUG] Starting run_live at {now()}")
     live_events = runner.run_live(
-        session=session,
+        session_id=session.id,
         live_request_queue=live_request_queue,
         run_config=run_config,
     )
