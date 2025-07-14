@@ -31,10 +31,7 @@ export function useChat(userId: string = 'user-1') {
         console.log('Available apps:', apps);
         setAvailableApps(apps);
         
-        // Auto-select the first app if available
-        if (apps.length > 0 && !selectedApp) {
-          setSelectedApp(apps[0]);
-        }
+        // Don't auto-select the first app - let user choose from Agent Library
       } catch (err) {
         console.error('Failed to load apps:', err);
         setError(`Failed to load available apps: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -43,7 +40,7 @@ export function useChat(userId: string = 'user-1') {
       }
     };
     loadApps();
-  }, [selectedApp]);
+  }, []);
 
   // Load sessions when app is selected
   useEffect(() => {
