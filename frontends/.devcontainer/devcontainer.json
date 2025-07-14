@@ -1,56 +1,30 @@
 {
-	"name": "Flutter",
-	"build": {
-		"dockerfile": "Dockerfile",
-		"args": {
-			// Modify for your project's intended platforms. These will be installed at container build time.
-			// Alternatively, this can be a step in postCreateCommand below.
-			"ANDROID_SDK_PACKAGES": "build-tools;33.0.2 platforms;android-33 extras;android;m2repository extras;google;m2repository"
-		}
-	},
-	"containerEnv": {
-		"DBUS_SESSION_BUS_ADDRESS": "${localEnv:DBUS_SESSION_BUS_ADDRESS}",
-		"DISPLAY": "${localEnv:DISPLAY}"
-	},
-	"remoteEnv": {
-		"DBUS_SESSION_BUS_ADDRESS": "${localEnv:DBUS_SESSION_BUS_ADDRESS}",
-		"DISPLAY": "${localEnv:DISPLAY}"
-	},
-	"runArgs": [
-		// This device is needed for android emulator to interact with kvm acceleration.
-		// It's strongly advised that you avoid emulation and buy a device instead.
-		"--device=/dev/kvm:/dev/kvm",
-		// This is needed for rendering the linux application.
-		"--device=/dev/dri:/dev/dri",
-		// This could probably be figured out with port mappings, but it makes life a lot easier,
-		// and I have not experienced any port collision scenarios yet.
-		"--network=host",
-		// Similarly, this makes life easier and the use case doesn't really need the security provided.
-		"--privileged",
-		// Increase /tmp shared memory size. Chrome will crash otherwise.
-		"--shm-size=4g",
-		// Mount the host's X11 socket directory. Needed to find the X server.
-		"--volume=/tmp/.X11-unix:/tmp/.X11-unix",
-		// If your host machine does not export this value.
-		// This allows the container's x11 client to authorize draw requests on the host's server.
-		"--volume=${localEnv:XAUTHORITY}:/home/vscode/.Xauthority",
-		// Needed for the linux application to connect to host user's dbus session.
-		"--volume=/run/user/1000/bus:/run/user/1000/bus"
-	],
-	// Set `remoteUser` to `root` to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
-	"remoteUser": "vscode",
-	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "flutter pub get",
-	// Configure tool-specific properties.
-	"customizations": {
-		// Configure properties specific to VS Code.
-		"vscode": {
-			// Add the IDs of extensions you want installed when the container is created.
-			"extensions": [
-				"dart-code.dart-code",
-				"dart-code.flutter",
-				"editorconfig.editorconfig"
-			]
-		}
-	}
+  "name": "FE React Devcontainer",
+  "dockerFile": "Dockerfile",
+  "context": "..",
+  "appPort": ["3000:3000"],
+  "workspaceFolder": "/workspaces/agent-development-environment/frontends",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "editor.formatOnSave": true
+      },
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-typescript-next"
+      ]
+    }
+  },
+  "runArgs": [
+    "--init",
+    "--cap-add=SYS_PTRACE",
+    "--security-opt",
+    "seccomp=unconfined"
+  ],
+  "containerEnv": {
+    "PORT": "3000",
+    "WATCHPACK_POLLING": "true",
+    "CHOKIDAR_USEPOLLING": "true"
+  }
 }
