@@ -81,11 +81,11 @@ export default function ChatSidebar({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center">
             <Image 
-              src="/logo.png" 
+              src="/noise_white.svg" 
               alt="Noise Digital Logo" 
-              width={240}
-              height={64}
-              className="h-15 w-auto"
+              width={120}
+              height={32}
+              className="h-8 w-auto"
             />
           </div>
           {selectedApp && onBackToLibrary && (

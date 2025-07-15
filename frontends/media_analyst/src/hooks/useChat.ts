@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { adkApi, Session, Event, AgentRunRequest } from '../lib/adk-api';
+import { ChartData } from '../types/chart';
+import type { AgentJsonResponse } from '../types/agent-response';
 
 interface ChatMessage {
   id: string;
@@ -9,6 +11,7 @@ interface ChatMessage {
   author: string;
   timestamp: number;
   isStreaming?: boolean;
+  charts?: ChartData[]; // Add charts to message interface
 }
 
 // Helper function to convert ADK timestamp to JavaScript timestamp
@@ -34,6 +37,44 @@ const normalizeTimestamp = (timestamp: number | string): number => {
   return normalizedTimestamp;
 };
 
+// Helper function to parse agent JSON response
+const parseAgentResponse = (text: string): { content: string; charts?: ChartData[] } => {
+  try {
+    // Try to parse as JSON first
+    const parsed: AgentJsonResponse = JSON.parse(text);
+    
+    // Check if it has the expected structure
+    if (parsed && typeof parsed === 'object') {
+      // Handle the new format: { text: "...", visualization: {...} }
+      if (parsed.text !== undefined) {
+        const result: { content: string; charts?: ChartData[] } = {
+          content: parsed.text
+        };
+        
+        // Check for visualization data
+        if (parsed.visualization) {
+          // Handle single chart
+          if (!Array.isArray(parsed.visualization) && parsed.visualization.type && parsed.visualization.data) {
+            result.charts = [parsed.visualization as ChartData];
+          }
+          // Handle multiple charts
+          else if (Array.isArray(parsed.visualization)) {
+            result.charts = parsed.visualization as ChartData[];
+          }
+        }
+        
+        return result;
+      }
+    }
+  } catch (error) {
+    // If parsing fails, treat as plain text
+    console.log('Response is not JSON, treating as plain text:', error);
+  }
+  
+  // Fallback: treat as plain text
+  return { content: text };
+};
+
 // Helper function to convert ADK events to chat messages
 const eventsToMessages = (events: Event[]): ChatMessage[] => {
   return events
@@ -42,11 +83,18 @@ const eventsToMessages = (events: Event[]): ChatMessage[] => {
       // Debug logging to see what we're getting
       console.log('Event timestamp:', event.timestamp, 'Type:', typeof event.timestamp);
       
+      const part = event.content?.parts?.find(part => part.text);
+      const rawText = part?.text || '';
+      
+      // Parse the agent's response (could be JSON or plain text)
+      const parsedResponse = parseAgentResponse(rawText);
+      
       return {
         id: event.id,
-        content: event.content?.parts?.find(part => part.text)?.text || '',
+        content: parsedResponse.content,
         author: event.author,
         timestamp: normalizeTimestamp(event.timestamp),
+        charts: parsedResponse.charts,
       };
     });
 };
@@ -187,31 +235,77 @@ export function useChat(userId: string = 'user-1') {
       };
       setMessages(prev => [...prev, userMessage]);
 
+      // DEMO MODE: Simulate agent returning JSON string responses
+      // TODO: Remove this demo logic once the backend agent returns structured JSON responses
       // Demo mode: Check for chart keywords and add example responses
       const lowerContent = content.toLowerCase();
-      let demoResponse = null;
+      let demoJsonResponse = null;
       
       // Check for trend/time-based queries first (most specific)
       if (lowerContent.includes('trend') || lowerContent.includes('over time') || lowerContent.includes('performance trend')) {
-        demoResponse = "Here's the media performance trend analysis you requested. The data shows interesting patterns in your campaign performance.";
+        demoJsonResponse = JSON.stringify({
+          text: "Here's the media performance trend analysis you requested. The data shows interesting patterns in your campaign performance.",
+          visualization: {
+            type: 'line',
+            title: 'Media Performance Trend',
+            insight: 'Performance shows a steady upward trend with a significant spike in week 4, indicating successful campaign optimization.',
+            data: [
+              { name: 'Week 1', value: 2400 },
+              { name: 'Week 2', value: 1398 },
+              { name: 'Week 3', value: 9800 },
+              { name: 'Week 4', value: 3908 },
+              { name: 'Week 5', value: 4800 },
+              { name: 'Week 6', value: 3800 }
+            ]
+          }
+        });
       } 
       // Check for distribution/share queries
       else if (lowerContent.includes('distribution') || lowerContent.includes('share') || lowerContent.includes('audience')) {
-        demoResponse = "Here's the audience distribution analysis showing how your viewers are distributed across different platforms and devices.";
+        demoJsonResponse = JSON.stringify({
+          text: "Here's the audience distribution analysis showing how your viewers are distributed across different platforms and devices.",
+          visualization: {
+            type: 'pie',
+            title: 'Audience Distribution',
+            insight: 'Mobile users dominate our audience at 45%, followed by desktop users. Tablet usage remains minimal.',
+            data: [
+              { name: 'Mobile', value: 45 },
+              { name: 'Desktop', value: 35 },
+              { name: 'Tablet', value: 8 },
+              { name: 'Smart TV', value: 12 }
+            ]
+          }
+        });
       } 
       // Check for comparison/breakdown queries (less specific, so checked last)
       else if (lowerContent.includes('compare') || lowerContent.includes('breakdown') || lowerContent.includes('categories')) {
-        demoResponse = "I've analyzed your media channels and created a comparison breakdown. Here are the key performance differences across channels.";
+        demoJsonResponse = JSON.stringify({
+          text: "I've analyzed your media channels and created a comparison breakdown. Here are the key performance differences across channels.",
+          visualization: {
+            type: 'bar',
+            title: 'Media Channel Performance',
+            insight: 'Social media and video content are the top performers, while display ads show lower engagement rates.',
+            data: [
+              { name: 'Social Media', value: 4000 },
+              { name: 'Video Content', value: 3000 },
+              { name: 'Blog Posts', value: 2000 },
+              { name: 'Email', value: 2780 },
+              { name: 'Display Ads', value: 1890 }
+            ]
+          }
+        });
       }
 
-      if (demoResponse) {
-        // Add demo response with chart trigger
+      if (demoJsonResponse) {
+        // Simulate the agent response being processed by our parsing logic
         setTimeout(() => {
+          const parsedResponse = parseAgentResponse(demoJsonResponse);
           const demoMessage: ChatMessage = {
             id: `agent-${Date.now()}`,
-            content: demoResponse,
+            content: parsedResponse.content,
             author: 'agent',
             timestamp: Date.now(),
+            charts: parsedResponse.charts,
           };
           setMessages(prev => [...prev, demoMessage]);
           setIsLoading(false);
