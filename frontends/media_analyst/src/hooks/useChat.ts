@@ -228,6 +228,27 @@ export function useChat(userId: string = 'user-1') {
     }
   };
 
+  const deleteSession = async (sessionId: string) => {
+    if (!selectedApp) return;
+    
+    try {
+      await adkApi.deleteSession(selectedApp, userId, sessionId);
+      
+      // Remove the session from the local list
+      setSessions(prev => prev.filter(session => session.id !== sessionId));
+      
+      // If the deleted session was the current one, clear it
+      if (currentSession?.id === sessionId) {
+        setCurrentSession(null);
+        setMessages([]);
+      }
+      
+      setError(null);
+    } catch (err) {
+      setError(`Failed to delete session: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
+
   return {
     availableApps,
     selectedApp,
@@ -241,6 +262,7 @@ export function useChat(userId: string = 'user-1') {
     sendMessage,
     createNewSession,
     selectSession,
+    deleteSession,
     refreshSessions: loadSessions,
     refreshApps: loadAvailableApps,
   };

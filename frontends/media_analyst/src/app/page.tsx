@@ -24,6 +24,7 @@ export default function Home() {
     sendMessage,
     createNewSession,
     selectSession,
+    deleteSession,
   } = useChat();
 
   const handleSelectAgent = async (app: string) => {
@@ -54,6 +55,7 @@ export default function Home() {
             isLoadingApps={isLoadingApps}
             createNewSession={createNewSession}
             selectSession={selectSession}
+            deleteSession={deleteSession}
             onBackToLibrary={handleBackToLibrary}
           />
         </div>
@@ -79,6 +81,7 @@ export default function Home() {
             <MessageList
               messages={messages}
               isLoading={isLoading}
+              selectedApp={selectedApp}
             />
 
             <MessageInput
