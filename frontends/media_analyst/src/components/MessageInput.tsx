@@ -17,6 +17,13 @@ export default function MessageInput({
   onSendMessage 
 }: MessageInputProps) {
   const [inputMessage, setInputMessage] = useState('');
+  const [showExamples, setShowExamples] = useState(false);
+
+  const examplePrompts = [
+    "Show me the performance trend over time",
+    "What's the audience distribution across devices?",
+    "Compare different media categories performance"
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,10 +31,42 @@ export default function MessageInput({
     
     await onSendMessage(inputMessage);
     setInputMessage('');
+    setShowExamples(false);
+  };
+
+  const handleExampleClick = (example: string) => {
+    setInputMessage(example);
+    setShowExamples(false);
   };
 
   return (
     <div className="border-t border-zinc-800 p-6 bg-black">
+      {/* Example prompts */}
+      {selectedApp && currentSession && !isLoading && (
+        <div className="mb-4">
+          <button
+            onClick={() => setShowExamples(!showExamples)}
+            className="text-sm text-zinc-400 hover:text-zinc-300 transition-colors"
+          >
+            💡 Try example questions {showExamples ? '▼' : '▶'}
+          </button>
+          
+          {showExamples && (
+            <div className="mt-2 space-y-2">
+              {examplePrompts.map((prompt, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleExampleClick(prompt)}
+                  className="block w-full text-left p-2 text-sm bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-300 transition-colors"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      
       <form onSubmit={handleSubmit} className="flex space-x-3">
         <input
           type="text"

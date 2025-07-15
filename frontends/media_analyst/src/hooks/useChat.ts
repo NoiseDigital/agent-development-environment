@@ -187,6 +187,38 @@ export function useChat(userId: string = 'user-1') {
       };
       setMessages(prev => [...prev, userMessage]);
 
+      // Demo mode: Check for chart keywords and add example responses
+      const lowerContent = content.toLowerCase();
+      let demoResponse = null;
+      
+      // Check for trend/time-based queries first (most specific)
+      if (lowerContent.includes('trend') || lowerContent.includes('over time') || lowerContent.includes('performance trend')) {
+        demoResponse = "Here's the media performance trend analysis you requested. The data shows interesting patterns in your campaign performance.";
+      } 
+      // Check for distribution/share queries
+      else if (lowerContent.includes('distribution') || lowerContent.includes('share') || lowerContent.includes('audience')) {
+        demoResponse = "Here's the audience distribution analysis showing how your viewers are distributed across different platforms and devices.";
+      } 
+      // Check for comparison/breakdown queries (less specific, so checked last)
+      else if (lowerContent.includes('compare') || lowerContent.includes('breakdown') || lowerContent.includes('categories')) {
+        demoResponse = "I've analyzed your media channels and created a comparison breakdown. Here are the key performance differences across channels.";
+      }
+
+      if (demoResponse) {
+        // Add demo response with chart trigger
+        setTimeout(() => {
+          const demoMessage: ChatMessage = {
+            id: `agent-${Date.now()}`,
+            content: demoResponse,
+            author: 'agent',
+            timestamp: Date.now(),
+          };
+          setMessages(prev => [...prev, demoMessage]);
+          setIsLoading(false);
+        }, 1500);
+        return;
+      }
+
       // Prepare request for ADK API
       const request: AgentRunRequest = {
         appName: selectedApp,
