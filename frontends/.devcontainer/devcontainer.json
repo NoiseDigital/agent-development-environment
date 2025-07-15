@@ -1,5 +1,5 @@
 {
-  "name": "FE React Devcontainer",
+  "name": "React Devcontainer",
   "dockerFile": "Dockerfile",
   "context": "..",
   "appPort": ["3000:3000", "8000:8000"],

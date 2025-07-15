@@ -11,6 +11,47 @@ interface ChatMessage {
   isStreaming?: boolean;
 }
 
+// Helper function to convert ADK timestamp to JavaScript timestamp
+const normalizeTimestamp = (timestamp: number | string): number => {
+  let normalizedTimestamp = timestamp;
+  
+  // If timestamp is a string, try to parse it
+  if (typeof normalizedTimestamp === 'string') {
+    normalizedTimestamp = new Date(normalizedTimestamp).getTime();
+  }
+  
+  // If timestamp seems to be in seconds instead of milliseconds (Unix timestamp)
+  if (normalizedTimestamp < 1000000000000) { // Less than year 2001 in milliseconds
+    normalizedTimestamp = normalizedTimestamp * 1000;
+  }
+  
+  // Fallback to current time if timestamp is invalid
+  if (!normalizedTimestamp || isNaN(normalizedTimestamp) || normalizedTimestamp <= 0) {
+    console.warn('Invalid timestamp detected, using current time:', timestamp);
+    normalizedTimestamp = Date.now();
+  }
+  
+  return normalizedTimestamp;
+};
+
+// Helper function to convert ADK events to chat messages
+const eventsToMessages = (events: Event[]): ChatMessage[] => {
+  return events
+    .filter(event => event.content?.parts?.some(part => part.text))
+    .map(event => {
+      // Debug logging to see what we're getting
+      console.log('Event timestamp:', event.timestamp, 'Type:', typeof event.timestamp);
+      
+      return {
+        id: event.id,
+        content: event.content?.parts?.find(part => part.text)?.text || '',
+        author: event.author,
+        timestamp: normalizeTimestamp(event.timestamp),
+      };
+    });
+};
+
+// Replace with auth to get userId
 export function useChat(userId: string = 'user-1') {
   const [availableApps, setAvailableApps] = useState<string[]>([]);
   const [selectedApp, setSelectedApp] = useState<string | null>(null);
@@ -31,7 +72,6 @@ export function useChat(userId: string = 'user-1') {
         console.log('Available apps:', apps);
         setAvailableApps(apps);
         
-        // Don't auto-select the first app - let user choose from Agent Library
       } catch (err) {
         console.error('Failed to load apps:', err);
         setError(`Failed to load available apps: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -186,18 +226,6 @@ export function useChat(userId: string = 'user-1') {
     } catch (err) {
       setError(`Failed to select session: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
-  };
-
-  // Helper function to convert ADK events to chat messages
-  const eventsToMessages = (events: Event[]): ChatMessage[] => {
-    return events
-      .filter(event => event.content?.parts?.some(part => part.text))
-      .map(event => ({
-        id: event.id,
-        content: event.content?.parts?.find(part => part.text)?.text || '',
-        author: event.author,
-        timestamp: event.timestamp,
-      }));
   };
 
   return {

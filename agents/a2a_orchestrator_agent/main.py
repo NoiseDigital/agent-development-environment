@@ -5,12 +5,13 @@ from google.adk.cli.fast_api import get_fast_api_app
 
 # Get the directory where main.py is located
 AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
-# Example session DB URL (e.g., SQLite)
+# Example session DB URL (e.g., SQLite). Replace with CloudSQL in prod
 SESSION_DB_URL = "sqlite:///./sessions.db"
 # Example allowed origins for CORS
 ALLOWED_ORIGINS = ["http://localhost", "http://localhost:8080", "*"]
 # Set web=True if you intend to serve a web interface, False otherwise
 SERVE_WEB_INTERFACE = True
+TRACE_TO_CLOUD = True
 
 # Call the function to get the FastAPI app instance
 app = get_fast_api_app(
@@ -18,6 +19,7 @@ app = get_fast_api_app(
     session_service_uri=SESSION_DB_URL,
     allow_origins=ALLOWED_ORIGINS,
     web=SERVE_WEB_INTERFACE,
+    trace_to_cloud=TRACE_TO_CLOUD,
 )
 
 # You can add more FastAPI routes or configurations below if needed

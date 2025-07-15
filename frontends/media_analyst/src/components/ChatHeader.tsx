@@ -41,7 +41,7 @@ export default function ChatHeader({
           {/* Title */}
           <h2 className="text-lg font-medium text-white">
             {selectedApp 
-              ? `${selectedApp.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}${currentSession ? ` • Session ${currentSession.id.split('-').pop()}` : ''}`
+              ? `${currentSession ? `${currentSession.id.split('-').pop()}` : ''}`
               : 'Select an Agent to Start'
             }
           </h2>

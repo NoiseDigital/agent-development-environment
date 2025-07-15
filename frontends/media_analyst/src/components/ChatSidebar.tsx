@@ -1,6 +1,31 @@
 'use client';
 
+import Image from 'next/image';
 import { Session } from '../lib/adk-api';
+import { getAgentConfiguration } from '../config/agentConfig';
+
+// Helper function to normalize timestamps (same as in useChat.ts)
+const normalizeTimestamp = (timestamp: number | string): number => {
+  let normalizedTimestamp = timestamp;
+  
+  // If timestamp is a string, try to parse it
+  if (typeof normalizedTimestamp === 'string') {
+    normalizedTimestamp = new Date(normalizedTimestamp).getTime();
+  }
+  
+  // If timestamp seems to be in seconds instead of milliseconds (Unix timestamp)
+  if (normalizedTimestamp < 1000000000000) { // Less than year 2001 in milliseconds
+    normalizedTimestamp = normalizedTimestamp * 1000;
+  }
+  
+  // Fallback to current time if timestamp is invalid
+  if (!normalizedTimestamp || isNaN(normalizedTimestamp) || normalizedTimestamp <= 0) {
+    console.warn('Invalid timestamp detected, using current time:', timestamp);
+    normalizedTimestamp = Date.now();
+  }
+  
+  return normalizedTimestamp;
+};
 
 interface ChatSidebarProps {
   availableApps: string[];
@@ -30,9 +55,15 @@ export default function ChatSidebar({
       {/* Header */}
       <div className="p-6 border-b border-zinc-800">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-medium text-white">
-            Media Analyst
-          </h1>
+          <div className="flex items-center">
+            <Image 
+              src="/logo.png" 
+              alt="Noise Digital Logo" 
+              width={240}
+              height={64}
+              className="h-15 w-auto"
+            />
+          </div>
           {selectedApp && onBackToLibrary && (
             <button
               onClick={onBackToLibrary}
@@ -64,11 +95,14 @@ export default function ChatSidebar({
               className="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-zinc-600 focus:border-transparent"
             >
               <option value="">Choose an agent...</option>
-              {availableApps.map((app) => (
-                <option key={app} value={app} className="bg-zinc-900">
-                  {app.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                </option>
-              ))}
+              {availableApps.map((app) => {
+                const agentConfig = getAgentConfiguration(app);
+                return (
+                  <option key={app} value={app} className="bg-zinc-900">
+                    {agentConfig.displayName}
+                  </option>
+                );
+              })}
             </select>
           </div>
         ) : (
@@ -97,7 +131,11 @@ export default function ChatSidebar({
               {selectedApp ? 'No conversations yet' : 'Select an agent to start'}
             </div>
           ) : (
-            sessions.map((session) => (
+            sessions.map((session) => {
+              // Debug log to see what timestamp we're getting
+              console.log('Session lastUpdateTime:', session.lastUpdateTime, 'Type:', typeof session.lastUpdateTime);
+              
+              return (
               <div
                 key={session.id}
                 onClick={() => selectSession(session.id)}
@@ -108,16 +146,14 @@ export default function ChatSidebar({
                 }`}
               >
                 <h3 className="font-medium text-white text-sm mb-1">
-                  Session {session.id.split('-').pop()}
+                  {session.id.split('-').pop()}
                 </h3>
-                <p className="text-xs text-zinc-400 mb-2">
-                  {session.events.length} messages
-                </p>
                 <p className="text-xs text-zinc-500">
-                  {new Date(session.lastUpdateTime).toLocaleDateString()}
+                  {new Date(normalizeTimestamp(session.lastUpdateTime)).toLocaleDateString()}
                 </p>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
