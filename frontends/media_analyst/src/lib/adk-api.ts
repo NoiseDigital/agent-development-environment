@@ -1,5 +1,5 @@
 // API client for ADK server
-const API_BASE_URL = 'https://agent-a2a-orchestrator-192748761045.us-central1.run.app';
+const API_BASE_URL = 'https://agent-media-performance-192748761045.us-central1.run.app';
 
 // API types based on the OpenAPI spec
 export interface AgentRunRequest {
