@@ -19,11 +19,37 @@ export default function MessageInput({
   const [inputMessage, setInputMessage] = useState('');
   const [showExamples, setShowExamples] = useState(false);
 
-  const examplePrompts = [
-    "Show me the performance trend over time",
-    "What's the audience distribution across devices?",
-    "Compare different media categories performance"
-  ];
+  // Get agent-specific example prompts
+  const getExamplePrompts = (agentName: string | null): string[] => {
+    if (!agentName) return [];
+    
+    // Return agent-specific examples based on the agent type
+    switch (agentName) {
+      case 'media_performance_agent': // Media Analyst
+        return [
+          "Show me the performance trend over time",
+          "What's the sales distribution across campaigns?",
+          "Compare platform performance",
+        ];
+      
+      case 'timesheet_agent': // Timesheet Agent
+        return [
+          "Help me fill out my timesheet for this week",
+          "Show me my time tracking summary",
+          "Submit my completed timesheet"
+        ];
+      
+      default:
+        // Generic examples for unknown agents
+        return [
+          "What can you help me with?",
+          "Show me an overview of available features",
+          "Help me get started"
+        ];
+    }
+  };
+
+  const examplePrompts = getExamplePrompts(selectedApp);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +68,7 @@ export default function MessageInput({
   return (
     <div className="border-t border-zinc-800 p-6 bg-black">
       {/* Example prompts */}
-      {selectedApp && currentSession && !isLoading && (
+      {selectedApp && currentSession && !isLoading && examplePrompts.length > 0 && (
         <div className="mb-4">
           <button
             onClick={() => setShowExamples(!showExamples)}
