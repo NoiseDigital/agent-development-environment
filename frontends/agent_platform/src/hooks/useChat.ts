@@ -43,7 +43,7 @@ const parseAgentResponse = (text: string): { content: string; charts?: ChartData
     // Clean up the text by removing markdown code block formatting
     let cleanText = text.trim();
     
-    // Remove ```json at the beginning and ``` at the end if present
+    // Remove outer ```json at the beginning and ``` at the end if present
     if (cleanText.startsWith('```json')) {
       cleanText = cleanText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
     } else if (cleanText.startsWith('```')) {
@@ -57,8 +57,41 @@ const parseAgentResponse = (text: string): { content: string; charts?: ChartData
     if (parsed && typeof parsed === 'object') {
       // Handle the new format: { text: "...", visualization: {...} }
       if (parsed.text !== undefined) {
+        let textContent = parsed.text;
+        
+        // If the text field itself contains JSON with backticks, clean it up
+        if (typeof textContent === 'string' && textContent.includes('```json')) {
+          // Remove nested JSON backticks from the text content
+          textContent = textContent.replace(/```json\s*/, '').replace(/\s*```$/, '');
+          
+          // Try to parse the nested JSON if it exists
+          try {
+            const nestedParsed = JSON.parse(textContent);
+            if (nestedParsed && typeof nestedParsed === 'object' && nestedParsed.text !== undefined) {
+              // Use the nested structure instead
+              const result: { content: string; charts?: ChartData[] } = {
+                content: nestedParsed.text
+              };
+              
+              // Check for visualization data in nested structure
+              if (nestedParsed.visualization) {
+                if (!Array.isArray(nestedParsed.visualization) && nestedParsed.visualization.type && nestedParsed.visualization.data) {
+                  result.charts = [nestedParsed.visualization as ChartData];
+                } else if (Array.isArray(nestedParsed.visualization)) {
+                  result.charts = nestedParsed.visualization as ChartData[];
+                }
+              }
+              
+              return result;
+            }
+          } catch (nestedError) {
+            console.log('Failed to parse nested JSON, using text as-is:', nestedError);
+            // Fall through to use the text as-is
+          }
+        }
+        
         const result: { content: string; charts?: ChartData[] } = {
-          content: parsed.text
+          content: textContent
         };
         
         // Check for visualization data
