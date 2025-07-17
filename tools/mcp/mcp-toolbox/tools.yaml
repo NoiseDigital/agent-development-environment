@@ -22,32 +22,70 @@ tools:
  analyze_media_performance:
     kind: bigquery-sql
     source: my-bq-source
+    parameters:
+      - name: date_from
+        type: string
+        description: Start date for analysis (YYYY-MM-DD format, optional)
+      - name: date_to
+        type: string
+        description: End date for analysis (YYYY-MM-DD format, optional)
+      - name: campaign_phase_filter
+        type: string
+        description: Filter by campaign phase (optional)
+      - name: publisher_filter
+        type: string
+        description: Filter by publisher (optional)
     statement: |
       SELECT
-        date,
-        ad_campaign,
+        date_time as date,
+        campaign_phase,
+        publisher,
         platform,
         SUM(impressions) AS total_impressions,
-        SUM(sales) AS total_sales,
-        SAFE_DIVIDE(SUM(sales), NULLIF(SUM(impressions), 0)) AS sales_per_impression
+        SUM(spend) AS total_spend,
+        SUM(clicks) AS total_clicks,
+        SAFE_DIVIDE(SUM(clicks), NULLIF(SUM(impressions), 0)) AS click_through_rate,
+        SAFE_DIVIDE(SUM(spend), NULLIF(SUM(impressions), 0)) AS cost_per_impression
       FROM
         `nd-agentspace-sbx.media_performance.performance`
-      GROUP BY date, ad_campaign, platform
-      ORDER BY date DESC, total_sales DESC
+      WHERE
+        (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
+        AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
+        AND (@campaign_phase_filter IS NULL OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', @campaign_phase_filter, '%')))
+        AND (@publisher_filter IS NULL OR LOWER(publisher) LIKE LOWER(CONCAT('%', @publisher_filter, '%')))
+      GROUP BY date_time, campaign_phase, publisher, platform
+      ORDER BY date_time DESC, total_spend DESC
     description: |
-      Analyze media performance by campaign and platform, aggregating impressions and sales, and calculating sales per impression.
+      Analyze media performance by campaign phase, publisher and platform, with optional date and filter parameters.
  summarize_media_performance:
     kind: bigquery-sql
     source: my-bq-source
+    parameters:
+      - name: date_from
+        type: string
+        description: Start date for summary (YYYY-MM-DD format, optional)
+      - name: date_to
+        type: string
+        description: End date for summary (YYYY-MM-DD format, optional)
     statement: |
       SELECT
         SUM(impressions) AS total_impressions,
-        SUM(sales) AS total_sales,
-        COUNT(DISTINCT ad_campaign) AS campaign_count,
-        COUNT(DISTINCT platform) AS platform_count
+        SUM(spend) AS total_spend,
+        SUM(clicks) AS total_clicks,
+        SUM(landing_page_views) AS total_landing_page_views,
+        SUM(brochure_views) AS total_brochure_views,
+        SUM(completed_views) AS total_completed_views,
+        COUNT(DISTINCT campaign_phase) AS campaign_phase_count,
+        COUNT(DISTINCT publisher) AS publisher_count,
+        COUNT(DISTINCT platform) AS platform_count,
+        SAFE_DIVIDE(SUM(clicks), NULLIF(SUM(impressions), 0)) AS overall_ctr,
+        SAFE_DIVIDE(SUM(spend), NULLIF(SUM(clicks), 0)) AS avg_cost_per_click
       FROM `nd-agentspace-sbx.media_performance.performance`
+      WHERE
+        (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
+        AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
     description: |
-      Summarize overall media performance: total impressions, total sales, number of campaigns, and platforms.
+      Summarize overall media performance: total metrics, campaign phases, publishers, platforms and key ratios.
 
  top_campaigns_by_sales:
     kind: bigquery-sql
@@ -96,6 +134,10 @@ tools:
  campaign_details:
     kind: bigquery-sql
     source: my-bq-source
+    parameters:
+      - name: campaign_filter
+        type: string
+        description: Filter by campaign phase (optional)
     statement: |
       SELECT
         date,
@@ -105,10 +147,12 @@ tools:
         impressions,
         sales
       FROM `nd-agentspace-sbx.media_performance.performance`
-      ORDER BY date DESC, ad_campaign
+      WHERE
+        (@campaign_filter IS NULL OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', @campaign_filter, '%')))
+      ORDER BY date DESC, campaign_phase
       LIMIT 100
     description: |
-      Show detailed records for recent campaign performance (last 100 rows).
+      Show detailed records for a specific campaigns performance.
 
 toolsets:
  public_bq_toolset:
@@ -119,4 +163,4 @@ toolsets:
    - top_campaigns_by_sales
    - platform_performance_breakdown
    - daily_performance_trend
-   - campaign_details
+  #  - campaign_details
