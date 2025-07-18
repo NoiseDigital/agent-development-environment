@@ -7,23 +7,25 @@ export interface AgentJsonResponse {
   
   // Optional visualization data
   visualization?: {
-    type: 'line' | 'bar' | 'pie';
+    type: 'line' | 'bar' | 'pie' | 'funnel' | 'area';
     title?: string;
     insight?: string;
     data: Array<{
       name: string;
-      value: number;
-      [key: string]: string | number; // Allow additional properties
+      value?: number;
+      fill?: string;
+      [key: string]: string | number | undefined; // Allow additional properties
     }>;
     config?: Record<string, unknown>; // Optional chart configuration
   } | Array<{
-    type: 'line' | 'bar' | 'pie';
+    type: 'line' | 'bar' | 'pie' | 'funnel' | 'area';
     title?: string;
     insight?: string;
     data: Array<{
       name: string;
-      value: number;
-      [key: string]: string | number;
+      value?: number;
+      fill?: string;
+      [key: string]: string | number | undefined;
     }>;
     config?: Record<string, unknown>;
   }>; // Support multiple charts

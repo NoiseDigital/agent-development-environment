@@ -15,6 +15,7 @@ gcloud run deploy agent-media-performance \
   --source . \
   --region=us-central1 \
   --allow-unauthenticated \
+  --min-instances=1 \
   --port=8080
 
 echo ""

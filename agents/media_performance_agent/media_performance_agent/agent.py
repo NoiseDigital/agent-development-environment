@@ -24,8 +24,9 @@ logger = logging.getLogger(__name__)
 def _build_llm_agent() -> LlmAgent:
     model_name = os.getenv("GOOGLE_MODEL_NAME", "gemini-2.0-flash")
     TOOLBOX_ENDPOINT = os.getenv("TOOLBOX_ENDPOINT", "https://mcp-toolbox-192748761045.us-central1.run.app")
+    # TOOLBOX_ENDPOINT = "http://localhost:8080"
     toolbox = ToolboxSyncClient(TOOLBOX_ENDPOINT)
-    tools = toolbox.load_toolset("media_performance_toolset")
+    tools = toolbox.load_toolset("media_performance_recharts_friendly")
     tools.append(AgentTool(react_charts_agent.root_agent))
     return LlmAgent(
     model=model_name,

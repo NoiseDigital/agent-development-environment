@@ -2,7 +2,7 @@ sources:
  my-bq-source:
    kind: bigquery
    project: nd-agentspace-sbx
-
+## TODO: Rewrite toolset for Noise's media data model and to be better for visualizations
 tools:
  search_release_notes_bq:
    kind: bigquery-sql
@@ -140,19 +140,236 @@ tools:
         description: Filter by campaign phase (optional)
     statement: |
       SELECT
-        date,
-        ad_campaign,
-        ad_id,
+        date_time as date,
+        line_id,
+        campaign_phase,
+        publisher,
         platform,
+        spend,
         impressions,
-        sales
+        clicks,
+        landing_page_views,
+        brochure_views,
+        completed_views
       FROM `nd-agentspace-sbx.media_performance.performance`
       WHERE
         (@campaign_filter IS NULL OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', @campaign_filter, '%')))
-      ORDER BY date DESC, campaign_phase
+      ORDER BY date_time DESC, campaign_phase
       LIMIT 100
     description: |
-      Show detailed records for a specific campaigns performance.
+      Show detailed records for recent campaign performance with optional campaign filter (last 100 rows).
+
+ # Recharts-friendly visualization tools
+ daily_spend_trend:
+    kind: bigquery-sql
+    source: my-bq-source
+    parameters:
+      - name: days_back
+        type: integer
+        description: Number of days to look back (default 30)
+      - name: campaign_phase_filter
+        type: string
+        description: Filter by campaign phase (optional)
+    statement: |
+      SELECT
+        date_time as name,
+        SUM(spend) as value
+      FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
+      WHERE
+        date_time >= DATE_SUB(CURRENT_DATE(), INTERVAL COALESCE(@days_back, 30) DAY)
+        AND (@campaign_phase_filter IS NULL OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', @campaign_phase_filter, '%')))
+      GROUP BY date_time
+      ORDER BY date_time
+    description: |
+      Returns daily spend trend in Recharts format with 'name' (date) and 'value' (spend) columns for line charts.
+
+ publisher_spend_breakdown:
+    kind: bigquery-sql
+    source: my-bq-source
+    parameters:
+      - name: date_from
+        type: string
+        description: Start date (YYYY-MM-DD format, optional)
+      - name: date_to
+        type: string
+        description: End date (YYYY-MM-DD format, optional)
+    statement: |
+      SELECT
+        publisher as name,
+        SUM(spend) as value
+      FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
+      WHERE
+        (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
+        AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
+      GROUP BY publisher
+      ORDER BY value DESC
+      LIMIT 10
+    description: |
+      Returns publisher spend breakdown in Recharts format with 'name' (publisher) and 'value' (spend) for bar/pie charts.
+
+ campaign_performance_comparison:
+    kind: bigquery-sql
+    source: my-bq-source
+    parameters:
+      - name: metric
+        type: string
+        description: Metric to compare (spend, impressions, clicks, landing_page_views)
+      - name: date_from
+        type: string
+        description: Start date (YYYY-MM-DD format, optional)
+      - name: date_to
+        type: string
+        description: End date (YYYY-MM-DD format, optional)
+    statement: |
+      SELECT
+        campaign_phase as name,
+        CASE @metric
+          WHEN 'spend' THEN SUM(spend)
+          WHEN 'impressions' THEN SUM(impressions)
+          WHEN 'clicks' THEN SUM(clicks)
+          WHEN 'landing_page_views' THEN SUM(landing_page_views)
+          ELSE SUM(spend)
+        END as value
+      FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
+      WHERE
+        (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
+        AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
+        AND campaign_phase IS NOT NULL
+      GROUP BY campaign_phase
+      ORDER BY value DESC
+      LIMIT 10
+    description: |
+      Returns campaign phase performance comparison in Recharts format with 'name' (campaign) and 'value' (selected metric).
+
+ platform_engagement_metrics:
+    kind: bigquery-sql
+    source: my-bq-source
+    parameters:
+      - name: date_from
+        type: string
+        description: Start date (YYYY-MM-DD format, optional)
+      - name: date_to
+        type: string
+        description: End date (YYYY-MM-DD format, optional)
+    statement: |
+      SELECT
+        platform as name,
+        SAFE_DIVIDE(SUM(clicks), NULLIF(SUM(impressions), 0)) * 100 as value
+      FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
+      WHERE
+        (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
+        AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
+        AND platform IS NOT NULL
+      GROUP BY platform
+      HAVING SUM(impressions) > 0
+      ORDER BY value DESC
+      LIMIT 10
+    description: |
+      Returns platform click-through rates in Recharts format with 'name' (platform) and 'value' (CTR %) for comparison charts.
+
+ weekly_performance_trend:
+    kind: bigquery-sql
+    source: my-bq-source
+    parameters:
+      - name: weeks_back
+        type: integer
+        description: Number of weeks to look back (default 12)
+      - name: metric
+        type: string
+        description: Metric to trend (spend, impressions, clicks, landing_page_views)
+    statement: |
+      SELECT
+        FORMAT_DATE('%Y-W%U', date_time) as name,
+        CASE @metric
+          WHEN 'spend' THEN SUM(spend)
+          WHEN 'impressions' THEN SUM(impressions)
+          WHEN 'clicks' THEN SUM(clicks)
+          WHEN 'landing_page_views' THEN SUM(landing_page_views)
+          ELSE SUM(spend)
+        END as value
+      FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
+      WHERE
+        date_time >= DATE_SUB(CURRENT_DATE(), INTERVAL COALESCE(@weeks_back, 12) * 7 DAY)
+      GROUP BY FORMAT_DATE('%Y-W%U', date_time)
+      ORDER BY name
+    description: |
+      Returns weekly performance trend in Recharts format with 'name' (week) and 'value' (selected metric) for line charts.
+
+ top_performing_campaigns:
+    kind: bigquery-sql
+    source: my-bq-source
+    parameters:
+      - name: metric
+        type: string
+        description: Metric to rank by (spend, impressions, clicks, landing_page_views)
+      - name: limit_rows
+        type: integer
+        description: Number of top campaigns to return (default 10)
+      - name: date_from
+        type: string
+        description: Start date (YYYY-MM-DD format, optional)
+      - name: date_to
+        type: string
+        description: End date (YYYY-MM-DD format, optional)
+    statement: |
+      SELECT
+        CONCAT(campaign_phase, ' (', publisher, ')') as name,
+        CASE @metric
+          WHEN 'spend' THEN SUM(spend)
+          WHEN 'impressions' THEN SUM(impressions)
+          WHEN 'clicks' THEN SUM(clicks)
+          WHEN 'landing_page_views' THEN SUM(landing_page_views)
+          ELSE SUM(spend)
+        END as value
+      FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
+      WHERE
+        (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
+        AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
+        AND campaign_phase IS NOT NULL
+        AND publisher IS NOT NULL
+      GROUP BY campaign_phase, publisher
+      ORDER BY value DESC
+      LIMIT COALESCE(@limit_rows, 10)
+    description: |
+      Returns top performing campaigns in Recharts format with 'name' (campaign + publisher) and 'value' (selected metric).
+
+ conversion_funnel_data:
+    kind: bigquery-sql
+    source: my-bq-source
+    parameters:
+      - name: campaign_phase_filter
+        type: string
+        description: Filter by campaign phase (optional)
+      - name: date_from
+        type: string
+        description: Start date (YYYY-MM-DD format, optional)
+      - name: date_to
+        type: string
+        description: End date (YYYY-MM-DD format, optional)
+    statement: |
+      WITH funnel_data AS (
+        SELECT
+          SUM(impressions) as impressions,
+          SUM(clicks) as clicks,
+          SUM(landing_page_views) as landing_page_views,
+          SUM(brochure_views) as brochure_views,
+          SUM(completed_views) as completed_views,
+          SUM(application_page_view) as applications
+        FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
+        WHERE
+          (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
+          AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
+          AND (@campaign_phase_filter IS NULL OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', @campaign_phase_filter, '%')))
+      )
+      SELECT 'Impressions' as name, impressions as value FROM funnel_data
+      UNION ALL SELECT 'Clicks' as name, clicks as value FROM funnel_data
+      UNION ALL SELECT 'Landing Page Views' as name, landing_page_views as value FROM funnel_data
+      UNION ALL SELECT 'Brochure Views' as name, brochure_views as value FROM funnel_data
+      UNION ALL SELECT 'Completed Views' as name, completed_views as value FROM funnel_data
+      UNION ALL SELECT 'Applications' as name, applications as value FROM funnel_data
+      ORDER BY value DESC
+    description: |
+      Returns conversion funnel data in Recharts format with 'name' (funnel stage) and 'value' (count) for funnel visualization.
 
 toolsets:
  public_bq_toolset:
@@ -163,4 +380,12 @@ toolsets:
    - top_campaigns_by_sales
    - platform_performance_breakdown
    - daily_performance_trend
-  #  - campaign_details
+   - campaign_details
+ media_performance_recharts_friendly:
+   - daily_spend_trend
+   - publisher_spend_breakdown
+   - campaign_performance_comparison
+   - platform_engagement_metrics
+   - weekly_performance_trend
+   - top_performing_campaigns
+   - conversion_funnel_data
