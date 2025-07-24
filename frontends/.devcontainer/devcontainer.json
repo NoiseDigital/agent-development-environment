@@ -1,0 +1,30 @@
+{
+  "name": "React Devcontainer",
+  "dockerFile": "Dockerfile",
+  "context": "..",
+  "appPort": ["3000:3000", "8000:8000"],
+  "workspaceFolder": "/workspaces/agent-development-environment/frontends",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "editor.formatOnSave": true
+      },
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-typescript-next"
+      ]
+    }
+  },
+  "runArgs": [
+    "--init",
+    "--cap-add=SYS_PTRACE",
+    "--security-opt",
+    "seccomp=unconfined"
+  ],
+  "containerEnv": {
+    "PORT": "3000",
+    "WATCHPACK_POLLING": "true",
+    "CHOKIDAR_USEPOLLING": "true"
+  }
+}

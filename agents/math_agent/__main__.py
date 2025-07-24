@@ -33,28 +33,27 @@ logger = logging.getLogger(__name__)
 def main(host: str, port: int):
     """
     This function initializes and starts the A2A (Agent-to-Agent) server for the
-    MediaPerformanceAgent. It's designed to be run from the command line.
+    MathAgent. It's designed to be run from the command line.
     """
-    logger.info(f"Starting MediaPerformanceAgent Server on http://{host}:{port}")
+    logger.info(f"Starting MathAgent Server on http://{host}:{port}")
 
     # Define the skill that this agent provides.
     skill = AgentSkill(
-        id="MediaPerformanceAgent",
-        name="Media Performance Agent",
-        description="Agent to answer questions about Media Performance.",
-        tags=["media", "performance", "campaign", "analytics"],
+        id="MathAgent",
+        name="Math Agent",
+        description="Agent to answer questions about Math.",
+        tags=["math", "arithmetic", "geometry", "algebra"],
         examples=[
-            "Top campaigns by sales?",
-            "Summarize media performance.",
-            "Platform performance breakdowns."
+            "Add 2+2",
+            "Subtract 10-3"
         ]
     )
 
     # Create an Agent Card, which serves as a public identity and metadata
     agent_card = AgentCard(
-        name="MediaPerformanceAgent",
-        description="Agent to answer questions about campaign media performance.",
-        url="https://agent-media-performance-192748761045.us-central1.run.app/", # Change to localhost when running locally
+        name="MathAgent",
+        description="Agent to answer questions about Math.",
+        url="https://agent-math-192748761045.us-central1.run.app/", # Change to localhost when running locally
         version="1.0.0",
         defaultInputModes=['text'],
         defaultOutputModes=['text'],

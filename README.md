@@ -2,7 +2,7 @@
 
 Work directly in the agents/ directory. 
 
-- Use helpful ADK cli tools like `adk server` and `adk web agents/` for a live testing environment of your Agent functionality
+- Use helpful ADK cli tools like `adk api_server` and `adk web agents/` for a live testing environment of your Agent functionality
 
 ## Deployment
 ### Deploying to Agent Engine

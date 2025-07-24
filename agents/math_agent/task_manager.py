@@ -1,10 +1,10 @@
 
 # =============================================================================
-# agents/media_performance_agent/task_manager.py
+# agents/math_agent/task_manager.py
 # =============================================================================
 # 🎯 Purpose:
 # This file defines the AgentTaskManager, which acts as the bridge between
-# the A2A (Agent-to-Agent) server framework and our specific MediaPerformanceAgent.
+# the A2A (Agent-to-Agent) server framework and our specific MathAgent.
 # It manages the execution of agent tasks, handles input/output, and updates
 # the task status within the A2A system.
 # =============================================================================
@@ -28,7 +28,7 @@ from a2a.utils import (
 from a2a.utils.errors import ServerError
 
 # 🤖 Import the actual agent implementation we want to use
-from agent.agent import MediaPerformanceAgent
+from agent import MathAgent
 
 # -----------------------------------------------------------------------------
 # 🪵 Logging Setup
@@ -37,21 +37,21 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------
-# 🛠️ AgentTaskManager: Manages the execution of the MediaPerformanceAgent
+# 🛠️ AgentTaskManager: Manages the execution of the MathAgent
 # -----------------------------------------------------------------------------
 class AgentTaskManager(AgentExecutor):
     """
-    Implements the AgentExecutor interface to integrate the MediaPerformanceAgent
+    Implements the AgentExecutor interface to integrate the MathAgent
     agent into the A2A server framework. This class is responsible for:
-    - Initializing the MediaPerformanceAgent agent.
+    - Initializing the MathAgent agent.
     - Handling incoming user requests and mapping them to agent invocations.
     - Managing task state updates (e.g., 'working', 'completed').
     - Formatting agent responses into A2A Messages.
     """
 
     def __init__(self):
-        self.agent = MediaPerformanceAgent()
-        logger.info("AgentTaskManager initialized with MediaPerformanceAgent.")
+        self.agent = MathAgent()
+        logger.info("AgentTaskManager initialized with MathAgent.")
 
     async def execute(
         self,

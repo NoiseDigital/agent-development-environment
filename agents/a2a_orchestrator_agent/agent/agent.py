@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 model_name = os.getenv("GOOGLE_MODEL_NAME", "gemini-2.0-flash")
 
 # Retrieve the A2A agent registry base URL from environment variables with a default fallback.
+# NOTE: Update to math agent, media performance agent was taken off A2A
 AGENT_REGISTRY_BASE_URL = "https://agent-media-performance-192748761045.us-central1.run.app"
 
 
