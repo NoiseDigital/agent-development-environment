@@ -1,12 +1,20 @@
 import os
+import logging
 
 import uvicorn
 from google.adk.cli.fast_api import get_fast_api_app
+from google.adk.artifacts import GcsArtifactService
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Get the directory where main.py is located
 AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
-# Example session DB URL (e.g., SQLite). Replace with CloudSQL in prod
-SESSION_DB_URL = "sqlite:///./sessions.db"
+
+gcs_bucket_name_py = "gs://nd-agent-engine-artifacts-sbx"
+
+SESSION_DB_URL = "postgresql+pg8000://postgres:password@35.239.165.179/postgres"
 # Example allowed origins for CORS
 ALLOWED_ORIGINS = ["http://localhost", "http://localhost:8080", "*"]
 # Set web=True if you intend to serve a web interface, False otherwise
@@ -17,16 +25,11 @@ TRACE_TO_CLOUD = True
 app = get_fast_api_app(
     agents_dir=AGENT_DIR,
     session_service_uri=SESSION_DB_URL,
+    artifact_service_uri=gcs_bucket_name_py,
     allow_origins=ALLOWED_ORIGINS,
     web=SERVE_WEB_INTERFACE,
     trace_to_cloud=TRACE_TO_CLOUD,
 )
-
-# You can add more FastAPI routes or configurations below if needed
-# Example:
-# @app.get("/hello")
-# async def read_root():
-#     return {"Hello": "World"}
 
 if __name__ == "__main__":
     # Use the PORT environment variable provided by Cloud Run, defaulting to 8080
