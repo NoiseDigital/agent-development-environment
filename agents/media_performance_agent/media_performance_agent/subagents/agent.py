@@ -328,7 +328,6 @@ When analyzing multi-metric data, focus insights on:
 2. **Click-through rates** - Engagement efficiency  
 3. **Conversion rates** - Landing page views / clicks
 4. **Volume metrics** - Impressions, clicks for scale context
-""",
-    # tools=tools,
+"""
 )
 
