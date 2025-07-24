@@ -5,6 +5,8 @@ import { getAgentConfiguration } from '../config/agentConfig';
 import ChartVisualization from './ChartVisualization';
 import { ChartData } from '../types/chart';
 
+// MessageList component for displaying chat messages
+
 interface ChatMessage {
   id: string;
   content: string;
