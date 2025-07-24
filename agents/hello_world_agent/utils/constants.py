@@ -11,7 +11,7 @@ def get_agent_description():
 
 
 def get_root_agent_model():
-    return "gemini-live-2.5-flash-preview-native-audio"
+    return "gemini-2.5-flash"
 
 
 ### DEPLOYMENT CONSTANTS ###
