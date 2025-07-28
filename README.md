@@ -2,7 +2,14 @@
 
 Work directly in the agents/ directory. 
 
-- Use helpful ADK cli tools like `adk api_server` and `adk web agents/` for a live testing environment of your Agent functionality
+- Use helpful ADK cli tools like `adk api_server` and `adk web agents/` for a live testing environment of your Agent functionality. Before doing login to google using `gcloud auth application-default login`.
+
+in the event the following error is observed: `{"error": "Missing key inputs argument! To use the Google AI API, provide (`api_key`) arguments. To use the Google Cloud API, provide (`vertexai`, `project` & `location`) arguments."}`, the agent you are using requires a `.env` with the following template information:  
+
+`GOOGLE_CLOUD_PROJECT={your-project}`
+`GOOGLE_CLOUD_LOCATION={your-location}`
+`AI_STORAGE_BUCKET={your-storage-bucket}`
+`GOOGLE_GENAI_USE_VERTEXAI=1`
 
 ## Deployment
 ### Deploying to Agent Engine

@@ -33,8 +33,8 @@ toolbox-core
 uv
 fastmcp==2.6.1
 # Core A2A and Agent SDK packages
-google_adk==1.4.2
-mcp==1.8.0
+google_adk
+mcp==1.9.2
 
 # Web framework and server
 starlette==0.46.2
