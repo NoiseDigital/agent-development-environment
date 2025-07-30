@@ -35,13 +35,13 @@ try:
 except Exception as e:
     print(f"Error initializing Python GcsArtifactService: {e}")
 
-try:
-    vertex_ai_session_service = VertexAiSessionService(project=os.environ["GOOGLE_CLOUD_PROJECT"],
-                                                       location=os.environ["GOOGLE_CLOUD_LOCATION"],
-                                                       agent_engine_id="8348011247563702272")
-    print(f"Python VertexAiSessionService initialized.")
-except Exception as e:
-    print(f"Error initializing Python VertexAiSessionService: {e}")
+# try:
+#     vertex_ai_session_service = VertexAiSessionService(project=os.environ["GOOGLE_CLOUD_PROJECT"],
+#                                                        location=os.environ["GOOGLE_CLOUD_LOCATION"],
+#                                                        agent_engine_id="8348011247563702272")
+#     print(f"Python VertexAiSessionService initialized.")
+# except Exception as e:
+#     print(f"Error initializing Python VertexAiSessionService: {e}")
 
 try:
     sqlite_session_service = DatabaseSessionService(db_url="sqlite:///./sessions.db")

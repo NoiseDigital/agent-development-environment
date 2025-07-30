@@ -1,9 +1,9 @@
 # Python Devcontainer Dockerfile
 FROM mcr.microsoft.com/devcontainers/python:3.11
 
-ENV GOOGLE_CLOUD_PROJECT=nd-agentspace-sbx
-ENV GOOGLE_CLOUD_LOCATION=us-central1
-ENV AI_STORAGE_BUCKET=nd-agent-engine-artifacts-sbx
+# ENV GOOGLE_CLOUD_PROJECT=nd-agentspace-sbx
+# ENV GOOGLE_CLOUD_LOCATION=us-central1
+# ENV AI_STORAGE_BUCKET=nd-agent-engine-artifacts-sbx
 
 RUN apt-get update && \
     apt-get install -y curl apt-transport-https ca-certificates gnupg && \
