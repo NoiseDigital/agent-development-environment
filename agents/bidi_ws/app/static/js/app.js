@@ -35,125 +35,11 @@ let appSessionId = localStorage.getItem("appSessionId");
 let websocket = null;
 let is_audio = false;
 
-// const ws_url =
-//   "ws://" + window.location.host + "/ws/" + sessionId;
-
 // Get DOM elements
 const messageForm = document.getElementById("messageForm");
 const messageInput = document.getElementById("message");
 const messagesDiv = document.getElementById("messages");
 let currentMessageId = null;
-
-// WebSocket handlers
-// function connectWebsocket() {
-//   // Connect websocket
-
-//   // Close any existing connection before creating a new one
-//   if (websocket && websocket.readyState !== WebSocket.CLOSED) {
-//     // Prevent the auto-reconnect handler from firing during a manual mode switch.
-//     websocket.onclose = null;
-//     websocket.close();
-//   }
-
-//   let url = `ws://${window.location.host}/ws/${userId}?is_audio=${is_audio}`;
-//   if (appSessionId) {
-//     url += `&session_id=${appSessionId}`
-//   }
-
-//   console.log("Connecting to:", url);
-//   websocket = new WebSocket(url);
-
-//   // Handle connection open
-//   websocket.onopen = function () {
-//     // Connection opened messages
-//     console.log("WebSocket connection opened.");
-//     document.getElementById("messages").textContent = "Connection opened";
-
-//     // Enable the Send button
-//     document.getElementById("sendButton").disabled = false;
-//     addSubmitHandler();
-//   };
-
-//   // Handle incoming messages
-//   websocket.onmessage = function (event) {
-//     // Parse the incoming message
-//     const message_from_server = JSON.parse(event.data);
-//     console.log("[AGENT TO CLIENT] ", message_from_server);
-
-//     // Handle the session confirmation message from the server.
-//     if (message_from_server.type === "session_created") {
-//       const newSessionId = message_from_server.session_id;
-//       if (appSessionId !== newSessionId) {
-//         console.log("Session ID updated by server:", newSessionId);
-//         appSessionId = newSessionId;
-//         localStorage.setItem("appSessionId", appSessionId);
-//       }
-//       return; // This is a control message, not for display.
-//     }
-
-//     // Check if the turn is complete
-//     // if turn complete, add new message
-//     if (
-//       message_from_server.turn_complete &&
-//       message_from_server.turn_complete == true
-//     ) {
-//       currentMessageId = null;
-//       return;
-//     }
-
-//     // Check for interrupt message
-//     if (
-//       message_from_server.interrupted &&
-//       message_from_server.interrupted === true
-//     ) {
-//       // Stop audio playback if it's playing
-//       if (audioPlayerNode) {
-//         audioPlayerNode.port.postMessage({ command: "endOfAudio" });
-//       }
-//       return;
-//     }
-
-//     // If it's audio, play it
-//     if (message_from_server.mime_type == "audio/pcm" && audioPlayerNode) {
-//       audioPlayerNode.port.postMessage(base64ToArray(message_from_server.data));
-//     }
-
-//     // If it's a text, print it
-//     if (message_from_server.mime_type == "text/plain") {
-//       // add a new message for a new turn
-//       if (currentMessageId == null) {
-//         currentMessageId = Math.random().toString(36).substring(7);
-//         const message = document.createElement("p");
-//         message.id = currentMessageId;
-//         // Append the message element to the messagesDiv
-//         messagesDiv.appendChild(message);
-//       }
-
-//       // Add message text to the existing message element
-//       const message = document.getElementById(currentMessageId);
-//       message.textContent += message_from_server.data;
-
-//       // Scroll down to the bottom of the messagesDiv
-//       messagesDiv.scrollTop = messagesDiv.scrollHeight;
-//     }
-//   };
-
-//   // Handle connection close
-//   websocket.onclose = function () {
-//     console.log("WebSocket connection closed.");
-//     document.getElementById("sendButton").disabled = true;
-//     document.getElementById("messages").textContent = "Connection closed";
-//     setTimeout(function () {
-//       console.log("Reconnecting...");
-//       connectWebsocket();
-//     }, 5000);
-//   };
-
-//   websocket.onerror = function (e) {
-//     console.log("WebSocket error: ", e);
-//   };
-// }
-// connectWebsocket();
 
 function connectWebsocket() {
   // This inner function contains all the logic for opening a new connection
@@ -242,22 +128,6 @@ function connectWebsocket() {
     };
   };
 
-  // --- Main Logic ---
-  // This is the entry point for connecting or reconnecting.
-  // First, check if a connection already exists and needs to be closed.
-  // if (websocket && websocket.readyState !== WebSocket.CLOSED) {
-  //   // A connection exists. We need to close it before opening a new one.
-  //   // We temporarily override its onclose handler. This onclose is for a PLANNED reconnection.
-  //   websocket.onclose = () => {
-  //     console.log("Old connection closed deliberately.");
-  //     openSocket(); // Open the new socket only AFTER the old one has closed.
-  //   };
-  //   websocket.close();
-  // } else {
-  //   // No connection exists, so just open a new one. This runs on initial page load.
-  //   openSocket();
-  // }
-
   if (websocket && websocket.readyState !== WebSocket.CLOSED) {
     console.log("Closing old connection...");
     // We don't want any of the old handlers firing, especially onclose.
@@ -334,23 +204,6 @@ let bufferTimer = null;
 // Import the audio worklets
 import { startAudioPlayerWorklet } from "./audio-player.js";
 import { startAudioRecorderWorklet } from "./audio-recorder.js";
-
-// Start audio
-// function startAudio() {
-//   // Start audio output
-//   startAudioPlayerWorklet().then(([node, ctx]) => {
-//     audioPlayerNode = node;
-//     audioPlayerContext = ctx;
-//   });
-//   // Start audio input
-//   startAudioRecorderWorklet(audioRecorderHandler).then(
-//     ([node, ctx, stream]) => {
-//       audioRecorderNode = node;
-//       audioRecorderContext = ctx;
-//       micStream = stream;
-//     }
-//   );
-// }
 
 async function startAudio() {
   // Use Promise.all to wait for both async operations to complete

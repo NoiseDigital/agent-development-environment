@@ -54,12 +54,6 @@ load_dotenv()
 try:
     session_service = DatabaseSessionService(db_url=db_url)
     print(f"DEBUG: Python SQLiteSessionService initialized. Database is {db_url}")
-    RUNNER = Runner(
-        app_name=APP_NAME,
-        agent=root_agent,
-        session_service=session_service
-    )
-    print("DEBUG: Global ADK Runner initialized.")
 except Exception as e:
     print(f"Error initializing Python SQLiteSessionService: {e}")
 
@@ -97,27 +91,16 @@ async def get_or_create_session(user_id, session_id):
 
 async def start_agent_session(user_id, session_id, is_audio=False):
     """Starts an agent session"""
-
-    # Create a Runner
-    # runner = InMemoryRunner(
-    #     app_name=APP_NAME,
-    #     agent=root_agent,
-    # )
     
-    # runner = Runner(
-    #     app_name = APP_NAME,
-    #     agent=root_agent,
-    #     session_service=session_service
-    # )
+    runner = Runner(
+        app_name = APP_NAME,
+        agent=root_agent,
+        session_service=session_service
+    )
 
     # Create a Session
     
     session = await get_or_create_session(user_id, session_id)
-    
-    # session = await runner.session_service.create_session(
-    #     app_name=APP_NAME,
-    #     user_id=user_id, 
-    # )
 
     # Set response modality
     modality = "AUDIO" if is_audio else "TEXT"
@@ -131,11 +114,20 @@ async def start_agent_session(user_id, session_id, is_audio=False):
     live_request_queue = LiveRequestQueue()
 
     # Start agent session
-    live_events = RUNNER.run_live(
+    live_events = runner.run_live(
         session=session,
         live_request_queue=live_request_queue,
         run_config=run_config,
-    )
+    )    
+    
+    ## TODO: Remove when AUDIO history bug is fixed
+    if is_audio:
+        print(f"DEBUG: Priming session {session.id} for audio mode.")
+        # This message is not displayed to the user but primes the agent.
+        prime_content = Content(role="user", parts=[Part.from_text(text="Hello! Let's continue!")])
+        live_request_queue.send_content(content=prime_content)
+    ## END TODO
+        
     return live_events, live_request_queue, session
 
 
@@ -255,7 +247,7 @@ async def websocket_endpoint(
         client_to_agent_messaging(websocket, live_request_queue)
     )
     tasks = [agent_to_client_task, client_to_agent_task]
-
+    
     try:
         # Wait for either task to complete (e.g., on disconnect) or fail
         await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
@@ -263,11 +255,8 @@ async def websocket_endpoint(
         # --- This is the critical cleanup block ---
         print(f"Cleaning up resources for session {session.id}...")
 
-        # 1. Close the queue to stop sending more data to the agent.
         live_request_queue.close()
 
-        # 2. Explicitly cancel the background tasks. This is the "close" signal
-        #    for the live run and is crucial for releasing the runner's resources.
         for task in tasks:
             task.cancel()
 
@@ -275,43 +264,3 @@ async def websocket_endpoint(
         await asyncio.gather(*tasks, return_exceptions=True)
 
         print(f"Client #{user_id_str} disconnected and resources cleaned up.")
-
-# @app.websocket("/ws/{user_id}")
-# async def websocket_endpoint(websocket: WebSocket, user_id: int, is_audio: str, session_id: str | None = None):
-#     """Client websocket endpoint"""
-
-#     # Wait for client connection
-#     print(f"Attempting to connect to websocket")
-#     await websocket.accept()
-#     print(f"Client #{user_id} connected, audio mode: {is_audio}")
-
-#     # Start agent session
-#     user_id_str = str(user_id)
-#     live_events, live_request_queue, session = await start_agent_session(user_id_str, session_id, is_audio == "true")
-    
-#     # Immediately send the session_id to the client so it can save it
-#     session_created_message = {
-#         "type": "session_created",
-#         "session_id": session.id
-#     }
-    
-#     await websocket.send_text(json.dumps(session_created_message))
-#     print(f"Sent session confirmation to client: {session.id}")
-
-#     # Start tasks
-#     agent_to_client_task = asyncio.create_task(
-#         agent_to_client_messaging(websocket, live_events)
-#     )
-#     client_to_agent_task = asyncio.create_task(
-#         client_to_agent_messaging(websocket, live_request_queue)
-#     )
-
-#     # Wait until the websocket is disconnected or an error occurs
-#     tasks = [agent_to_client_task, client_to_agent_task]
-#     await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
-
-#     # Close LiveRequestQueue
-#     live_request_queue.close()
-
-#     # Disconnected
-#     print(f"Client #{user_id} disconnected")
