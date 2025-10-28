@@ -21,7 +21,7 @@ tools:
 
 
  # Recharts-friendly visualization tools
- ## qa done
+ 
  daily_spend_trend:
     kind: bigquery-sql
     source: my-bq-source
@@ -45,7 +45,7 @@ tools:
     description: |
       Returns daily spend trend in Recharts format with 'name' (date) and 'value' (spend) columns for line charts.
  
- ## qa done
+ 
  publisher_spend_breakdown:
     kind: bigquery-sql
     source: my-bq-source
@@ -70,7 +70,7 @@ tools:
     description: |
       Returns publisher spend breakdown in Recharts format with 'name' (publisher) and 'value' (spend) for bar/pie charts.
 
- ## qa done
+ 
  campaign_performance_comparison:
     kind: bigquery-sql
     source: my-bq-source
@@ -106,7 +106,8 @@ tools:
       LIMIT 10
     description: |
       Returns campaign phase performance comparison in Recharts format with 'name' (campaign) and 'value' (selected metric).
-
+ 
+ 
  platform_engagement_metrics:
     kind: bigquery-sql
     source: my-bq-source
@@ -120,56 +121,64 @@ tools:
     statement: |
       SELECT
         platform as name,
-        SAFE_DIVIDE(SUM(clicks), NULLIF(SUM(impressions), 0)) * 100 as value
+        CAST(
+          ROUND(
+            COALESCE(SAFE_DIVIDE(SUM(clicks), SUM(impressions)), 0),
+            4
+          ) as FLOAT64
+        ) as value
       FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
       WHERE
-        (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
-        AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
+        (NULLIF(@date_from, "") IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
+        AND (NULLIF(@date_to, "") IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
         AND platform IS NOT NULL
       GROUP BY platform
-      HAVING SUM(impressions) > 0
       ORDER BY value DESC
       LIMIT 10
     description: |
       Returns platform click-through rates in Recharts format with 'name' (platform) and 'value' (CTR %) for comparison charts.
 
+ 
  weekly_performance_trend:
     kind: bigquery-sql
     source: my-bq-source
     parameters:
       - name: weeks_back
-        type: integer
+        type: string
         description: Number of weeks to look back (default 12)
       - name: metric
         type: string
-        description: Metric to trend (spend, impressions, clicks, landing_page_views)
+        description: Metric to trend (total_spend (default), impressions, clicks, completed_views, landing_page_views, engaged_visits)
     statement: |
       SELECT
         FORMAT_DATE('%Y-W%U', date_time) as name,
-        CASE @metric
-          WHEN 'spend' THEN SUM(spend)
-          WHEN 'impressions' THEN SUM(impressions)
-          WHEN 'clicks' THEN SUM(clicks)
-          WHEN 'landing_page_views' THEN SUM(landing_page_views)
-          ELSE SUM(spend)
+        CASE
+          WHEN @metric = "total_spend" THEN CAST(SUM(total_spend) AS FLOAT64)
+          WHEN @metric = "impressions" THEN CAST(SUM(impressions) AS FLOAT64)
+          WHEN @metric = "clicks" THEN CAST(SUM(clicks) AS FLOAT64)
+          WHEN @metric = "completed_views" THEN CAST(SUM(completed_views) AS FLOAT64)
+          WHEN @metric = "landing_page_views" THEN CAST(SUM(landing_page_views) AS FLOAT64)
+          WHEN @metric = "engaged_visits" THEN CAST(SUM(engaged_visits) AS FLOAT64)
+          ELSE 0
         END as value
       FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
       WHERE
-        date_time >= DATE_SUB(CURRENT_DATE(), INTERVAL COALESCE(@weeks_back, 12) * 7 DAY)
+        date_time >= DATE_SUB(CURRENT_DATE(), INTERVAL (COALESCE(SAFE_CAST(@weeks_back AS INT64), 12) *7) DAY)
       GROUP BY FORMAT_DATE('%Y-W%U', date_time)
       ORDER BY name
     description: |
       Returns weekly performance trend in Recharts format with 'name' (week) and 'value' (selected metric) for line charts.
-
+ 
+ 
  top_performing_campaigns:
     kind: bigquery-sql
     source: my-bq-source
     parameters:
       - name: metric
         type: string
-        description: Metric to rank by (spend, impressions, clicks, landing_page_views)
+        description: Metric to trend (total_spend (default), impressions, clicks, completed_views, landing_page_views, engaged_visits)
       - name: limit_rows
-        type: integer
+        type: string
         description: Number of top campaigns to return (default 10)
       - name: date_from
         type: string
@@ -178,26 +187,46 @@ tools:
         type: string
         description: End date (YYYY-MM-DD format, optional)
     statement: |
+      WITH CalculatedValue AS (
+        SELECT
+          campaign || " - " || publisher as name,
+          CASE
+            WHEN @metric = "total_spend" THEN CAST(SUM(total_spend) AS FLOAT64)
+            WHEN @metric = "impressions" THEN CAST(SUM(impressions) AS FLOAT64)
+            WHEN @metric = "clicks" THEN CAST(SUM(clicks) AS FLOAT64)
+            WHEN @metric = "completed_views" THEN CAST(SUM(completed_views) AS FLOAT64)
+            WHEN @metric = "landing_page_views" THEN CAST(SUM(landing_page_views) AS FLOAT64)
+            WHEN @metric = "engaged_visits" THEN CAST(SUM(engaged_visits) AS FLOAT64)
+            ELSE 0
+          END as value
+        FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+        WHERE
+          (NULLIF(@date_from, "") IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
+          AND (NULLIF(@date_to, "") IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
+          AND campaign IS NOT NULL
+          AND publisher IS NOT NULL
+        GROUP BY campaign, publisher
+      ),
+
+      RankedResults AS (
+        SELECT
+          name,
+          value,
+          -- Now we can simply ORDER BY the 'value' alias
+          ROW_NUMBER() OVER(ORDER BY value DESC) as rn
+        FROM CalculatedValue
+      )
+
       SELECT
-        CONCAT(campaign_phase, ' (', publisher, ')') as name,
-        CASE @metric
-          WHEN 'spend' THEN SUM(spend)
-          WHEN 'impressions' THEN SUM(impressions)
-          WHEN 'clicks' THEN SUM(clicks)
-          WHEN 'landing_page_views' THEN SUM(landing_page_views)
-          ELSE SUM(spend)
-        END as value
-      FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+        name,
+        value
+      FROM RankedResults
       WHERE
-        (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
-        AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
-        AND campaign_phase IS NOT NULL
-        AND publisher IS NOT NULL
-      GROUP BY campaign_phase, publisher
+        rn <= COALESCE(SAFE_CAST(@limit_rows AS INT64), 10)
       ORDER BY value DESC
-      LIMIT COALESCE(@limit_rows, 10)
     description: |
       Returns top performing campaigns in Recharts format with 'name' (campaign + publisher) and 'value' (selected metric).
+
 
  conversion_funnel_data:
     kind: bigquery-sql
@@ -218,22 +247,39 @@ tools:
           SUM(impressions) as impressions,
           SUM(clicks) as clicks,
           SUM(landing_page_views) as landing_page_views,
-          SUM(brochure_views) as brochure_views,
           SUM(completed_views) as completed_views,
-          SUM(application_page_view) as applications
+          SUM(total_spend) as total_spend,
+          SUM(engaged_visits) as engaged_visits
         FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
         WHERE
-          (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
-          AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
-          AND (@campaign_phase_filter IS NULL OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', @campaign_phase_filter, '%')))
+          (NULLIF(@date_from, "") IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
+          AND (NULLIF(@date_to, "") IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
+          AND (@campaign_phase_filter IS NULL OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', trim(@campaign_phase_filter), '%')))
       )
-      SELECT 'Impressions' as name, impressions as value FROM funnel_data
-      UNION ALL SELECT 'Clicks' as name, clicks as value FROM funnel_data
-      UNION ALL SELECT 'Landing Page Views' as name, landing_page_views as value FROM funnel_data
-      UNION ALL SELECT 'Brochure Views' as name, brochure_views as value FROM funnel_data
-      UNION ALL SELECT 'Completed Views' as name, completed_views as value FROM funnel_data
-      UNION ALL SELECT 'Applications' as name, applications as value FROM funnel_data
-      ORDER BY value DESC
+      -- Final SELECT: Unpivot the data and map to friendly names
+      SELECT
+        -- Map the raw column name to a friendly 'name'
+        CASE name
+          WHEN 'impressions' THEN 'Impressions'
+          WHEN 'clicks' THEN 'Clicks'
+          WHEN 'landing_page_views' THEN 'Landing Page Views'
+          WHEN 'completed_views' THEN 'Completed Views'
+          WHEN 'total_spend' THEN 'Total Spend'
+          WHEN 'engaged_visits' THEN 'Engaged Visits'
+        END as name,
+        ROUND(SAFE_CAST( value AS FLOAT64),2) as value
+      FROM funnel_data
+      -- UNPIVOT turns columns into rows
+      UNPIVOT(value FOR name IN (
+          impressions,
+          clicks,
+          landing_page_views,
+          completed_views,
+          total_spend,
+          engaged_visits
+        )
+      )
+      ORDER BY name ASC
     description: |
       Returns conversion funnel data in Recharts format with 'name' (funnel stage) and 'value' (count) for funnel visualization.
 
