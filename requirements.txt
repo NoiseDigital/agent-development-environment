@@ -1,7 +1,7 @@
 fastapi==0.115.12
 uvicorn==0.34.3
-google-cloud-aiplatform[adk,agent_engines]==1.99.0
-google-cloud-aiplatform==1.99.0
+google-cloud-aiplatform[adk,agent_engines]
+google-cloud-aiplatform
 a2a-sdk==0.2.*
 git+https://github.com/google/adk-python.git@main
 streamlit
@@ -10,7 +10,7 @@ platformdirs
 Flask
 gunicorn
 scikit-learn
-google-genai==1.21.1
+google-genai
 pillow
 pandas
 google-cloud-bigquery[pandas]
