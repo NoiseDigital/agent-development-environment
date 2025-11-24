@@ -3,7 +3,8 @@ sources:
    kind: bigquery
    project: nd-agentspace-sbx
 
- # Recharts-friendly visualization tools
+
+tools:
  
  daily_spend_trend:
     kind: bigquery-sql
@@ -267,8 +268,6 @@ sources:
       Returns conversion funnel data in Recharts format with 'name' (funnel stage) and 'value' (count) for funnel visualization.
 
 toolsets:
- public_bq_toolset:
-   - search_release_notes_bq
  media_performance_recharts_friendly:
    - daily_spend_trend
    - publisher_spend_breakdown
