@@ -1,22 +1,32 @@
 {
-    "name": "Agent Development Environment",
-    "build": {
-        "dockerfile": "Dockerfile"
+    "name": "Agent Platform",
+    "dockerComposeFile" : "../docker-compose.yml",
+    "workspaceFolder": "/workspace",
+    "service": "devcontainer",
+    "containerEnv": {
+        "APP_PATH": "${containerWorkspaceFolder}",
+        "SHELL": "/bin/bash"
     },
+    "forwardPorts": [8000, 5000, 3000, 5432],
+    "portsAttributes": {
+        "8000": {"label": "ADK Agent Server"},
+        "5000": {"label": "MCP Toolbox"},
+        "3000": {"label": "Frontend"},
+        "5432": {"label": "PostgreSQL"}
+    },
+    "postCreateCommand": "uv sync --project /workspace/services/backend/agents",
     "customizations": {
         "vscode": {
-            "settings": {
-                "python.pythonPath": "/usr/local/bin/python",
-                "terminal.integrated.defaultProfile.linux": "bash"
-            },
             "extensions": [
                 "ms-python.python",
                 "ms-python.vscode-pylance",
+                "ms-python.black-formatter",
                 "HashiCorp.terraform",
+                "charliermarsh.ruff",
+                "tamasfe.even-better-toml",
                 "hediet.vscode-drawio"
             ]
         }
     },
-    "forwardPorts": [8080],
-    "remoteUser": "vscode"
+    "remoteUser": "root"
 }

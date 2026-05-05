@@ -1,264 +1,124 @@
-# Working on Agents?
+# Noise Agent Platform
 
-Work directly in the agents/ directory. 
+Internal platform for building, running, and iterating on AI agents. Provides a Next.js agent library UI, and a multi-agent backend, and an MCP layer.
 
-- Use helpful ADK cli tools like `adk api_server` and `adk web agents/` for a live testing environment of your Agent functionality. Before doing login to google using `gcloud auth application-default login`.
+## Stack
 
-in the event the following error is observed: `{"error": "Missing key inputs argument! To use the Google AI API, provide (`api_key`) arguments. To use the Google Cloud API, provide (`vertexai`, `project` & `location`) arguments."}`, the agent you are using requires a `.env` with the following template information:  
+| Service | Tech | Port |
+|---|---|---|
+| `frontend` | Next.js 15 | 3000 |
+| `agent` | Google ADK + FastAPI + uvicorn | 8000 |
+| `mcp` | MCP Toolbox v1.1.0 | 5000 |
+| `postgres` | PostgreSQL 16 | 5432 |
 
-`GOOGLE_CLOUD_PROJECT={your-project}`
-`GOOGLE_CLOUD_LOCATION={your-location}`
-`AI_STORAGE_BUCKET={your-storage-bucket}`
-`GOOGLE_GENAI_USE_VERTEXAI=1`
+## Prerequisites
 
-## Deployment
-### Deploying to Agent Engine
-- Run the deploy.py script in your agents directory to push the agent to Agent Engine
-    - Note the Resource ID of your Agent Engine instance, and add it to your utils/constants.py file for when you want to update a deployed Agent Engine instance. 
-- Your Agent is now built and deployed to a cloud environment, where the runtime is fully managed. The Agent can always be tested locally, but is now accessible to remote endpoints, meaning it is much easier to build into a web application.
+- Docker Desktop
+- Copy `.env.example` to `.env` and fill in GCP project details:
+  ```bash
+  cp .env.example .env
+  ```
 
-### Deploying to Cloud Run [from source]
-#### ADK
-There is a streamlined ADK command for deploying an agent to cloud run. While it is fast, it is not flexible.
+## Getting Started
 
-An example of this can be found in the `math_agent`.
-
-- Run the following command from your agent's directory to deploy your agent to a Cloud Run instance. Some pro's to this are that the ADK Web UI are accessible through the Cloud Run URL. As well, there is more flexibilty in orchestrating containers. 
-```curl
-adk deploy cloud_run \
-    --project=$GOOGLE_CLOUD_PROJECT \
-    --region=$GOOGLE_CLOUD_LOCATION \
-    --service_name=$SERVICE_NAME \
-    --app_name=$APP_NAME \
-    --with_ui \
-    $AGENT_PATH
-```
-#### gcloud
-More setup is required, but for more flexibility, opt for gcloud to deploy an Agent.
-An example of this can be found in the `media_performance_agent`, where the agent uses an unpickleable method to access the MCP Toolbox. It cannot be deployed through the adk command as no extra packages can be defined. 
-
-For deploying one cloud run service for one agent
-```curl
-agents/
-├── agent_1_name/
-├────── agent_1_name/    # Directory for agent code
-│       ├── __init__.py
-│       └── agent.py    
-├────── main.py            # FastAPI application entry point
-├────── requirements.txt   # Python dependencies
-└────── Dockerfile         # Container build instructions
+```bash
+git clone <repo>
+cd agent-development-environment
+./first_start.sh
 ```
 
-For deploying one cloud run service for multiple agents (not recommended)
-```curl
-agents/
-├── agent_1_name/
-│   ├── __init__.py
-│   └── agent.py
-├── agent_2_name/
-│   ├── __init__.py
-│   └── agent.py    
-├── main.py            # FastAPI application entry point
-├── requirements.txt   # Python dependencies
-└── Dockerfile         # Container build instructions
+`first_start.sh` detects whether GCP credentials exist in the Docker volume, opens a browser for `gcloud auth application-default login` if not, then starts all services. On subsequent runs, use `docker compose up` directly — credentials are already cached in the volume.
+
+```bash
+docker compose up           # normal start
+docker compose up --build   # rebuild images
+docker compose up -d        # detached mode
 ```
 
+> **Windows?** Use `first_start.ps1` instead of `first_start.sh`.
 
-### Integrating Agent to Agentspace?
+| URL | Description |
+|---|---|
+| http://localhost:3000 | Frontend chat UI |
+| http://localhost:8000/dev-ui | ADK API / dev UI |
+| http://localhost:5000/ui | MCP Toolbox UI |
 
-Agentspace supports hosting deployed Agent Engine instances. Once an Agent is deployed to Agent Engine, the following commands can manage Agentspace integration.
+## Project Structure
 
-Example for Timesheet Agent:
-
-- Add Agent Engine Agent to Agentspace
-```curl
-curl -X POST \
-    -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-    -H "Content-Type: application/json" \
-    -H "X-Goog-User-Project: {GOOGLE_CLOUD_PROJECT}" \
-    "https://discoveryengine.googleapis.com/v1alpha/projects/{GOOGLE_CLOUD_PROJECT}/locations/{AGENTSPACE_APP_LOCATION}/collections/default_collection/engines/{AGENTSPACE_APP_ID}/assistants/default_assistant/agents" \
-    -d '{
-            "displayName": "Timesheet Agent",
-            "description": "Agent to help users populate and submit their timesheets.",
-            "icon": {
-                "uri": "PUBLIC_URI"
-                },
-            "adk_agent_definition": {
-                "tool_settings": {
-                    "tool_description": "Agent to help users populate and submit their timesheets by sourcing active work from Asana and Outlook, and submitting it to Intacct."
-                },
-            "provisioned_reasoning_engine": {
-                "reasoning_engine":
-                "projects/{GOOGLE_CLOUD_PROJECT}/locations/{AGENT_ENGINE_LOCATION}/reasoningEngines/{AGENT_ENGINE_ID}"
-                },
-            }
-        }'
+```
+services/
+├── frontend/               # Next.js chat UI
+├── backend/
+│   ├── agents/             # ADK agents + FastAPI host
+│   │   ├── adk_agents/     # Individual agent packages
+│   │   └── main.py         # get_fast_api_app() entrypoint
+│   ├── mcp/                # MCP Toolbox server + tools.yaml
+│   └── database/           # Postgres
+terraform/                  # GCP infrastructure
 ```
 
-- List Agents in Agentspace
-```curl
-curl -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-    -H "Content-Type: application/json" \
-    -H "X-Goog-User-Project: {GOOGLE_CLOUD_PROJECT}" \
-    "https://discoveryengine.googleapis.com/v1alpha/projects/{GOOGLE_CLOUD_PROJECT}/locations/{AGENTSPACE_APP_LOCATION}/collections/default_collection/engines/{AGENTSPACE_APP_ID}/assistants/default_assistant/agents"
-```
+## Adding an Agent
 
-- Update Agent in Agentspace
-```curl
-curl -X PATCH \
-    -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-    -H "Content-Type: application/json" \
-    -H "X-Goog-User-Project: {GOOGLE_CLOUD_PROJECT}" \
-    "https://discoveryengine.googleapis.com/v1alpha/projects/{GOOGLE_CLOUD_PROJECT}/locations/{AGENTSPACE_APP_LOCATION}/collections/default_collection/engines/{AGENTSPACE_APP_ID}/assistants/default_assistant/agents/{AGENTSPACE_AGENT_ID}" \
-    -d '{
-            "displayName": "DISPLAY NAME",
-            "description": "DISPLAY DESCRIPTION",
-            "icon": {
-                "uri": "PUBLIC_URI"
-            },
-            "adk_agent_definition": {
-                "tool_settings": {
-                    "tool_description": "DESCRIPTION OF AGENT GOALS, USED FOR GENERATING INTRO IN CHAT SESSION"
-                },
-                "provisioned_reasoning_engine": {
-                    "reasoning_engine":
-                    "projects/{GOOGLE_CLOUD_PROJECT}/locations/{AGENT_ENGINE_LOCATION}/reasoningEngines/{AGENT_ENGINE_ID}"
-                }
-            }
-        }'
-```
+1. Create a directory under `services/backend/agents/adk_agents/<agent_name>/`
+2. Add `__init__.py` and `agent.py` with a `root_agent` variable
+3. The ADK server auto-discovers it — no registration needed
+4. Add display config in `services/frontend/src/config/agentConfig.tsx`
 
-- Delete Agent in Agentspace
-```curl
-curl -X DELETE \
-    -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-    -H "Content-Type: application/json" \
-    -H "X-Goog-User-Project: {GOOGLE_CLOUD_PROJECT}" \
-    "https://discoveryengine.googleapis.com/v1alpha/projects/{GOOGLE_CLOUD_PROJECT}/locations/{AGENTSPACE_APP_LOCATION}/collections/default_collection/engines/{AGENTSPACE_APP_ID}/assistants/default_assistant/agents/{AGENTSPACE_AGENT_ID}"
-```
---------------------
-
-# Working on Tools? 
-## MCP Servers
-### Guide: Build and Deploy a Remote MCP Server to Google Cloud Run in Under 10 Minutes
-- https://cloud.google.com/blog/topics/developers-practitioners/build-and-deploy-a-remote-mcp-server-to-google-cloud-run-in-under-10-minutes
-
-### Run MCP Server Locally
-- Navigate to tool folder, run server
-- Point Agent's MCPToolset URL to local address
-```python
-from google.adk.agents.llm_agent import LlmAgent
-from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
-from google.adk.tools.mcp_tool.mcp_session_manager import SseConnectionParams
-
-# Local URL (after running cd tools/mcp-on-cloudrun python server.py)
-MCP_SERVER_URL = "http://0.0.0.0:8080/sse"
-
-# NOTE: Must set errlog=None to deploy to Agent Engine
-tools = MCPToolset(
-    connection_params=SseConnectionParams(
-        url=MCP_SERVER_URL
-    ),
-    errlog=None
-)
-
-root_agent = LlmAgent(
-    model='gemini-2.0-flash',
-    name='math_agent',
-    instruction="""
-        You do math with tools
-      """,
-    tools=[tools],
-)
-```
-
-### Deploy MCP Server to Cloud Run [from source]
-```curl
-cd tools/mcp/$TOOL_NAME && gcloud run deploy mcp-$TOOL_NAME --no-allow-unauthenticated --region=$REGION --source .
-```
-
-### Use MCP Server Tool in ADK Agent
-```python
-from google.adk.agents.llm_agent import LlmAgent
-from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
-from google.adk.tools.mcp_tool.mcp_session_manager import SseConnectionParams
-
-# Remote URL (deployed Cloud Run MCP Toolbox)
-MCP_SERVER_URL = "https://{CLOUD_RUN_URL}.us-central1.run.app/sse"
-
-# NOTE: Must set errlog=None to deploy to Agent Engine
-tools = MCPToolset(
-    connection_params=SseConnectionParams(
-        url=MCP_SERVER_URL
-    ),
-    errlog=None
-)
-
-root_agent = LlmAgent(
-    model='gemini-2.0-flash',
-    name='math_agent',
-    instruction="""
-        You do math with tools
-      """,
-    tools=[tools],
-)
-```
-
-## MCP Toolbox
-### Guide: Deploy MCP Toolbox to Cloud Run
-https://googleapis.github.io/genai-toolbox/how-to/deploy_toolbox/
-
-### Run MCP Toolbox Server locally
-- `cd tools/mcp/mcp-toolbox && ./toolbox --tools-file "tools.yaml" --port 8080`
-NOTE: Cannot deploy agent to Agent Engine with toolbox-core library as MCP handler (pickling issue)
-
-### Deploy MCP Toolbox to Cloud Run [container image]
-- cd to tools/mcp-toolbox
-- Update deployed tools secret: `gcloud secrets versions add tools --data-file=tools.yaml`
-- Add image to env variable: `export IMAGE=us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:latest`
-- Redeploy Cloud Run service: 
-```curl
-gcloud run deploy mcp-toolbox \
-    --image $IMAGE \
-    --service-account toolbox-identity \
-    --region us-central1 \
-    --set-secrets "/app/tools.yaml=tools:latest" \
-    --args="--tools-file=/app/tools.yaml","--address=0.0.0.0","--port=8080"
-```
-
-### Use MCP Toolbox Tool in ADK Agent
+**Minimal `agent.py`:**
 ```python
 from google.adk.agents import Agent
-from toolbox_core import ToolboxSyncClient
-
-# Remote URL (deployed Cloud Run MCP Toolbox)
-TOOLBOX_ENDPOINT = "https://{CLOUD_RUN_URL}.us-central1.run.app"
-
-toolbox = ToolboxSyncClient(TOOLBOX_ENDPOINT)
-tools = toolbox.load_toolset(TOOLSET_NAME_IN_YAML)
 
 root_agent = Agent(
-    name="mcp_toolbox_agent",
-    model="gemini-2.0-flash",
-    description="Agent that uses MCP Toolbox tools.",
-    instruction="You are a helpful agent who uses tools.",
-    tools=tools,
+    name="my_agent",
+    model="gemini-2.5-flash",
+    instruction="You are a helpful assistant.",
 )
 ```
---------------------
-# Working on A2A?
-## Guide: Converting ADK agents for A2A
-https://cloud.google.com/blog/products/ai-machine-learning/unlock-ai-agent-collaboration-convert-adk-agents-for-a2a
---------------------
-# Working on Web App?
-This repo contains a FastAPI app to list and query all Agent Engine instances.
 
-## Local Server
+## Using MCP Toolbox
 
-- Run `uvicorn main:app` to start up a local server for FastAPI
-- Go to `http://127.0.0.1:8000/docs` to test API via swagger
+Tools are defined in `services/backend/mcp/mcp-toolbox/tools.yaml` using the v1.0+ flat document format. The MCP service is available at `http://mcp:5000` inside the Docker network.
 
-## Cloud Run Deployment
+> **Note:** MCP Toolbox server v1.1.0 speaks protocol `2025-03-26`. Pass `protocol=Protocol.MCP_v20250326` to `ToolboxSyncClient` to avoid a version mismatch error until the server supports a newer protocol spec.
 
-- Cloud Build triggers are setup to deploy when main/ has changes on remote
-- Redeploy image with gcloud builds submit --tag us-central1-docker.pkg.dev/{GOOGLE_CLOUD_PROJECT}/fastapi-repo/agent-engine-service:latest .
+```python
+import os
+from toolbox_core import ToolboxSyncClient
+from toolbox_core.protocol import Protocol
+
+TOOLBOX_ENDPOINT = os.getenv("TOOLBOX_ENDPOINT", "http://mcp:5000")
+toolbox = ToolboxSyncClient(TOOLBOX_ENDPOINT, protocol=Protocol.MCP_v20250326)
+tools = toolbox.load_toolset("my_toolset")
+```
+
+## Environment Variables
+
+Key variables with their defaults (set in `.env` or shell to override):
+
+| Variable | Default | Description |
+|---|---|---|
+| `GOOGLE_CLOUD_PROJECT` | `nd-agentspace-sbx` | GCP project |
+| `GOOGLE_CLOUD_LOCATION` | `northamerica-northeast1` | GCP region |
+| `GOOGLE_MODEL_NAME` | `gemini-2.5-flash` | Default model |
+| `TOOLBOX_ENDPOINT` | `http://mcp:5000` | MCP Toolbox URL |
+| `AGENTS_BASE_URL` | `http://localhost:8000` | Agent API (browser-side) |
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming, commit conventions, and guidelines for adding agents and tools.
+
+## Deployment
+
+TODO CI/CD
+
+### MCP Toolbox to Cloud Run
+
+```bash
+export IMAGE=us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:1.1.0
+gcloud run deploy mcp-toolbox \
+  --image $IMAGE \
+  --service-account toolbox-identity \
+  --region us-central1 \
+  --set-secrets "/app/tools.yaml=tools:latest" \
+  --args="--config=/app/tools.yaml","--address=0.0.0.0","--port=8080"
+```
