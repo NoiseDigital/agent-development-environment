@@ -163,25 +163,56 @@ export class ADKApiClient {
     return response.json();
   }
 
-  // Streaming version using Server-Sent Events
-  async sendMessageStreaming(request: AgentRunRequest): Promise<EventSource> {
+  async *sendMessageSSE(request: AgentRunRequest): AsyncGenerator<Event, void, unknown> {
     const baseUrl = this.getBaseUrl(request.appName);
-    const streamingRequest = { ...request, streaming: true };
-    
     const response = await fetch(`${baseUrl}/run_sse`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(streamingRequest),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...request, streaming: true }),
     });
-    
-    if (!response.ok) throw new Error('Failed to start streaming');
-    
-    // For SSE, we need to make a separate connection
-    // This is a simplified approach - you might need to adjust based on your ADK server implementation
-    const eventSource = new EventSource(`${baseUrl}/run_sse`);
-    return eventSource;
+
+    if (!response.ok) throw new Error(`SSE request failed: ${response.status}`);
+    if (!response.body) throw new Error('No response body');
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (!data || data === '[DONE]') continue;
+          try {
+            yield JSON.parse(data) as Event;
+          } catch {
+            // skip malformed SSE lines
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  async nameSession(appName: string, messages: Array<{ content: string; role: string }>): Promise<string> {
+    const baseUrl = this.getBaseUrl(appName);
+    const response = await fetch(`${baseUrl}/name_session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages }),
+    });
+    if (!response.ok) throw new Error('Failed to name session');
+    const data = await response.json();
+    return data.name as string;
   }
 }
 

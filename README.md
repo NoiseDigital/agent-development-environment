@@ -1,15 +1,16 @@
-# Noise Agent Platform
+<p align="center">
+  <img src="assets/noise_agent_platform_icon.png" alt="Noise Agent Platform" width="500" />
+</p>
 
-Internal platform for building, running, and iterating on AI agents. Provides a Next.js agent library UI, and a multi-agent backend, and an MCP layer.
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white" alt="Next.js 15" />
+  <img src="https://img.shields.io/badge/Google_ADK-1.32.0-4285F4?logo=google&logoColor=white" alt="Google ADK 1.32.0" />
+  <img src="https://img.shields.io/badge/MCP_Toolbox-1.1.0-00897B" alt="MCP Toolbox 1.1.0" />
+  <img src="https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white" alt="Python 3.13" />
+  <img src="https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white" alt="PostgreSQL 16" />
+</p>
 
-## Stack
-
-| Service | Tech | Port |
-|---|---|---|
-| `frontend` | Next.js 15 | 3000 |
-| `agent` | Google ADK + FastAPI + uvicorn | 8000 |
-| `mcp` | MCP Toolbox v1.1.0 | 5000 |
-| `postgres` | PostgreSQL 16 | 5432 |
+<p align="center">Internal platform for building, running, and iterating on AI agents. Provides a Next.js agent library UI, a multi-agent backend, and an MCP layer.</p>
 
 ## Prerequisites
 
@@ -42,6 +43,7 @@ docker compose up -d        # detached mode
 | http://localhost:3000 | Frontend chat UI |
 | http://localhost:8000/dev-ui | ADK API / dev UI |
 | http://localhost:5000/ui | MCP Toolbox UI |
+| http://localhost:5432 | Postgres DB |
 
 ## Project Structure
 

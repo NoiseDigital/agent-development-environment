@@ -1,0 +1,36 @@
+repos:
+  # Ruff — Python linter + formatter (replaces flake8/black/isort)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.10
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # General hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      # Python
+      - id: check-ast
+      - id: debug-statements
+      # Security
+      - id: detect-private-key
+      # Size guard (warn on files > 1 MB)
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+
+  # Terraform formatting
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.99.4
+    hooks:
+      - id: terraform_fmt
+        files: \.tf$

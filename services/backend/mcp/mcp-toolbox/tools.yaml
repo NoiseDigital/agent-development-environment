@@ -167,7 +167,7 @@ statement: |
 description: |
   Show detailed records for recent campaign performance with optional campaign filter (last 100 rows).
 ---
-Recharts-friendly visualization tools
+# Recharts-friendly visualization tools
 kind: tool
 name: daily_spend_trend
 type: bigquery-sql

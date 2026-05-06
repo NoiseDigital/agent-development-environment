@@ -7,6 +7,10 @@ export interface AgentConfig {
   description: string;
   url: string;
   icon: React.ReactElement;
+  /** Completely hide this agent from the library UI */
+  hidden?: boolean;
+  /** Show in library but disabled with a "Coming Soon" badge */
+  comingSoon?: boolean;
 }
 
 // Complete agent configurations

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { adkApi, Session, Event, AgentRunRequest } from '../lib/adk-api';
+import { adkApi, Session, AgentRunRequest } from '../lib/adk-api';
 import { ChartData } from '../types/chart';
 import type { AgentJsonResponse } from '../types/agent-response';
 
@@ -11,33 +11,35 @@ interface ChatMessage {
   author: string;
   timestamp: number;
   isStreaming?: boolean;
-  charts?: ChartData[]; // Add charts to message interface
+  charts?: ChartData[];
 }
 
-// Helper function to convert ADK timestamp to JavaScript timestamp
+// ── Timestamp normalisation ──────────────────────────────────────────────────
+
 const normalizeTimestamp = (timestamp: number | string): number => {
-  let normalizedTimestamp = timestamp;
-  
-  // If timestamp is a string, try to parse it
-  if (typeof normalizedTimestamp === 'string') {
-    normalizedTimestamp = new Date(normalizedTimestamp).getTime();
-  }
-  
-  // If timestamp seems to be in seconds instead of milliseconds (Unix timestamp)
-  if (normalizedTimestamp < 1000000000000) { // Less than year 2001 in milliseconds
-    normalizedTimestamp = normalizedTimestamp * 1000;
-  }
-  
-  // Fallback to current time if timestamp is invalid
-  if (!normalizedTimestamp || isNaN(normalizedTimestamp) || normalizedTimestamp <= 0) {
-    console.warn('Invalid timestamp detected, using current time:', timestamp);
-    normalizedTimestamp = Date.now();
-  }
-  
-  return normalizedTimestamp;
+  let ts = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
+  if (ts < 1_000_000_000_000) ts *= 1000; // seconds → ms
+  if (!ts || isNaN(ts) || ts <= 0) ts = Date.now();
+  return ts;
 };
 
-// Helper function to parse agent JSON response
+// ── Session name persistence (localStorage) ──────────────────────────────────
+
+const NAMES_KEY = 'agent-platform-session-names';
+
+const loadStoredNames = (): Record<string, string> => {
+  try { return JSON.parse(localStorage.getItem(NAMES_KEY) ?? '{}'); } catch { return {}; }
+};
+
+const persistName = (sessionId: string, name: string) => {
+  try {
+    const names = loadStoredNames();
+    names[sessionId] = name;
+    localStorage.setItem(NAMES_KEY, JSON.stringify(names));
+  } catch { /* ignore */ }
+};
+
+// ── Agent JSON response parser ───────────────────────────────────────────────
 const parseAgentResponse = (text: string): { content: string; charts?: ChartData[] } => {
   try {
     // Clean up the text by removing markdown code block formatting
@@ -48,6 +50,12 @@ const parseAgentResponse = (text: string): { content: string; charts?: ChartData
       cleanText = cleanText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
     } else if (cleanText.startsWith('```')) {
       cleanText = cleanText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    } else {
+      // The LLM sometimes wraps the JSON in prose text — extract the embedded code block.
+      const embedded = cleanText.match(/```json\s*([\s\S]*?)\s*```/);
+      if (embedded) {
+        cleanText = embedded[1];
+      }
     }
     
     // Try to parse as JSON
@@ -123,15 +131,9 @@ const eventsToMessages = (events: Event[]): ChatMessage[] => {
   return events
     .filter(event => event.content?.parts?.some(part => part.text))
     .map(event => {
-      // Debug logging to see what we're getting
-      console.log('Event timestamp:', event.timestamp, 'Type:', typeof event.timestamp);
-      
       const part = event.content?.parts?.find(part => part.text);
       const rawText = part?.text || '';
-      
-      // Parse the agent's response (could be JSON or plain text)
       const parsedResponse = parseAgentResponse(rawText);
-      
       return {
         id: event.id,
         content: parsedResponse.content,
@@ -143,26 +145,34 @@ const eventsToMessages = (events: Event[]): ChatMessage[] => {
 };
 
 // Replace with auth to get userId
-export function useChat(userId: string = 'user-1') {
+export function useChat(initialApp?: string, userId: string = 'user-1') {
   const [availableApps, setAvailableApps] = useState<string[]>([]);
-  const [selectedApp, setSelectedApp] = useState<string | null>(null);
+  const [selectedApp, setSelectedApp] = useState<string | null>(initialApp ?? null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingApps, setIsLoadingApps] = useState(true);
+  const [sessionNames, setSessionNames] = useState<Record<string, string>>({});
 
-  // Load available apps on mount  
+  // Load stored session names from localStorage on mount
+  useEffect(() => {
+    setSessionNames(loadStoredNames());
+  }, []);
+
+  const saveSessionName = (sessionId: string, name: string) => {
+    persistName(sessionId, name);
+    setSessionNames(prev => ({ ...prev, [sessionId]: name }));
+  };
+
+  // Load available apps on mount
   useEffect(() => {
     const loadApps = async () => {
       try {
         setIsLoadingApps(true);
-        console.log('Fetching available apps from ADK server...');
         const apps = await adkApi.listApps();
-        console.log('Available apps:', apps);
         setAvailableApps(apps);
-        
       } catch (err) {
         console.error('Failed to load apps:', err);
         setError(`Failed to load available apps: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -268,42 +278,104 @@ export function useChat(userId: string = 'user-1') {
     setIsLoading(true);
     setError(null);
 
-    try {
-      // Add user message immediately to UI
-      const userMessage: ChatMessage = {
-        id: `user-${Date.now()}`,
-        content: content.trim(),
-        author: 'user',
-        timestamp: Date.now(),
-      };
-      setMessages(prev => [...prev, userMessage]);
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      content: content.trim(),
+      author: 'user',
+      timestamp: Date.now(),
+    };
 
-      // Prepare request for ADK API
+    const streamingId = `streaming-${Date.now()}`;
+    const streamingPlaceholder: ChatMessage = {
+      id: streamingId,
+      content: '',
+      author: 'agent',
+      timestamp: Date.now(),
+      isStreaming: true,
+    };
+
+    // Capture whether this is the first exchange (for auto-naming)
+    const isFirstMessage = messages.filter(m => m.author !== 'user').length === 0;
+
+    setMessages(prev => [...prev, userMessage, streamingPlaceholder]);
+
+    try {
       const request: AgentRunRequest = {
         appName: selectedApp,
         userId,
         sessionId: currentSession.id,
-        newMessage: {
-          parts: [{ text: content.trim() }],
-          role: 'user'
-        },
-        streaming: false
+        newMessage: { parts: [{ text: content.trim() }], role: 'user' },
+        streaming: true,
       };
 
-      // Send message to ADK
-      await adkApi.sendMessage(request);
-      
-      // Refresh the session to get all events
+      let accumulated = '';
+      let agentAuthor = 'agent';
+
+      for await (const event of adkApi.sendMessageSSE(request)) {
+        if (event.author && event.author !== 'user') agentAuthor = event.author;
+        const textPart = event.content?.parts?.find(p => p.text);
+        if (textPart?.text) {
+          accumulated += textPart.text;
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === streamingId ? { ...m, content: accumulated, author: agentAuthor } : m
+            )
+          );
+        }
+        if (event.turnComplete) break;
+      }
+
+      // Parse the completed response for charts / JSON wrapper
+      const parsed = parseAgentResponse(accumulated);
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === streamingId
+            ? { ...m, content: parsed.content, charts: parsed.charts, isStreaming: false }
+            : m
+        )
+      );
+
+      // Sync session state
       const updatedSession = await adkApi.getSession(selectedApp, userId, currentSession.id);
       setCurrentSession(updatedSession);
 
+      // Auto-name the session after the first exchange if it has no stored name
+      if (isFirstMessage && !sessionNames[currentSession.id]) {
+        try {
+          const name = await adkApi.nameSession(selectedApp, [
+            { content: content.trim(), role: 'user' },
+            { content: parsed.content.slice(0, 300), role: 'model' },
+          ]);
+          saveSessionName(currentSession.id, name);
+          setSessions(prev =>
+            prev.map(s => s.id === currentSession.id ? { ...s } : s)
+          );
+        } catch { /* non-fatal */ }
+      }
+
     } catch (err) {
       setError(`Failed to send message: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      
-      // Remove the user message if sending failed
-      setMessages(prev => prev.slice(0, -1));
+      setMessages(prev => prev.filter(m => m.id !== streamingId && m.id !== userMessage.id));
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const renameSession = async (sessionId: string) => {
+    if (!selectedApp) return;
+    try {
+      const session = sessions.find(s => s.id === sessionId);
+      if (!session) return;
+      const textEvents = session.events.filter(e => e.content?.parts?.some(p => p.text));
+      const msgs = textEvents.slice(0, 8).map(e => ({
+        content: e.content!.parts.find(p => p.text)!.text!.slice(0, 300),
+        role: e.author === 'user' ? 'user' : 'model',
+      }));
+      if (msgs.length === 0) return;
+      const name = await adkApi.nameSession(selectedApp, msgs);
+      saveSessionName(sessionId, name);
+    } catch (err) {
+      setError(`Failed to rename session: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
@@ -350,10 +422,13 @@ export function useChat(userId: string = 'user-1') {
     isLoading,
     isLoadingApps,
     error,
+    sessionNames,
     sendMessage,
     createNewSession,
     selectSession,
     deleteSession,
+    renameSession,
+    saveSessionName,
     refreshSessions: loadSessions,
     refreshApps: loadAvailableApps,
   };

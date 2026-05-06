@@ -87,7 +87,9 @@ def _build_llm_agent() -> LlmAgent:
         Always return a JSON string with this structure:
 
         **When using ReactChartsAgent (for visualizations):**
-        - Delegate to ReactChartsAgent and return its complete response (includes both text and visualization)
+        - Call ReactChartsAgent and output ONLY its raw JSON response verbatim.
+        - Do NOT add any text, explanation, or markdown before or after the JSON.
+        - Your entire response must be exactly the JSON object ReactChartsAgent returned — nothing else.
 
         **When NOT using ReactChartsAgent (text-only analysis):**
         ```json
