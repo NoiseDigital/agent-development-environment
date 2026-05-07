@@ -27,16 +27,17 @@
 2. Open the repo in VS Code and select **Reopen in Container**.
 
 3. The **Start Services** task runs automatically in a terminal panel and handles everything:
-  - Runs `scripts/devcontainer_start.sh`
-   - Creates `.env` from `.env.example` if it doesn't exist — review `GOOGLE_CLOUD_PROJECT` before first use
-   - Prompts for GCP authentication if credentials are missing — click the URL, sign in, paste the code back
-   - Starts all app services (`postgres`, `mcp`, `agent`, `frontend`)
+
+- Runs `scripts/devcontainer_start.sh`
+- Creates `.env` from `.env.example` if it doesn't exist — review `GOOGLE_CLOUD_PROJECT` before first use
+- Prompts for GCP authentication if credentials are missing — click the URL, sign in, paste the code back
+- Starts all app services (`postgres`, `mcp`, `agent`, `frontend`)
 
    On subsequent opens, if credentials already exist the auth step is skipped and services start immediately.
 
-4. Pre-commit hooks are installed automatically on first container create.
+1. Pre-commit hooks are installed automatically on first container create.
 
-5. All services should be up and running, attachable in their own VSCode windows
+2. All services should be up and running, attachable in their own VSCode windows
 
 > To restart services: **Terminal → Run Task → Start Services**
 > To inspect compose logs: **Terminal → Run Task → Compose Logs**
@@ -49,14 +50,12 @@ git config --global user.email "you@example.com"
 git config --global user.name "Your Name"
 ```
 
-
 | URL | Description | Open On Startup |
 |---|---|---|
-| http://localhost:3000 | Frontend chat UI | true |
-| http://localhost:8000/dev-ui | ADK API / dev UI | true |
-| http://localhost:5000/ui | MCP Toolbox UI | false |
-| http://localhost:5432 | Postgres DB | false |
-
+| <http://localhost:3000> | Frontend chat UI | true |
+| <http://localhost:8000/dev-ui> | ADK API / dev UI | true |
+| <http://localhost:5000/ui> | MCP Toolbox UI | false |
+| <http://localhost:5432> | Postgres DB | false |
 
 ## Project Structure
 
@@ -77,6 +76,7 @@ terraform/                  # GCP infrastructure
 The ADK server auto-discovers agents — no registration needed. See [CONTRIBUTING.md](CONTRIBUTING.md) for full steps and `agentConfig.tsx` display flags.
 
 **Minimal `agent.py`:**
+
 ```python
 from google.adk.agents import Agent
 
@@ -102,8 +102,6 @@ TOOLBOX_ENDPOINT = os.getenv("TOOLBOX_ENDPOINT", "http://mcp:5000")
 toolbox = ToolboxSyncClient(TOOLBOX_ENDPOINT, protocol=Protocol.MCP_v20250326)
 tools = toolbox.load_toolset("my_toolset")
 ```
-
-
 
 ## Contributing
 

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "include-component-in-tag": true,
+  "packages": {
+    "services/frontend": {
+      "release-type": "node",
+      "component": "frontend",
+      "changelog-path": "CHANGELOG.md"
+    },
+    "services/backend/agents": {
+      "release-type": "python",
+      "component": "agents",
+      "changelog-path": "CHANGELOG.md"
+    },
+    "services/backend/mcp": {
+      "release-type": "simple",
+      "component": "mcp",
+      "changelog-path": "CHANGELOG.md"
+    }
+  }
+}
