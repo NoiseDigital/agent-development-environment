@@ -7,7 +7,7 @@
     "service": "workspace",
     "runServices": ["workspace"],
     "shutdownAction": "none",
-    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+    "workspaceFolder": "/workspaces/agent-platform",
     "containerEnv": {
         "AGENT_PLATFORM_DEVCONTAINER": "1",
         "SHELL": "/bin/bash",

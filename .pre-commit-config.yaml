@@ -1,4 +1,6 @@
 repos:
+  exclude: ^services/backend/agents/adk_agents\.egg-info/
+
   # Ruff — Python linter + formatter (replaces flake8/black/isort)
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.9.10

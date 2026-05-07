@@ -37,8 +37,8 @@
           "path": "services/backend/mcp/math/pyproject.toml",
           "jsonpath": "$.project.version"
         },
-        "services/backend/mcp/_images/toolbox/version.txt",
-        "services/backend/mcp/_images/google-ads/version.txt"
+        "services/backend/mcp/images/toolbox/version.txt",
+        "services/backend/mcp/images/google-ads/version.txt"
       ]
     }
   }

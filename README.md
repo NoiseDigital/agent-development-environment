@@ -28,11 +28,11 @@
 
 3. The **Start Services** task runs automatically in a terminal panel and handles everything:
 
-- Runs `scripts/devcontainer_start.sh`
+- Runs `scripts/start_services.sh`
 - Creates `.env` from `.env.example` if it doesn't exist — review `GOOGLE_CLOUD_PROJECT` before first use
 - Prompts for GCP authentication if credentials are missing — click the URL, sign in, paste the code back
 - Starts core app services (`postgres`, `mcp-toolbox`, `agent`, `frontend`)
-- Bootstraps optional MCP profile env files from `.env.example` to `.env` under `services/backend/mcp/_images/`
+- Bootstraps optional MCP profile env files from `.env.example` to `.env` under `services/backend/mcp/images/` (except `google-ads`, which is synced from Secret Manager)
 
    On subsequent opens, if credentials already exist the auth step is skipped and services start immediately.
 
@@ -70,7 +70,7 @@ services/
 │   │   ├── adk_agents/     # Individual agent packages
 │   │   └── main.py         # get_fast_api_app() entrypoint
 │   ├── mcp/                # MCP servers (image-based + code-based)
-│   │   ├── _images/        # Image-based MCP configs and thin-wrapper images
+│   │   ├── images/        # Image-based MCP configs and thin-wrapper images
 │   │   └── math/           # Code-based MCP server
 │   └── database/           # Postgres
 terraform/                  # GCP infrastructure
@@ -94,7 +94,7 @@ root_agent = Agent(
 
 ## Using MCP Toolbox
 
-Tools are defined in `services/backend/mcp/_images/toolbox/tools.yaml` using the v1.0+ flat document format. The MCP Toolbox service is available at `http://mcp-toolbox:5000` inside the Docker network.
+Tools are defined in `services/backend/mcp/images/toolbox/tools.yaml` using the v1.0+ flat document format. The MCP Toolbox service is available at `http://mcp-toolbox:5000` inside the Docker network.
 
 > **Note:** MCP Toolbox server v1.1.0 speaks protocol `2025-03-26`. Pass `protocol=Protocol.MCP_v20250326` to `ToolboxSyncClient` to avoid a version mismatch error until the server supports a newer protocol spec.
 
@@ -113,13 +113,20 @@ tools = toolbox.load_toolset("my_toolset")
 Core services start automatically in the devcontainer. Optional MCP servers are profile-gated and must be started explicitly.
 
 ```bash
-docker compose --profile google-ads up -d mcp-google-ads
-docker compose --profile math up -d mcp-math
+./scripts/start_optional_mcp.sh google-ads
+./scripts/start_optional_mcp.sh math
 ```
 
 Notes:
-- `mcp-google-ads` reads credentials from `services/backend/mcp/_images/google-ads/.env`
+- `mcp-google-ads` reads credentials from `services/backend/mcp/images/google-ads/.env`, synced from Secret Manager
 - HTTP mode (`/mcp`) for Google Ads MCP requires OAuth proxy env vars (`GOOGLE_ADS_MCP_OAUTH_CLIENT_ID` and `GOOGLE_ADS_MCP_OAUTH_CLIENT_SECRET`)
+- Secret payload must include these keys: `GOOGLE_PROJECT_ID`, `GOOGLE_ADS_DEVELOPER_TOKEN`, `GOOGLE_ADS_MCP_OAUTH_CLIENT_ID`, `GOOGLE_ADS_MCP_OAUTH_CLIENT_SECRET`, `GOOGLE_ADS_MCP_BASE_URL`
+- Configure secret sync in root `.env`:
+  - `GOOGLE_ADS_MCP_ENV_SECRET_NAME` (required)
+  - `GOOGLE_ADS_MCP_ENV_SECRET_PROJECT` (optional; defaults to `GOOGLE_CLOUD_PROJECT`)
+  - `GOOGLE_ADS_MCP_ENV_SECRET_VERSION` (optional; defaults to `latest`)
+  - `GOOGLE_IMPERSONATE_SERVICE_ACCOUNT` (optional; uses IAM impersonation, no local key file)
+- If the current user cannot access the configured secret, the generated `.env` is removed and `mcp-google-ads` cannot be started.
 
 ## Contributing
 

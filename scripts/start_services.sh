@@ -28,6 +28,16 @@ if [ -z "$HOST_PROJECT_ROOT" ]; then
     HOST_PROJECT_ROOT="$PROJECT_ROOT"
 fi
 
+# Convert Windows-style paths (e.g. C:\Users\...) to /drive/path format so the
+# Linux Docker CLI does not treat them as relative paths when passed to
+# --project-directory (Docker Desktop on Windows returns Windows paths from inspect).
+if [[ "$HOST_PROJECT_ROOT" =~ ^([A-Za-z]):[/\\](.*) ]]; then
+    _drive="${BASH_REMATCH[1],,}"
+    _rest="${BASH_REMATCH[2]//\\//}"
+    HOST_PROJECT_ROOT="/${_drive}/${_rest}"
+    unset _drive _rest
+fi
+
 cd "$PROJECT_ROOT"
 
 # ── 1. Bootstrap .env ─────────────────────────────────────────────────────────
@@ -42,7 +52,11 @@ if [ ! -f .env ]; then
 fi
 
 # Bootstrap .env files for optional (profile-based) MCP servers.
-for mcp_dir in "$PROJECT_ROOT"/services/backend/mcp/_images/*/; do
+for mcp_dir in "$PROJECT_ROOT"/services/backend/mcp/images/*/; do
+    mcp_name="$(basename "$mcp_dir")"
+    if [ "$mcp_name" = "google-ads" ]; then
+        continue
+    fi
     example="$mcp_dir/.env.example"
     dotenv="$mcp_dir/.env"
     if [ -f "$example" ] && [ ! -f "$dotenv" ]; then
@@ -56,6 +70,11 @@ set -a
 # shellcheck disable=SC1091 # .env is created from .env.example during bootstrap.
 . ./.env
 set +a
+
+GCLOUD_IMPERSONATION_ARGS=()
+if [ -n "${GOOGLE_IMPERSONATE_SERVICE_ACCOUNT:-}" ]; then
+    GCLOUD_IMPERSONATION_ARGS=(--impersonate-service-account "$GOOGLE_IMPERSONATE_SERVICE_ACCOUNT")
+fi
 
 # ── 2. GCP Authentication ─────────────────────────────────────────────────────
 if [ -f "$CREDS_FILE" ]; then
@@ -72,7 +91,7 @@ else
     echo "Click the URL below, sign in, then paste the verification code here."
     echo ""
 
-    gcloud auth application-default login --no-launch-browser
+    gcloud auth application-default login --no-launch-browser "${GCLOUD_IMPERSONATION_ARGS[@]}"
 
     if [ -n "${GOOGLE_CLOUD_PROJECT:-}" ]; then
         gcloud auth application-default set-quota-project "${GOOGLE_CLOUD_PROJECT}"
@@ -83,6 +102,32 @@ else
     echo ""
 fi
 
+# Sync secrets-backed env for Google Ads MCP.
+GOOGLE_ADS_ENV_PATH="$PROJECT_ROOT/services/backend/mcp/images/google-ads/.env"
+if [ -n "${GOOGLE_ADS_MCP_ENV_SECRET_NAME:-}" ]; then
+    GOOGLE_ADS_SECRET_PROJECT="${GOOGLE_ADS_MCP_ENV_SECRET_PROJECT:-${GOOGLE_CLOUD_PROJECT:-}}"
+    GOOGLE_ADS_SECRET_VERSION="${GOOGLE_ADS_MCP_ENV_SECRET_VERSION:-latest}"
+
+    if [ -z "$GOOGLE_ADS_SECRET_PROJECT" ]; then
+        echo "⚠ GOOGLE_ADS_MCP_ENV_SECRET_PROJECT and GOOGLE_CLOUD_PROJECT are both unset."
+        echo "  Cannot fetch Google Ads MCP secret; profile will remain unavailable."
+        rm -f "$GOOGLE_ADS_ENV_PATH"
+    elif gcloud "${GCLOUD_IMPERSONATION_ARGS[@]}" secrets versions access "$GOOGLE_ADS_SECRET_VERSION" \
+        --secret "$GOOGLE_ADS_MCP_ENV_SECRET_NAME" \
+        --project "$GOOGLE_ADS_SECRET_PROJECT" \
+        > "$GOOGLE_ADS_ENV_PATH" 2>/dev/null; then
+        chmod 600 "$GOOGLE_ADS_ENV_PATH"
+        echo "✔ Synced Google Ads MCP env from Secret Manager."
+    else
+        echo "⚠ Could not access secret '$GOOGLE_ADS_MCP_ENV_SECRET_NAME'"
+        echo "  in project '$GOOGLE_ADS_SECRET_PROJECT' (version: $GOOGLE_ADS_SECRET_VERSION)."
+        echo "  Google Ads MCP profile will not start without secret access."
+        rm -f "$GOOGLE_ADS_ENV_PATH"
+    fi
+else
+    rm -f "$GOOGLE_ADS_ENV_PATH"
+fi
+
 # ── 3. Start sibling services via host Docker socket ─────────────────────────
 echo "Starting services..."
 echo ""
@@ -91,14 +136,20 @@ echo ""
 # recognises it as its own and doesn't warn about an externally-created volume.
 docker volume create agent-platform_gcloud_config >/dev/null 2>&1 || true
 
-# --project-directory must be the host-side path so Docker resolves bind-mount sources
-# against the host filesystem, not the container path.
+# Build contexts must be resolved by the Docker CLI against the container filesystem.
+# Bind-mount sources must be resolved by the Docker daemon against the host filesystem.
+# Split into two steps: build first (container path), then start (host path, --no-build).
 # COMPOSE_IGNORE_ORPHANS suppresses the workspace container orphan warning — the
 # workspace service is intentionally absent from this up invocation.
+docker compose \
+    --project-directory "$PROJECT_ROOT" \
+    -f "$PROJECT_ROOT/docker-compose.yml" \
+    build agent frontend
+
 COMPOSE_IGNORE_ORPHANS=1 docker compose \
     --project-directory "$HOST_PROJECT_ROOT" \
     -f "$PROJECT_ROOT/docker-compose.yml" \
-    up -d --wait --wait-timeout 120 \
+    up -d --no-build --wait --wait-timeout 120 \
     postgres mcp-toolbox agent frontend
 
 echo ""
@@ -109,6 +160,6 @@ echo "  ADK Agent → http://localhost:8000/dev-ui"
 echo "  MCP UI    → http://localhost:5000/ui"
 echo ""
 echo "Optional MCP servers (not started by default):"
-echo "  Google Ads  → docker compose --profile google-ads up -d mcp-google-ads"
-echo "  Math        → docker compose --profile math up -d mcp-math"
+echo "  Google Ads  → ./scripts/start_optional_mcp.sh google-ads"
+echo "  Math        → ./scripts/start_optional_mcp.sh math"
 echo ""
