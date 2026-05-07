@@ -1,30 +1,68 @@
 {
     "name": "Agent Platform",
-    "dockerComposeFile" : "../docker-compose.yml",
-    "workspaceFolder": "/workspace",
-    "service": "devcontainer",
+    "runArgs": ["--name=agent-platform-devcontainer"],
+    "privileged": true,
+    "features": {
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {
+            "moby": false,
+            "version": "latest",
+            "dockerDashComposeVersion": "v2",
+            "installDockerBuildx": true
+        }
+    },
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+    "mounts": [
+        {
+            "source": "${localWorkspaceFolderBasename}_gcloud_config",
+            "target": "/root/.config/gcloud",
+            "type": "volume"
+        }
+    ],
     "containerEnv": {
-        "APP_PATH": "${containerWorkspaceFolder}",
-        "SHELL": "/bin/bash"
+        "SHELL": "/bin/bash",
+        "LANG": "C.UTF-8",
+        "LANGUAGE": "C.UTF-8",
+        "LC_ALL": "C.UTF-8"
     },
     "forwardPorts": [8000, 5000, 3000, 5432],
     "portsAttributes": {
-        "8000": {"label": "ADK Agent Server"},
-        "5000": {"label": "MCP Toolbox"},
-        "3000": {"label": "Frontend"},
-        "5432": {"label": "PostgreSQL"}
+        "8000": {
+            "label": "ADK Agent Server",
+            "requireLocalPort": true,
+            "onAutoForward": "openBrowserOnce"
+        },
+        "5000": {
+            "label": "MCP Toolbox",
+            "requireLocalPort": true
+        },
+        "3000": {
+            "label": "Frontend",
+            "requireLocalPort": true,
+            "onAutoForward": "openBrowserOnce"
+        },
+        "5432": {
+            "label": "PostgreSQL",
+            "requireLocalPort": true
+        }
     },
-    "postCreateCommand": "uv sync --project /workspace/services/backend/agents",
+    "postCreateCommand": "pre-commit install",
+    "postAttachCommand": {
+        "services": "bash ${containerWorkspaceFolder}/scripts/start_services.sh"
+    },
     "customizations": {
         "vscode": {
             "extensions": [
                 "ms-python.python",
                 "ms-python.vscode-pylance",
-                "ms-python.black-formatter",
                 "HashiCorp.terraform",
                 "charliermarsh.ruff",
                 "tamasfe.even-better-toml",
-                "hediet.vscode-drawio"
+                "hediet.vscode-drawio",
+                "bierner.markdown-preview-github-styles",
+                "bierner.github-markdown-preview"
             ]
         }
     },

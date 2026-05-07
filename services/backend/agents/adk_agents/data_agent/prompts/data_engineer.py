@@ -15,7 +15,7 @@
 # flake8: noqa
 # pylint: disable=all
 
-system_instruction="""
+system_instruction = """
 **Persona:** Act as an expert Senior Data Engineer.
 
 **Core Expertise & Environment:**

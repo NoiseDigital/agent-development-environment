@@ -18,11 +18,11 @@ import sys
 from typing import Optional
 
 from google.genai.types import (
-                                Content,
-                                GenerateContentConfig,
-                                SafetySetting,
-                                ThinkingConfig
-                                )
+    Content,
+    GenerateContentConfig,
+    SafetySetting,
+    ThinkingConfig,
+)
 from google.adk.agents import Agent
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.models import LlmResponse, LlmRequest
@@ -33,23 +33,32 @@ from google.adk.tools import FunctionTool
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from services.backend.agents.src.shared.config_env import prepare_environment
 
-from services.backend.agents.adk_agents.data_agent.prompts.root_agent import system_instruction as root_agent_instruction
-from services.backend.agents.adk_agents.data_agent.tools.bi_engineer import bi_engineer_tool
-from services.backend.agents.adk_agents.data_agent.tools.crm_business_analyst import crm_business_analyst_agent
-from services.backend.agents.adk_agents.data_agent.tools.data_engineer import data_engineer
+from services.backend.agents.adk_agents.data_agent.prompts.root_agent import (
+    system_instruction as root_agent_instruction,
+)
+from services.backend.agents.adk_agents.data_agent.tools.bi_engineer import (
+    bi_engineer_tool,
+)
+from services.backend.agents.adk_agents.data_agent.tools.crm_business_analyst import (
+    crm_business_analyst_agent,
+)
+from services.backend.agents.adk_agents.data_agent.tools.data_engineer import (
+    data_engineer,
+)
 
 
 ROOT_AGENT_MODEL_ID = "gemini-2.5-pro-preview-06-05"
 
 
-async def before_model_callback(callback_context: CallbackContext,
-                          llm_request: LlmRequest) -> LlmResponse | None:
+async def before_model_callback(
+    callback_context: CallbackContext, llm_request: LlmRequest
+) -> LlmResponse | None:
     chart_image_name = callback_context.state.get("chart_image_name", None)
     if chart_image_name:
         callback_context.state["chart_image_name"] = ""
-        llm_request.contents[0].parts.append( # type: ignore
-            await callback_context.load_artifact(
-                filename=chart_image_name)) # type: ignore
+        llm_request.contents[0].parts.append(  # type: ignore
+            await callback_context.load_artifact(filename=chart_image_name)
+        )  # type: ignore
     return None
 
 
@@ -57,8 +66,9 @@ async def before_agent_callback(callback_context: CallbackContext) -> Optional[C
     pass
 
 
-async def after_model_callback(callback_context: CallbackContext,
-                          llm_response: LlmResponse) -> LlmResponse | None:
+async def after_model_callback(
+    callback_context: CallbackContext, llm_response: LlmResponse
+) -> LlmResponse | None:
     pass
 
 
@@ -79,18 +89,16 @@ root_agent = Agent(
         FunctionTool(data_engineer),
         FunctionTool(bi_engineer_tool),
     ],
-    planner=BuiltInPlanner(
-        thinking_config=ThinkingConfig(thinking_budget=32768)
-    ),
+    planner=BuiltInPlanner(thinking_config=ThinkingConfig(thinking_budget=32768)),
     generate_content_config=GenerateContentConfig(
-        temperature = 0.0001,
-        top_p = 0.0,
+        temperature=0.0001,
+        top_p=0.0,
         seed=256,
         safety_settings=[
             SafetySetting(
-                category="HARM_CATEGORY_DANGEROUS_CONTENT", # type: ignore
-                threshold="BLOCK_ONLY_HIGH", # type: ignore
+                category="HARM_CATEGORY_DANGEROUS_CONTENT",  # type: ignore
+                threshold="BLOCK_ONLY_HIGH",  # type: ignore
             ),
         ],
-    )
+    ),
 )

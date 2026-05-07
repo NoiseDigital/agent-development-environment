@@ -12,9 +12,11 @@ from services.backend.agents.adk_agents.hello_world_agent.utils.constants import
     get_resource_engine_id,
     get_agent_name,
     get_agent_display_name,
-    get_agent_display_description
+    get_agent_display_description,
 )
-from services.backend.agents.src.shared.vertex_agent_deploy import deploy_or_update_agent
+from services.backend.agents.src.shared.vertex_agent_deploy import (
+    deploy_or_update_agent,
+)
 
 
 # Load environment variables

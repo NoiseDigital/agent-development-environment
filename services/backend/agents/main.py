@@ -16,11 +16,12 @@ app = get_fast_api_app(
     session_service_uri=os.environ.get("DATABASE_URL"),
     allow_origins=os.environ.get("ALLOWED_ORIGINS", "http://localhost").split(","),
     web=True,
-    trace_to_cloud=False
+    trace_to_cloud=False,
 )
 
 
 _genai_client = genai.Client()
+
 
 class MessageSnippet(BaseModel):
     content: str
@@ -30,15 +31,16 @@ class MessageSnippet(BaseModel):
 class NameSessionRequest(BaseModel):
     messages: List[MessageSnippet]
 
+
 class NameSessionResponse(BaseModel):
     name: str
+
 
 @app.post("/name_session", response_model=NameSessionResponse)
 async def name_session(request: NameSessionRequest) -> NameSessionResponse:
     """Generate a short description name for a chat session based on the messages in the session."""
     context = "\n".join(
-        f"{m.role.upper()} {m.content[:300]}"
-        for m in request.messages[-8:]
+        f"{m.role.upper()} {m.content[:300]}" for m in request.messages[-8:]
     )
 
     prompt = (
@@ -57,7 +59,10 @@ async def name_session(request: NameSessionRequest) -> NameSessionResponse:
             raise ValueError("Generated name is empty")
         return NameSessionResponse(name=name[:50])
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate session name: {str(e)}")
-    
+        raise HTTPException(
+            status_code=500, detail=f"Failed to generate session name: {str(e)}"
+        )
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))

@@ -26,7 +26,7 @@ from google.genai.types import (
     GenerateContentConfig,
     Part,
     SafetySetting,
-    ThinkingConfig
+    ThinkingConfig,
 )
 from google.genai import Client as GenaiClient
 from google.cloud.bigquery import Client, QueryJobConfig
@@ -36,13 +36,17 @@ import altair as alt
 from altair.vegalite.schema import core as alt_core
 import pandas as pd
 
-from services.backend.agents.adk_agents.data_agent.prompts.bi_engineer import prompt as bi_engineer_prompt
-from services.backend.agents.adk_agents.data_agent.tools.chart_evaluator import evaluate_chart
+from services.backend.agents.adk_agents.data_agent.prompts.bi_engineer import (
+    prompt as bi_engineer_prompt,
+)
+from services.backend.agents.adk_agents.data_agent.tools.chart_evaluator import (
+    evaluate_chart,
+)
 
 
 MAX_RESULT_ROWS_DISPLAY = 50
-BI_ENGINEER_AGENT_MODEL_ID = "gemini-2.5-pro" # "gemini-2.5-pro-preview-05-06"
-BI_ENGINEER_FIX_AGENT_MODEL_ID = "gemini-2.5-pro" # "gemini-2.5-pro-preview-05-06"
+BI_ENGINEER_AGENT_MODEL_ID = "gemini-2.5-pro"  # "gemini-2.5-pro-preview-05-06"
+BI_ENGINEER_FIX_AGENT_MODEL_ID = "gemini-2.5-pro"  # "gemini-2.5-pro-preview-05-06"
 
 
 @cache
@@ -52,6 +56,7 @@ def _init_environment():
     _data_project_id = os.environ["SFDC_DATA_PROJECT_ID"]
     _location = os.environ["BQ_LOCATION"]
     _dataset = os.environ["SFDC_BQ_DATASET"]
+
 
 class VegaResult(BaseModel):
     vega_lite_json: str
@@ -72,13 +77,15 @@ def _enhance_parameters(vega_chart: dict, df: pd.DataFrame) -> dict:
     if "params" not in vega_chart:
         return vega_chart
     if "params" not in vega_chart or "'transform':" not in str(vega_chart):
-        print("Cannot enhance parameters because one or "
-              "more of these are missing: "
-              "[params, transform]")
+        print(
+            "Cannot enhance parameters because one or "
+            "more of these are missing: "
+            "[params, transform]"
+        )
         return vega_chart
     print("Enhancing parameters...")
     params_list = vega_chart["params"]
-    params = { p["name"]: p for p in params_list }
+    params = {p["name"]: p for p in params_list}
     for p in params:
         if not p.endswith("__selection"):
             continue
@@ -121,18 +128,17 @@ def _create_chat(model: str, history: list, max_thinking: bool = False):
             response_mime_type="application/json",
             safety_settings=[
                 SafetySetting(
-                    category="HARM_CATEGORY_DANGEROUS_CONTENT", # type: ignore
-                    threshold="BLOCK_ONLY_HIGH", # type: ignore
+                    category="HARM_CATEGORY_DANGEROUS_CONTENT",  # type: ignore
+                    threshold="BLOCK_ONLY_HIGH",  # type: ignore
                 ),
             ],
             thinking_config=(
-                ThinkingConfig(thinking_budget=32768) if max_thinking
-                else None),
-            max_output_tokens=65536
+                ThinkingConfig(thinking_budget=32768) if max_thinking else None
+            ),
+            max_output_tokens=65536,
         ),
-        history=history
+        history=history,
     )
-
 
 
 def _fix_df_dates(df: pd.DataFrame) -> pd.DataFrame:
@@ -159,16 +165,16 @@ def _fix_df_dates(df: pd.DataFrame) -> pd.DataFrame:
         df[col] = iso_values.astype("string")
 
     # --- Process object columns that might contain date/datetime objects ---
-    object_cols = df.select_dtypes(include=['object']).columns
+    object_cols = df.select_dtypes(include=["object"]).columns
     for col in object_cols:
         # Heuristic to find columns that contain date/datetime objects
         first_valid_index = df[col].first_valid_index()
-        if first_valid_index is not None and isinstance(df[col].loc[first_valid_index], (date, datetime)):
+        if first_valid_index is not None and isinstance(
+            df[col].loc[first_valid_index], (date, datetime)
+        ):
             # 1. Convert each value to an ISO string
             iso_values = df[col].apply(
-                lambda x: x.isoformat()
-                if isinstance(x, (date, datetime))
-                else x
+                lambda x: x.isoformat() if isinstance(x, (date, datetime)) else x
             )
             # 2. Explicitly cast the column to the modern 'string' dtype
             df[col] = iso_values.astype("string")
@@ -179,7 +185,8 @@ def _json_date_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()
-    raise TypeError ("Type %s not serializable" % type(obj))
+    raise TypeError("Type %s not serializable" % type(obj))
+
 
 def _safe_json(json_str: str) -> str:
     json_str = "{" + json_str.strip().split("{", 1)[-1]
@@ -187,11 +194,14 @@ def _safe_json(json_str: str) -> str:
     json_dict = json.loads(json_str)
     return json.dumps(json_dict, default=_json_date_serial)
 
-async def bi_engineer_tool(original_business_question: str,
-                     question_that_sql_result_can_answer: str,
-                     sql_file_name: str,
-                     notes: str,
-                     tool_context: ToolContext) -> str:
+
+async def bi_engineer_tool(
+    original_business_question: str,
+    question_that_sql_result_can_answer: str,
+    sql_file_name: str,
+    notes: str,
+    tool_context: ToolContext,
+) -> str:
     """Senior BI Engineer. Executes SQL code.
 
     Args:
@@ -207,15 +217,16 @@ async def bi_engineer_tool(original_business_question: str,
     """
     _init_environment()
     sql_code_part = await tool_context.load_artifact(sql_file_name)
-    sql_code = sql_code_part.inline_data.data.decode("utf-8") # type: ignore
+    sql_code = sql_code_part.inline_data.data.decode("utf-8")  # type: ignore
     client = Client(project=_bq_project_id, location=_location)
     try:
-        dataset_location = client.get_dataset(
-                                f"{_data_project_id}.{_dataset}").location
+        dataset_location = client.get_dataset(f"{_data_project_id}.{_dataset}").location
         job_config = QueryJobConfig(use_query_cache=False)
-        df: pd.DataFrame = client.query(sql_code,
-                     job_config=job_config,
-                     location=dataset_location).result().to_dataframe()
+        df: pd.DataFrame = (
+            client.query(sql_code, job_config=job_config, location=dataset_location)
+            .result()
+            .to_dataframe()
+        )
         df = _fix_df_dates(df)
     except (BadRequest, NotFound) as ex:
         err_text = ex.args[0].strip()
@@ -226,22 +237,18 @@ async def bi_engineer_tool(original_business_question: str,
     else:
         notes_text = ""
 
-    vega_lite_spec = json.dumps(
-        alt_core.load_schema(),
-        indent=1,
-        sort_keys=False
-    )
+    vega_lite_spec = json.dumps(alt_core.load_schema(), indent=1, sort_keys=False)
     chart_prompt = bi_engineer_prompt.format(
         original_business_question=original_business_question,
         question_that_sql_result_can_answer=question_that_sql_result_can_answer,
         sql_code=sql_code,
         notes_text=notes_text,
         columns_string=df.dtypes.to_string(),
-        dataframe_preview_len=min(10,len(df)),
+        dataframe_preview_len=min(10, len(df)),
         dataframe_len=len(df),
         dataframe_head=df.head(10).to_string(),
         vega_lite_spec=vega_lite_spec,
-        vega_lite_schema_version=alt.SCHEMA_VERSION.split(".")[0]
+        vega_lite_schema_version=alt.SCHEMA_VERSION.split(".")[0],
     )
 
     vega_chart_json = ""
@@ -249,15 +256,15 @@ async def bi_engineer_tool(original_business_question: str,
     while True:
         vega_chat = _create_chat(BI_ENGINEER_AGENT_MODEL_ID, [])
         chart_results = vega_chat.send_message(chart_prompt)
-        chart_model = chart_results.parsed # type: ignore
+        chart_model = chart_results.parsed  # type: ignore
         if chart_model:
             break
-    chart_json = chart_model.vega_lite_json # type: ignore
+    chart_json = chart_model.vega_lite_json  # type: ignore
 
-    for _ in range(5): # 5 tries to make a good chart
+    for _ in range(5):  # 5 tries to make a good chart
         for _ in range(10):
             try:
-                vega_dict = json.loads(_safe_json(chart_json)) # type: ignore
+                vega_dict = json.loads(_safe_json(chart_json))  # type: ignore
                 vega_dict["data"] = {"values": []}
                 vega_dict.pop("datasets", None)
                 vega_chart = alt.Chart.from_dict(vega_dict)
@@ -285,13 +292,11 @@ ERROR {type(ex).__name__}: {str(ex)}
                 error_reason = message
                 print(message)
                 if not vega_fix_chat:
-                    vega_fix_chat = _create_chat(BI_ENGINEER_FIX_AGENT_MODEL_ID,
-                                                 vega_chat.get_history(),
-                                                 True)
+                    vega_fix_chat = _create_chat(
+                        BI_ENGINEER_FIX_AGENT_MODEL_ID, vega_chat.get_history(), True
+                    )
                 print("Fixing...")
-                chart_json = vega_fix_chat.send_message(
-                    message
-                ).parsed.vega_lite_json # type: ignore
+                chart_json = vega_fix_chat.send_message(message).parsed.vega_lite_json  # type: ignore
 
         if not error_reason:
             with io.BytesIO() as file:
@@ -300,11 +305,12 @@ ERROR {type(ex).__name__}: {str(ex)}
                 file.seek(0)
                 png_data = file.getvalue()
                 evaluate_chart_result = evaluate_chart(
-                                            png_data,
-                                            vega_chart_json,
-                                            question_that_sql_result_can_answer,
-                                            len(df),
-                                            tool_context)
+                    png_data,
+                    vega_chart_json,
+                    question_that_sql_result_can_answer,
+                    len(df),
+                    tool_context,
+                )
             if not evaluate_chart_result or evaluate_chart_result.is_good:
                 break
             error_reason = evaluate_chart_result.reason
@@ -313,9 +319,9 @@ ERROR {type(ex).__name__}: {str(ex)}
             break
 
         print(f"Feedback:\n{error_reason}.\n\nWorking on another version...")
-        history = (vega_fix_chat.get_history()
-                   if vega_fix_chat
-                   else vega_chat.get_history())
+        history = (
+            vega_fix_chat.get_history() if vega_fix_chat else vega_chat.get_history()
+        )
         vega_chat = _create_chat(BI_ENGINEER_AGENT_MODEL_ID, history)
         chart_json = vega_chat.send_message(f"""
             Fix the chart based on the feedback.
@@ -330,33 +336,35 @@ ERROR {type(ex).__name__}: {str(ex)}
             ``json
             {vega_chart_json}
             ````
-            """).parsed.vega_lite_json # type: ignore
+            """).parsed.vega_lite_json  # type: ignore
 
-    print(f"Done working on a chart.")
+    print("Done working on a chart.")
     if error_reason:
         print(f"Chart is still not good: {error_reason}")
     else:
         print("And the chart seem good to me.")
     data_file_name = f"{tool_context.invocation_id}.parquet"
     parquet_bytes = df.to_parquet()
-    await tool_context.save_artifact(filename=data_file_name,
-                               artifact=Part.from_bytes(
-                                   data=parquet_bytes,
-                                   mime_type="application/parquet"))
+    await tool_context.save_artifact(
+        filename=data_file_name,
+        artifact=Part.from_bytes(data=parquet_bytes, mime_type="application/parquet"),
+    )
     file_name = f"{tool_context.invocation_id}.vg"
-    await tool_context.save_artifact(filename=file_name,
-                               artifact=Part.from_bytes(
-                                    mime_type="application/json",
-                                    data=vega_chart_json.encode("utf-8")))
+    await tool_context.save_artifact(
+        filename=file_name,
+        artifact=Part.from_bytes(
+            mime_type="application/json", data=vega_chart_json.encode("utf-8")
+        ),
+    )
     with io.BytesIO() as file:
         vega_chart.save(file, "png", ppi=72)
         file.seek(0)
         data = file.getvalue()
         new_image_name = f"{tool_context.invocation_id}.png"
-        await tool_context.save_artifact(filename=new_image_name,
-                                   artifact=Part.from_bytes(
-                                        mime_type="image/png",
-                                        data=data))
+        await tool_context.save_artifact(
+            filename=new_image_name,
+            artifact=Part.from_bytes(mime_type="image/png", data=data),
+        )
         tool_context.state["chart_image_name"] = new_image_name
 
     csv = df.head(MAX_RESULT_ROWS_DISPLAY).to_csv(index=False)
@@ -365,4 +373,6 @@ ERROR {type(ex).__name__}: {str(ex)}
     else:
         csv_message = "**DATA**:"
 
-    return f"chart_image_id: `{new_image_name}`\n\n{csv_message}\n\n```csv\n{csv}\n```\n"
+    return (
+        f"chart_image_id: `{new_image_name}`\n\n{csv_message}\n\n```csv\n{csv}\n```\n"
+    )

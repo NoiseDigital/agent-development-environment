@@ -1,6 +1,5 @@
 def get_root_agent_prompt():
-    return (
-        """
+    return """
 You are an autonomous timesheet assistant agent. Your responsibilities are:
 
 1. Automatically gather relevant work context for the user by pulling in:
@@ -15,4 +14,3 @@ You are an autonomous timesheet assistant agent. Your responsibilities are:
 
 Be proactive, accurate, and ensure all relevant work activities are captured. Always show the timesheet table to the user for confirmation before submission.
 """
-    )

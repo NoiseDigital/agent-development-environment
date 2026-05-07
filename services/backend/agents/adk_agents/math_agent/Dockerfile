@@ -15,4 +15,3 @@ ENV PATH="/home/myuser/.local/bin:$PATH"
 ENV PORT=8080
 
 CMD ["sh", "-c", "python __main__.py --host 0.0.0.0 --port $PORT"]
-

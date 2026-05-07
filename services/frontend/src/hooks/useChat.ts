@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { adkApi, Session, AgentRunRequest } from '../lib/adk-api';
 import { ChartData } from '../types/chart';
 import type { AgentJsonResponse } from '../types/agent-response';
+import { getAgentConfiguration } from '../config/agentConfig';
 
 interface ChatMessage {
   id: string;
@@ -40,100 +41,74 @@ const persistName = (sessionId: string, name: string) => {
 };
 
 // ── Agent JSON response parser ───────────────────────────────────────────────
-const parseAgentResponse = (text: string): { content: string; charts?: ChartData[] } => {
-  try {
-    // Clean up the text by removing markdown code block formatting
-    let cleanText = text.trim();
-    
-    // Remove outer ```json at the beginning and ``` at the end if present
-    if (cleanText.startsWith('```json')) {
-      cleanText = cleanText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-    } else if (cleanText.startsWith('```')) {
-      cleanText = cleanText.replace(/^```\s*/, '').replace(/\s*```$/, '');
-    } else {
-      // The LLM sometimes wraps the JSON in prose text — extract the embedded code block.
-      const embedded = cleanText.match(/```json\s*([\s\S]*?)\s*```/);
-      if (embedded) {
-        cleanText = embedded[1];
-      }
+
+/**
+ * Extract the first complete, balanced JSON object from a string.
+ * Properly skips brace/bracket characters inside JSON string literals.
+ */
+const extractFirstJsonObject = (text: string): string | null => {
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
     }
-    
-    // Try to parse as JSON
-    const parsed: AgentJsonResponse = JSON.parse(cleanText);
-    
-    // Check if it has the expected structure
-    if (parsed && typeof parsed === 'object') {
-      // Handle the new format: { text: "...", visualization: {...} }
-      if (parsed.text !== undefined) {
-        let textContent = parsed.text;
-        
-        // If the text field itself contains JSON with backticks, clean it up
-        if (typeof textContent === 'string' && textContent.includes('```json')) {
-          // Remove nested JSON backticks from the text content
-          textContent = textContent.replace(/```json\s*/, '').replace(/\s*```$/, '');
-          
-          // Try to parse the nested JSON if it exists
-          try {
-            const nestedParsed = JSON.parse(textContent);
-            if (nestedParsed && typeof nestedParsed === 'object' && nestedParsed.text !== undefined) {
-              // Use the nested structure instead
-              const result: { content: string; charts?: ChartData[] } = {
-                content: nestedParsed.text
-              };
-              
-              // Check for visualization data in nested structure
-              if (nestedParsed.visualization) {
-                if (!Array.isArray(nestedParsed.visualization) && nestedParsed.visualization.type && nestedParsed.visualization.data) {
-                  result.charts = [nestedParsed.visualization as ChartData];
-                } else if (Array.isArray(nestedParsed.visualization)) {
-                  result.charts = nestedParsed.visualization as ChartData[];
-                }
-              }
-              
-              return result;
-            }
-          } catch (nestedError) {
-            console.log('Failed to parse nested JSON, using text as-is:', nestedError);
-            // Fall through to use the text as-is
-          }
-        }
-        
-        const result: { content: string; charts?: ChartData[] } = {
-          content: textContent
-        };
-        
-        // Check for visualization data
-        if (parsed.visualization) {
-          // Handle single chart
-          if (!Array.isArray(parsed.visualization) && parsed.visualization.type && parsed.visualization.data) {
-            result.charts = [parsed.visualization as ChartData];
-          }
-          // Handle multiple charts
-          else if (Array.isArray(parsed.visualization)) {
-            result.charts = parsed.visualization as ChartData[];
-          }
-        }
-        
-        return result;
-      }
-    }
-  } catch (error) {
-    // If parsing fails, treat as plain text
-    console.log('Response is not JSON, treating as plain text:', error);
   }
-  
+  return null;
+};
+
+/** Try to parse a string as a valid AgentJsonResponse with a `text` field. */
+const tryParseAgentJson = (raw: string): { content: string; charts?: ChartData[] } | null => {
+  try {
+    const parsed: AgentJsonResponse = JSON.parse(raw.trim());
+    if (!parsed || typeof parsed !== 'object' || parsed.text === undefined) return null;
+
+    const result: { content: string; charts?: ChartData[] } = { content: parsed.text };
+
+    if (parsed.visualization) {
+      if (!Array.isArray(parsed.visualization) && parsed.visualization.type && parsed.visualization.data) {
+        result.charts = [parsed.visualization as ChartData];
+      } else if (Array.isArray(parsed.visualization)) {
+        result.charts = parsed.visualization as ChartData[];
+      }
+    }
+    return result;
+  } catch {
+    return null;
+  }
+};
+
+const parseAgentResponse = (text: string): { content: string; charts?: ChartData[] } => {
+  // Try the first balanced JSON object found anywhere in the response
+  const jsonStr = extractFirstJsonObject(text);
+  if (jsonStr) {
+    const result = tryParseAgentJson(jsonStr);
+    if (result) return result;
+  }
   // Fallback: treat as plain text
   return { content: text };
 };
 
 // Helper function to convert ADK events to chat messages
-const eventsToMessages = (events: Event[]): ChatMessage[] => {
+const eventsToMessages = (events: Event[], supportsVisualization: boolean): ChatMessage[] => {
   return events
     .filter(event => event.content?.parts?.some(part => part.text))
     .map(event => {
       const part = event.content?.parts?.find(part => part.text);
       const rawText = part?.text || '';
-      const parsedResponse = parseAgentResponse(rawText);
+      const parsedResponse = supportsVisualization
+        ? parseAgentResponse(rawText)
+        : { content: rawText };
       return {
         id: event.id,
         content: parsedResponse.content,
@@ -154,7 +129,14 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingApps, setIsLoadingApps] = useState(true);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [sessionNames, setSessionNames] = useState<Record<string, string>>({});
+  // Prevent the currentSession useEffect from overwriting messages that were
+  // just parsed correctly by sendMessage (the session sync happens right after).
+  const skipNextSessionSync = useRef(false);
+  const supportsVisualization = selectedApp
+    ? (getAgentConfiguration(selectedApp)?.supportsVisualization ?? false)
+    : false;
 
   // Load stored session names from localStorage on mount
   useEffect(() => {
@@ -183,38 +165,38 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
     loadApps();
   }, []);
 
-  // Load sessions when app is selected
+  // Load sessions when app changes — no currentSession dep to avoid re-fetch loops
   useEffect(() => {
+    if (!selectedApp) return;
+    let cancelled = false;
     const loadSessionsForApp = async () => {
-      if (!selectedApp) return;
-      
+      setIsLoadingSessions(true);
       try {
-        console.log(`Loading sessions for app: ${selectedApp}`);
         const sessionList = await adkApi.listSessions(selectedApp, userId);
-        console.log('Sessions loaded:', sessionList);
-        setSessions(sessionList);
-        
-        // If no current session, select the first one or create a new one
-        if (!currentSession && sessionList.length === 0) {
-          // Don't auto-create session, let user do it manually
-        } else if (!currentSession && sessionList.length > 0) {
-          setCurrentSession(sessionList[0]);
-        }
+        if (!cancelled) setSessions(sessionList);
       } catch (err) {
-        console.error('Failed to load sessions:', err);
-        setError(`Failed to load sessions: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        if (!cancelled)
+          setError(`Failed to load sessions: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      } finally {
+        if (!cancelled) setIsLoadingSessions(false);
       }
     };
     loadSessionsForApp();
-  }, [selectedApp, userId, currentSession]);
+    return () => { cancelled = true; };
+  }, [selectedApp, userId]);
 
-  // Update messages when current session changes
+  // Update messages when current session changes (e.g. navigating to a session)
+  // Skip the sync when sendMessage just updated messages — it already parsed correctly.
   useEffect(() => {
     if (currentSession) {
-      const chatMessages = eventsToMessages(currentSession.events);
+      if (skipNextSessionSync.current) {
+        skipNextSessionSync.current = false;
+        return;
+      }
+      const chatMessages = eventsToMessages(currentSession.events, supportsVisualization);
       setMessages(chatMessages);
     }
-  }, [currentSession]);
+  }, [currentSession]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadAvailableApps = async () => {
     try {
@@ -223,7 +205,7 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
       const apps = await adkApi.listApps();
       console.log('Available apps:', apps);
       setAvailableApps(apps);
-      
+
       // Auto-select the first app if available
       if (apps.length > 0 && !selectedApp) {
         setSelectedApp(apps[0]);
@@ -238,13 +220,13 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
 
   const loadSessions = async () => {
     if (!selectedApp) return;
-    
+
     try {
       console.log(`Loading sessions for app: ${selectedApp}`);
       const sessionList = await adkApi.listSessions(selectedApp, userId);
       console.log('Sessions loaded:', sessionList);
       setSessions(sessionList);
-      
+
       // If no current session, select the first one or create a new one
       if (!currentSession && sessionList.length === 0) {
         // Don't auto-create session, let user do it manually
@@ -257,9 +239,9 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
     }
   };
 
-  const createNewSession = async () => {
-    if (!selectedApp) return;
-    
+  const createNewSession = async (): Promise<Session | null> => {
+    if (!selectedApp) return null;
+
     try {
       const sessionId = `session-${Date.now()}`;
       const newSession = await adkApi.createSession(selectedApp, userId, sessionId);
@@ -267,8 +249,10 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
       setCurrentSession(newSession);
       setMessages([]);
       setError(null);
+      return newSession;
     } catch (err) {
       setError(`Failed to create session: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      return null;
     }
   };
 
@@ -326,7 +310,9 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
       }
 
       // Parse the completed response for charts / JSON wrapper
-      const parsed = parseAgentResponse(accumulated);
+      const parsed = supportsVisualization
+        ? parseAgentResponse(accumulated)
+        : { content: accumulated, charts: undefined };
       setMessages(prev =>
         prev.map(m =>
           m.id === streamingId
@@ -335,7 +321,9 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
         )
       );
 
-      // Sync session state
+      // Sync session state — skip the currentSession useEffect message overwrite
+      // since we've already parsed and set messages correctly above.
+      skipNextSessionSync.current = true;
       const updatedSession = await adkApi.getSession(selectedApp, userId, currentSession.id);
       setCurrentSession(updatedSession);
 
@@ -381,7 +369,7 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
 
   const selectSession = async (sessionId: string) => {
     if (!selectedApp) return;
-    
+
     try {
       const session = await adkApi.getSession(selectedApp, userId, sessionId);
       setCurrentSession(session);
@@ -393,19 +381,19 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
 
   const deleteSession = async (sessionId: string) => {
     if (!selectedApp) return;
-    
+
     try {
       await adkApi.deleteSession(selectedApp, userId, sessionId);
-      
+
       // Remove the session from the local list
       setSessions(prev => prev.filter(session => session.id !== sessionId));
-      
+
       // If the deleted session was the current one, clear it
       if (currentSession?.id === sessionId) {
         setCurrentSession(null);
         setMessages([]);
       }
-      
+
       setError(null);
     } catch (err) {
       setError(`Failed to delete session: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -421,8 +409,10 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
     messages,
     isLoading,
     isLoadingApps,
+    isLoadingSessions,
     error,
     sessionNames,
+    supportsVisualization,
     sendMessage,
     createNewSession,
     selectSession,

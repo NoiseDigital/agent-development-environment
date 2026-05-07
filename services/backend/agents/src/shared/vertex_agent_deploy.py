@@ -1,5 +1,6 @@
 from vertexai.preview.reasoning_engines import AdkApp
 
+
 def deploy_or_update_agent(
     root_agent,
     requirements,
@@ -22,9 +23,13 @@ def deploy_or_update_agent(
         staging_bucket=staging_bucket,
     )
 
-    action = input(
-        "Type 'deploy' to deploy a new agent or 'update' to update an existing agent: "
-    ).strip().lower()
+    action = (
+        input(
+            "Type 'deploy' to deploy a new agent or 'update' to update an existing agent: "
+        )
+        .strip()
+        .lower()
+    )
     if action not in ("deploy", "update"):
         print("Invalid action. Exiting.")
         return
@@ -46,8 +51,12 @@ def deploy_or_update_agent(
     elif action == "update":
         if not resource_engine_id:
             print("RESOURCE_ENGINE_ID variable is not set. Cannot update agent.")
-            print("If this is your first deployment, you must deploy first to create a new agent.")
-            print("Run this script again and choose 'deploy' to deploy a new agent. After deployment, save the printed resource name as RESOURCE_ENGINE_ID for future updates.")
+            print(
+                "If this is your first deployment, you must deploy first to create a new agent."
+            )
+            print(
+                "Run this script again and choose 'deploy' to deploy a new agent. After deployment, save the printed resource name as RESOURCE_ENGINE_ID for future updates."
+            )
             return
         print(f"Updating agent {resource_engine_id} on Vertex AI Agent Engine...")
         agent_engines.update(

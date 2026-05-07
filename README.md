@@ -8,6 +8,7 @@
   <img src="https://img.shields.io/badge/MCP_Toolbox-1.1.0-00897B" alt="MCP Toolbox 1.1.0" />
   <img src="https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white" alt="Python 3.13" />
   <img src="https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white" alt="PostgreSQL 16" />
+  <img src="https://github.com/noisedigital/agent-development-environment/actions/workflows/ci.yml/badge.svg" alt="CI" />
 </p>
 
 <p align="center">Internal platform for building, running, and iterating on AI agents. Provides a Next.js agent library UI, a multi-agent backend, and an MCP layer.</p>
@@ -22,34 +23,42 @@
 
 ## Getting Started
 
+### Devcontainer
+
+Open the repo in VS Code and select **Reopen in Container**.
+
+On first open, a terminal will open and run startup (/scripts/start_services.sh) automatically:
+1. If GCP credentials are missing, a browser window opens for `gcloud auth application-default login`
+2. All services start (postgres, mcp, agent, frontend)
+3. All services are on hot reload, but you can manage the compose services in the root container with standard `docker-compose` commands if necessary
+
+On every subsequent attach, services start automatically without credential prompts.
+
+Credentials are written to `/root/.config/gcloud` in the devcontainer and bind-mounted read-only into the relevant service containers.
+
+**Service logs** — run the **Compose Logs** task (**Terminal → Run Task → Compose Logs**) to stream live logs from all services.
+
+**Git identity** — the devcontainer mounts your host `~/.gitconfig` so your name and email carry over automatically. If you see *"Author identity unknown"*, configure git on your host first:
+
 ```bash
-git clone <repo>
-cd agent-development-environment
-./first_start.sh
+git config --global user.email "you@example.com"
+git config --global user.name "Your Name"
 ```
 
-`first_start.sh` detects whether GCP credentials exist in the Docker volume, opens a browser for `gcloud auth application-default login` if not, then starts all services. On subsequent runs, use `docker compose up` directly — credentials are already cached in the volume.
 
-```bash
-docker compose up           # normal start
-docker compose up --build   # rebuild images
-docker compose up -d        # detached mode
-```
+| URL | Description | Open On Startup |
+|---|---|---|
+| http://localhost:3000 | Frontend chat UI | true |
+| http://localhost:8000/dev-ui | ADK API / dev UI | true |
+| http://localhost:5000/ui | MCP Toolbox UI | false |
+| http://localhost:5432 | Postgres DB | false |
 
-> **Windows?** Use `first_start.ps1` instead of `first_start.sh`.
-
-| URL | Description |
-|---|---|
-| http://localhost:3000 | Frontend chat UI |
-| http://localhost:8000/dev-ui | ADK API / dev UI |
-| http://localhost:5000/ui | MCP Toolbox UI |
-| http://localhost:5432 | Postgres DB |
 
 ## Project Structure
 
 ```
 services/
-├── frontend/               # Next.js chat UI
+├── frontend/               # Platform UI
 ├── backend/
 │   ├── agents/             # ADK agents + FastAPI host
 │   │   ├── adk_agents/     # Individual agent packages
@@ -61,10 +70,7 @@ terraform/                  # GCP infrastructure
 
 ## Adding an Agent
 
-1. Create a directory under `services/backend/agents/adk_agents/<agent_name>/`
-2. Add `__init__.py` and `agent.py` with a `root_agent` variable
-3. The ADK server auto-discovers it — no registration needed
-4. Add display config in `services/frontend/src/config/agentConfig.tsx`
+The ADK server auto-discovers agents — no registration needed. See [CONTRIBUTING.md](CONTRIBUTING.md) for full steps and `agentConfig.tsx` display flags.
 
 **Minimal `agent.py`:**
 ```python
@@ -107,11 +113,11 @@ Key variables with their defaults (set in `.env` or shell to override):
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming, commit conventions, and guidelines for adding agents and tools.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming, commit conventions, CI requirements, and guidelines for adding agents and tools.
 
 ## Deployment
 
-TODO CI/CD
+CI runs on every push and PR (`ruff`, `ESLint`, `tsc`, `terraform validate`, `docker compose config`). All checks must pass before merge.
 
 ### MCP Toolbox to Cloud Run
 

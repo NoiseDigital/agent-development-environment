@@ -12,11 +12,11 @@ from google.genai.types import (
     Blob,
 )
 
-from google.adk.runners import InMemoryRunner, Runner
+from google.adk.runners import Runner
 from google.adk.agents import LiveRequestQueue
 from google.adk.agents.run_config import RunConfig
 from google.adk.artifacts import GcsArtifactService
-from google.adk.sessions import VertexAiSessionService, InMemorySessionService, DatabaseSessionService
+from google.adk.sessions import VertexAiSessionService, DatabaseSessionService
 #
 # ADK Streaming
 #
@@ -30,27 +30,30 @@ gcs_bucket_name_py = "nd-agent-engine-artifacts-sbx"
 
 try:
     gcs_service = GcsArtifactService(bucket_name=gcs_bucket_name_py)
-    print(
-        f"Python GcsArtifactService initialized for bucket: {gcs_bucket_name_py}")
+    print(f"Python GcsArtifactService initialized for bucket: {gcs_bucket_name_py}")
 except Exception as e:
     print(f"Error initializing Python GcsArtifactService: {e}")
 
 try:
-    vertex_ai_session_service = VertexAiSessionService(project=os.environ["GOOGLE_CLOUD_PROJECT"],
-                                                       location=os.environ["GOOGLE_CLOUD_LOCATION"],
-                                                       agent_engine_id="8348011247563702272")
-    print(f"Python VertexAiSessionService initialized.")
+    vertex_ai_session_service = VertexAiSessionService(
+        project=os.environ["GOOGLE_CLOUD_PROJECT"],
+        location=os.environ["GOOGLE_CLOUD_LOCATION"],
+        agent_engine_id="8348011247563702272",
+    )
+    print("Python VertexAiSessionService initialized.")
 except Exception as e:
     print(f"Error initializing Python VertexAiSessionService: {e}")
 
 try:
     sqlite_session_service = DatabaseSessionService(db_url="sqlite:///./sessions.db")
-    print(f"Python SQLiteSessionService initialized.")
+    print("Python SQLiteSessionService initialized.")
 except Exception as e:
     print(f"Error initializing Python SQLiteSessionService: {e}")
 
+
 def now():
     return time.time()
+
 
 async def start_agent_session(user_id, is_audio=False):
     """Starts an agent session"""
@@ -107,7 +110,9 @@ async def agent_to_client_messaging(websocket, live_events):
                     }
                     await websocket.send_text(json.dumps(message))
                     print(f"[AGENT TO CLIENT]: {message}")
-                    print(f"[DEBUG] Sent event to client at {now()} (turn_complete/interrupted)")
+                    print(
+                        f"[DEBUG] Sent event to client at {now()} (turn_complete/interrupted)"
+                    )
                     continue
 
                 # Read the Content and its first Part
@@ -119,13 +124,14 @@ async def agent_to_client_messaging(websocket, live_events):
 
                 # If it's audio, send Base64 encoded audio data
                 is_audio = part.inline_data and part.inline_data.mime_type.startswith(
-                    "audio/pcm")
+                    "audio/pcm"
+                )
                 if is_audio:
                     audio_data = part.inline_data and part.inline_data.data
                     if audio_data:
                         message = {
                             "mime_type": "audio/pcm",
-                            "data": base64.b64encode(audio_data).decode("ascii")
+                            "data": base64.b64encode(audio_data).decode("ascii"),
                         }
                         await websocket.send_text(json.dumps(message))
                         print(f"[AGENT TO CLIENT]: audio/pcm: {len(audio_data)} bytes.")
@@ -134,10 +140,7 @@ async def agent_to_client_messaging(websocket, live_events):
 
                 # If it's text and a parial text, send it
                 if part.text and event.partial:
-                    message = {
-                        "mime_type": "text/plain",
-                        "data": part.text
-                    }
+                    message = {"mime_type": "text/plain", "data": part.text}
                     await websocket.send_text(json.dumps(message))
                     print(f"[AGENT TO CLIENT]: text/plain: {message}")
                     print(f"[DEBUG] Sent event to client at {now()} (text)")
@@ -167,7 +170,8 @@ async def client_to_agent_messaging(websocket, live_request_queue):
                 # Send an audio data
                 decoded_data = base64.b64decode(data)
                 live_request_queue.send_realtime(
-                    Blob(data=decoded_data, mime_type=mime_type))
+                    Blob(data=decoded_data, mime_type=mime_type)
+                )
                 print(f"[DEBUG] Sent client audio to agent at {now()}")
             else:
                 raise ValueError(f"Mime type not supported: {mime_type}")

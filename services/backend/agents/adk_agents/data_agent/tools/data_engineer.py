@@ -24,19 +24,19 @@ from pydantic import BaseModel
 
 from google.cloud.exceptions import BadRequest, NotFound
 from google.cloud.bigquery import Client, QueryJobConfig
-from google.genai.types import (Content,
-                                GenerateContentConfig,
-                                Part,
-                                SafetySetting)
+from google.genai.types import Content, GenerateContentConfig, Part, SafetySetting
 from google.genai import Client as GenaiClient
 
 from google.adk.tools import ToolContext
 
-from services.backend.agents.adk_agents.data_agent.prompts.data_engineer import (system_instruction
-                                   as data_engineer_instruction,
-                                   prompt as data_engineer_prompt)
-from services.backend.agents.adk_agents.data_agent.prompts.sql_correction import (instruction as sql_correction_instruction,
-                                    prompt as sql_correction_prompt)
+from services.backend.agents.adk_agents.data_agent.prompts.data_engineer import (
+    system_instruction as data_engineer_instruction,
+    prompt as data_engineer_prompt,
+)
+from services.backend.agents.adk_agents.data_agent.prompts.sql_correction import (
+    instruction as sql_correction_instruction,
+    prompt as sql_correction_prompt,
+)
 
 # "gemini-2.5-pro-preview-05-06"
 DATA_ENGINEER_AGENT_MODEL_ID = "gemini-2.5-pro"
@@ -54,12 +54,12 @@ def _init_environment():
     _data_project_id = os.environ["SFDC_DATA_PROJECT_ID"]
     _location = os.environ["BQ_LOCATION"]
     _dataset = os.environ["SFDC_BQ_DATASET"]
-    _sfdc_metadata_path = os.environ.get("SFDC_METADATA_FILE",
-                                         _DEFAULT_METADATA_FILE)
+    _sfdc_metadata_path = os.environ.get("SFDC_METADATA_FILE", _DEFAULT_METADATA_FILE)
     if not Path(_sfdc_metadata_path).exists():
         if "/" not in _sfdc_metadata_path:
-            _sfdc_metadata_path = str(Path(__file__).parent.parent /
-                                      _sfdc_metadata_path)
+            _sfdc_metadata_path = str(
+                Path(__file__).parent.parent / _sfdc_metadata_path
+            )
 
     _sfdc_metadata = Path(_sfdc_metadata_path).read_text(encoding="utf-8")
     _sfdc_metadata_dict = json.loads(_sfdc_metadata)
@@ -71,8 +71,9 @@ def _init_environment():
         if table.table_id in _sfdc_metadata_dict:
             table_dict = _sfdc_metadata_dict[table.table_id]
             _final_dict[table.table_id] = table_dict
-            table_obj = client.get_table(f"{_data_project_id}.{_dataset}."
-                                         f"{table.table_id}")
+            table_obj = client.get_table(
+                f"{_data_project_id}.{_dataset}.{table.table_id}"
+            )
             for f in table_obj.schema:
                 if f.name in table_dict["columns"]:
                     table_dict["columns"][f.name]["field_type"] = f.field_type
@@ -99,18 +100,16 @@ def _sql_validator(sql_code: str) -> Tuple[str, str]:
         sfdc_name = v["salesforce_name"]
         full_name = f"`{_data_project_id}.{_dataset}.{sfdc_name}`"
         sql_code_to_run = sql_code_to_run.replace(
-            full_name,
-            f"`{_data_project_id}.{_dataset}.{k}`"
+            full_name, f"`{_data_project_id}.{_dataset}.{k}`"
         )
 
     client = Client(project=_bq_project_id, location=_location)
     try:
-        dataset_location = client.get_dataset(
-            f"{_data_project_id}.{_dataset}").location
+        dataset_location = client.get_dataset(f"{_data_project_id}.{_dataset}").location
         job_config = QueryJobConfig(dry_run=True, use_query_cache=False)
-        client.query(sql_code,
-                     job_config=job_config,
-                     location=dataset_location).result()
+        client.query(
+            sql_code, job_config=job_config, location=dataset_location
+        ).result()
     except (BadRequest, NotFound) as ex:
         err_text = ex.args[0].strip()
         return f"ERROR: {err_text}", sql_code_to_run
@@ -138,7 +137,7 @@ async def data_engineer(request: str, tool_context: ToolContext) -> SQLResult:
         request=request,
         data_project_id=_data_project_id,
         dataset=_dataset,
-        sfdc_metadata=_sfdc_metadata
+        sfdc_metadata=_sfdc_metadata,
     )
 
     genai_client = GenaiClient(
@@ -148,12 +147,7 @@ async def data_engineer(request: str, tool_context: ToolContext) -> SQLResult:
     )
     sql_code_result = genai_client.models.generate_content(
         model=DATA_ENGINEER_AGENT_MODEL_ID,
-        contents=Content(
-            role="user",
-            parts=[
-                Part.from_text(text=prompt)
-            ]
-        ),
+        contents=Content(role="user", parts=[Part.from_text(text=prompt)]),
         config=GenerateContentConfig(
             response_schema=SQLResult,
             response_mime_type="application/json",
@@ -166,8 +160,8 @@ async def data_engineer(request: str, tool_context: ToolContext) -> SQLResult:
                     category="HARM_CATEGORY_DANGEROUS_CONTENT",  # type: ignore
                     threshold="BLOCK_ONLY_HIGH",  # type: ignore
                 ),
-            ]
-        )
+            ],
+        ),
     )
     sql_result: SQLResult = sql_code_result.parsed  # type: ignore
     sql = sql_result.sql_code
@@ -195,7 +189,7 @@ async def data_engineer(request: str, tool_context: ToolContext) -> SQLResult:
                     system_instruction=sql_correction_instruction.format(
                         data_project_id=_data_project_id,
                         dataset=_dataset,
-                        sfdc_metadata=_sfdc_metadata
+                        sfdc_metadata=_sfdc_metadata,
                     ),
                     temperature=0.0,
                     top_p=0.000001,
@@ -205,12 +199,11 @@ async def data_engineer(request: str, tool_context: ToolContext) -> SQLResult:
                             category="HARM_CATEGORY_DANGEROUS_CONTENT",  # type: ignore
                             threshold="BLOCK_ONLY_HIGH",  # type: ignore
                         ),
-                    ]
-                )
+                    ],
+                ),
             )
         correcting_prompt = sql_correction_prompt.format(
-            validating_query=validating_query,
-            validator_result=validator_result
+            validating_query=validating_query, validator_result=validator_result
         )
         corr_result = chat_session.send_message(correcting_prompt).parsed
         validating_query = corr_result.sql_code  # type: ignore
@@ -228,9 +221,8 @@ async def data_engineer(request: str, tool_context: ToolContext) -> SQLResult:
         await tool_context.save_artifact(
             f"{sql_file_prefix}.sql",
             Part.from_bytes(
-                mime_type="text/x-sql",
-                data=validating_query.encode("utf-8")
-            )
+                mime_type="text/x-sql", data=validating_query.encode("utf-8")
+            ),
         )
         return SQLResult(
             sql_code=validating_query,
@@ -240,5 +232,5 @@ async def data_engineer(request: str, tool_context: ToolContext) -> SQLResult:
         return SQLResult(
             sql_code="-- no query",
             sql_code_file_name="none.sql",
-            error=f"## Could not create a valid query in {MAX_FIX_ATTEMPTS}"
-            " attempts.")
+            error=f"## Could not create a valid query in {MAX_FIX_ATTEMPTS} attempts.",
+        )

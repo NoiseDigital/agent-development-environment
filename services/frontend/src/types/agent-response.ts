@@ -4,7 +4,7 @@
 export interface AgentJsonResponse {
   // The text content to display to the user
   text: string;
-  
+
   // Optional visualization data
   visualization?: {
     type: 'line' | 'bar' | 'pie' | 'funnel' | 'area';

@@ -22,19 +22,17 @@ logger = logging.getLogger(__name__)
 # Remote URL (deployed Cloud Run MCP Server)
 MCP_SERVER_URL = "https://mcp-math-192748761045.us-central1.run.app/sse"
 
+
 # Define a function to build the LlmAgent instance.
 def _build_llm_agent() -> LlmAgent:
     # NOTE: Must set errlog=None to deploy to Agent Engine
     tools = MCPToolset(
-        connection_params=SseConnectionParams(
-            url=MCP_SERVER_URL
-        ),
-        errlog=None
+        connection_params=SseConnectionParams(url=MCP_SERVER_URL), errlog=None
     )
 
     return LlmAgent(
-        model='gemini-2.5-flash',
-        name='math_agent',
+        model="gemini-2.5-flash",
+        name="math_agent",
         instruction="""
             You do math with tools
         """,
@@ -42,9 +40,9 @@ def _build_llm_agent() -> LlmAgent:
     )
 
 
-
 # Instantiate the LlmAgent at the global level for ADK Web deployments
 root_agent = _build_llm_agent()
+
 
 # --- MathAgent Class (for A2A server) ---
 # This class wraps the root_agent and provides the 'invoke' method
@@ -54,6 +52,7 @@ class MathAgent:
     Agent to answer questions about Math using Gemini and MCP tools.
     This class is primarily used by the A2A server via AgentTaskManager.
     """
+
     SUPPORTED_CONTENT_TYPES = ["text", "text/plain"]
 
     def __init__(self):
@@ -62,13 +61,12 @@ class MathAgent:
         self._user_id = "media_performance_agent_user"
         self._runner = Runner(
             app_name=self._agent.name,
-            agent=self._agent, # Pass the LlmAgent instance to the Runner
+            agent=self._agent,  # Pass the LlmAgent instance to the Runner
             artifact_service=InMemoryArtifactService(),
             session_service=InMemorySessionService(),
             memory_service=InMemoryMemoryService(),
         )
         logger.info("MathAgent (wrapper) initialized.")
-
 
     async def invoke(self, query: str, session_id: str) -> AsyncIterable[dict]:
         logger.info(f"Received query for session {session_id}: {query[:100]}...")
@@ -87,26 +85,27 @@ class MathAgent:
             logger.info(f"Created new session {session_id}.")
 
         user_content = types.Content(
-            role="user",
-            parts=[types.Part.from_text(text=query)]
+            role="user", parts=[types.Part.from_text(text=query)]
         )
 
         async for event in self._runner.run_async(
-            user_id=self._user_id,
-            session_id=session.id,
-            new_message=user_content
+            user_id=self._user_id, session_id=session.id, new_message=user_content
         ):
             if event.is_final_response():
                 response_text = ""
-                if event.content and event.content.parts and event.content.parts[-1].text:
+                if (
+                    event.content
+                    and event.content.parts
+                    and event.content.parts[-1].text
+                ):
                     response_text = event.content.parts[-1].text
                 logger.info(f"Final response for session {session_id}.")
                 yield {
-                    'is_task_complete': True,
-                    'content': response_text,
+                    "is_task_complete": True,
+                    "content": response_text,
                 }
             else:
                 yield {
-                    'is_task_complete': False,
-                    'updates': "Processing the media performance request...",
+                    "is_task_complete": False,
+                    "updates": "Processing the media performance request...",
                 }

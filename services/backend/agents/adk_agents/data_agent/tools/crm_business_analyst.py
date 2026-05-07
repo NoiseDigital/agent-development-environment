@@ -24,28 +24,27 @@ from google.genai.types import (
     GenerateContentConfig,
     Part,
     SafetySetting,
-    ThinkingConfig
+    ThinkingConfig,
 )
 
-from services.backend.agents.adk_agents.data_agent.prompts.crm_business_analyst import (system_instruction
-                                          as crm_business_analyst_instruction)
+from services.backend.agents.adk_agents.data_agent.prompts.crm_business_analyst import (
+    system_instruction as crm_business_analyst_instruction,
+)
 
 
 BUSINESS_ANALYST_AGENT_MODEL_ID = "gemini-2.5-pro"
 
 
-async def after_model_callback(callback_context: CallbackContext,
-                          llm_response: LlmResponse) -> LlmResponse | None:
+async def after_model_callback(
+    callback_context: CallbackContext, llm_response: LlmResponse
+) -> LlmResponse | None:
     if not llm_response.content or not llm_response.content.parts:
         return
     for p in llm_response.content.parts:
         if p.text and p.text.strip():
             await callback_context.save_artifact(
                 f"analysis_{uuid.uuid4().hex}.md",
-                Part.from_bytes(
-                    mime_type="text/markdown",
-                    data=p.text.encode("utf-8")
-                )
+                Part.from_bytes(mime_type="text/markdown", data=p.text.encode("utf-8")),
             )
 
 
@@ -74,13 +73,11 @@ crm_business_analyst_agent = LlmAgent(
         seed=1,
         safety_settings=[
             SafetySetting(
-                category="HARM_CATEGORY_DANGEROUS_CONTENT", # type: ignore
-                threshold="BLOCK_ONLY_HIGH", # type: ignore
+                category="HARM_CATEGORY_DANGEROUS_CONTENT",  # type: ignore
+                threshold="BLOCK_ONLY_HIGH",  # type: ignore
             ),
-        ]
+        ],
     ),
-    planner=BuiltInPlanner(
-        thinking_config=ThinkingConfig(thinking_budget=32768)
-    ),
-    after_model_callback=after_model_callback
+    planner=BuiltInPlanner(thinking_config=ThinkingConfig(thinking_budget=32768)),
+    after_model_callback=after_model_callback,
 )

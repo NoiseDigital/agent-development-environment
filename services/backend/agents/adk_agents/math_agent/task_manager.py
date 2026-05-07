@@ -1,4 +1,3 @@
-
 # =============================================================================
 # agents/math_agent/task_manager.py
 # =============================================================================
@@ -35,6 +34,7 @@ from services.backend.agents.adk_agents.math_agent.agent import MathAgent
 # -----------------------------------------------------------------------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 # -----------------------------------------------------------------------------
 # 🛠️ AgentTaskManager: Manages the execution of the MathAgent
@@ -73,28 +73,27 @@ class AgentTaskManager(AgentExecutor):
 
         try:
             async for item in self.agent.invoke(query, task.contextId):
-                is_task_complete = item.get('is_task_complete', False)
+                is_task_complete = item.get("is_task_complete", False)
 
                 if not is_task_complete:
-                    update_message = item.get('updates', 'Agent is processing...')
+                    update_message = item.get("updates", "Agent is processing...")
                     logger.debug(f"Agent update: {update_message}")
                     await updater.update_status(
                         TaskState.working,
-                        new_agent_text_message(
-                            update_message, task.contextId, task.id
-                        ),
+                        new_agent_text_message(update_message, task.contextId, task.id),
                     )
                 else:
-                    final_content = item.get('content', 'No content received.')
-                    logger.info(f"Task {task.id} completed. Final content length: {len(final_content)} characters.")
+                    final_content = item.get("content", "No content received.")
+                    logger.info(
+                        f"Task {task.id} completed. Final content length: {len(final_content)} characters."
+                    )
 
                     message = new_agent_text_message(
                         final_content, task.contextId, task.id
                     )
-                    await updater.update_status(
-                        TaskState.completed, message
-                    )
+                    await updater.update_status(TaskState.completed, message)
                     import asyncio
+
                     await asyncio.sleep(0.1)
                     break
 
@@ -110,5 +109,7 @@ class AgentTaskManager(AgentExecutor):
     async def cancel(
         self, request: RequestContext, event_queue: EventQueue
     ) -> Task | None:
-        logger.warning(f"Attempted to cancel task {request.current_task.id if request.current_task else 'N/A'}. Cancellation is not supported.")
+        logger.warning(
+            f"Attempted to cancel task {request.current_task.id if request.current_task else 'N/A'}. Cancellation is not supported."
+        )
         raise ServerError(error=UnsupportedOperationError())

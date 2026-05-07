@@ -6,12 +6,9 @@ from google.adk.tools.function_tool import FunctionTool
 from google.adk.agents.llm_agent import LlmAgent
 import httpx
 from dotenv import load_dotenv
-from a2a.types import (
-    AgentCard
-)
+from a2a.types import AgentCard
 
 from a2a.types import (
-    AgentCard,
     SendMessageRequest,
 )
 
@@ -22,7 +19,9 @@ model_name = os.getenv("GOOGLE_MODEL_NAME", "gemini-2.5-flash")
 
 # Retrieve the A2A agent registry base URL from environment variables with a default fallback.
 # NOTE: Update to math agent, media performance agent was taken off A2A
-AGENT_REGISTRY_BASE_URL = "https://agent-media-performance-192748761045.us-central1.run.app"
+AGENT_REGISTRY_BASE_URL = (
+    "https://agent-media-performance-192748761045.us-central1.run.app"
+)
 
 
 async def list_agents() -> list[dict]:
@@ -43,23 +42,18 @@ async def list_agents() -> list[dict]:
         final_agent_card_to_use: AgentCard | None = None
 
         try:
-            logger.info(
-                f"Attempting to fetch public agent card from: {base_url}"
-            )
+            logger.info(f"Attempting to fetch public agent card from: {base_url}")
             # Fetches the AgentCard from the standard public path.
             public_card = await resolver.get_agent_card()
             logger.info("Successfully fetched public agent card:")
-            logger.info(
-                public_card.model_dump_json(indent=2, exclude_none=True)
-            )
+            logger.info(public_card.model_dump_json(indent=2, exclude_none=True))
             final_agent_card_to_use = public_card
-            logger.info(
-                "Using PUBLIC agent card for A2AClient initialization.")
+            logger.info("Using PUBLIC agent card for A2AClient initialization.")
 
         except Exception as e:
             logger.error(
                 f"Critical error fetching public agent card from {base_url}: {e}",
-                exc_info=True  # This prints the full traceback, very helpful for debugging
+                exc_info=True,  # This prints the full traceback, very helpful for debugging
             )
             raise RuntimeError(
                 "Failed to fetch the public agent card. Cannot continue."
@@ -79,13 +73,9 @@ async def call_agent(agent_name: str, message: str) -> str:
     """
     cards = await list_agents()  # Use the module-level list_agents
 
-    client = A2AClient(httpx_client=httpx.AsyncClient(timeout=3000),
-                       agent_card=cards)
+    client = A2AClient(httpx_client=httpx.AsyncClient(timeout=3000), agent_card=cards)
 
     print("Connected to A2AClient at", AGENT_REGISTRY_BASE_URL)
-    session_id = "transalation_session"
-    # Find the agent card by name
-    task_id = uuid4().hex
 
     payload = {
         "jsonrpc": "2.0",
@@ -94,16 +84,11 @@ async def call_agent(agent_name: str, message: str) -> str:
         "params": {
             "message": {
                 "role": "user",
-                "parts": [
-                    {
-                        "kind": "text",
-                        "text": message
-                    }
-                ],
-                "messageId": uuid4().hex
+                "parts": [{"kind": "text", "text": message}],
+                "messageId": uuid4().hex,
             },
-            "metadata": {}
-        }
+            "metadata": {},
+        },
     }
 
     # Using user_id as session_id for simplicity as in original code
@@ -114,10 +99,11 @@ async def call_agent(agent_name: str, message: str) -> str:
 
     print("Response from send_message:", response_rec)
 
-    response = response_rec.model_dump(mode='json', exclude_none=True)
+    response = response_rec.model_dump(mode="json", exclude_none=True)
     # print("Formatted Response:", response)
     # print("parse", response['result']['status']['message']['parts'][0]['text'])
-    return (response['result']['status']['message']['parts'][0]['text'])
+    return response["result"]["status"]["message"]["parts"][0]["text"]
+
 
 # System instruction for the LLM
 system_instr = (
@@ -138,4 +124,3 @@ root_agent = LlmAgent(
         FunctionTool(call_agent),
     ],
 )
-

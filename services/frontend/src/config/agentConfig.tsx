@@ -11,6 +11,12 @@ export interface AgentConfig {
   hidden?: boolean;
   /** Show in library but disabled with a "Coming Soon" badge */
   comingSoon?: boolean;
+  /**
+   * When true, the chat UI attempts to parse agent responses as
+   * { text, visualization } JSON and renders charts. Agents that
+   * return plain text should leave this false (default).
+   */
+  supportsVisualization?: boolean;
 }
 
 // Complete agent configurations
@@ -20,6 +26,7 @@ export const agentConfigurations: Record<string, AgentConfig> = {
     displayName: 'Media Analyst',
     description: 'I\'m here to help you analyze media content, unlock performance insights, examine data trends, and assist with your media analytics tasks.',
     url: process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'https://agent-media-performance-192748761045.us-central1.run.app',
+    supportsVisualization: true,
     icon: React.createElement('svg', {
       className: 'w-8 h-8',
       fill: 'none',
@@ -122,29 +129,29 @@ export const defaultIcons = [
 export const getAgentConfiguration = (agentName: string): AgentConfig => {
   console.log('Looking for agent:', agentName);
   console.log('Available configurations:', Object.keys(agentConfigurations));
-  
+
   const config = agentConfigurations[agentName];
-  
+
   if (config) {
     console.log('Found config for:', agentName, config);
     return config;
   }
-  
+
   console.log('No config found for:', agentName, 'using fallback');
-  
+
   // Fallback for agents not in config
   const defaultDisplayName = agentName
     .split(/[-_]/)
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
-  
+
   // Use hash to consistently assign default icon
   let hash = 0;
   for (let i = 0; i < agentName.length; i++) {
     hash = agentName.charCodeAt(i) + ((hash << 5) - hash);
   }
   const defaultIcon = defaultIcons[Math.abs(hash) % defaultIcons.length];
-  
+
   return {
     name: agentName,
     displayName: defaultDisplayName,
@@ -157,7 +164,7 @@ export const getAgentConfiguration = (agentName: string): AgentConfig => {
 // Helper function to get all configured agent URLs
 export const getAgentEndpoints = (): Record<string, { name: string; url: string; description?: string }> => {
   const endpoints: Record<string, { name: string; url: string; description?: string }> = {};
-  
+
   Object.values(agentConfigurations).forEach(config => {
     endpoints[config.name] = {
       name: config.name,
@@ -165,6 +172,6 @@ export const getAgentEndpoints = (): Record<string, { name: string; url: string;
       description: config.description
     };
   });
-  
+
   return endpoints;
 };

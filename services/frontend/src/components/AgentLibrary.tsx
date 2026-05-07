@@ -8,10 +8,10 @@ interface AgentLibraryProps {
   onSelectAgent: (app: string) => void;
 }
 
-export default function AgentLibrary({ 
-  availableApps, 
-  isLoadingApps, 
-  onSelectAgent 
+export default function AgentLibrary({
+  availableApps,
+  isLoadingApps,
+  onSelectAgent
 }: AgentLibraryProps) {
 
   if (isLoadingApps) {
@@ -103,4 +103,3 @@ export default function AgentLibrary({
     </div>
   );
 }
-

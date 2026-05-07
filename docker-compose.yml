@@ -1,17 +1,6 @@
 services:
-  devcontainer:
-    build:
-      context: .
-      dockerfile: .devcontainer/Dockerfile
-    volumes:
-      - .:/workspace
-      - gcloud_config:/root/.config/gcloud
-    stdin_open: true
-    tty: true
-    command: ["-c", "sleep infinity"]
-
   # Auth: run `gcloud auth application-default login` in the devcontainer to authenticate.
-  # The ADC credentials are shared with this container via the gcloud_config volume.
+  # ADC credentials are bind-mounted from /root/.config/gcloud in the devcontainer.
   # IAM roles needed: Vertex AI User, Cloud Trace Agent
   agent:
     build:
@@ -19,7 +8,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./services/backend/agents:/workspace
-      - gcloud_config:/root/.config/gcloud:ro
+      - /root/.config/gcloud:/root/.config/gcloud:ro
     ports:
       - "${AGENT_PORT:-8000}:${AGENT_PORT:-8000}"
     environment:
@@ -43,7 +32,7 @@ services:
     tty: true
     command: uv run uvicorn main:app --host 0.0.0.0 --port ${AGENT_PORT:-8000} --reload
 
-  # Auth: shares ADC credentials from the devcontainer via the gcloud_config volume.
+  # Auth: shares ADC credentials from the devcontainer via /root/.config/gcloud.
   # IAM roles needed: BigQuery Data Viewer, BigQuery Job User
   mcp:
     build:
@@ -51,7 +40,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./services/backend/mcp:/workspace
-      - gcloud_config:/root/.config/gcloud:ro
+      - /root/.config/gcloud:/root/.config/gcloud:ro
     ports:
       - "${MCP_PORT:-5000}:${MCP_PORT:-5000}"
     environment:
@@ -108,6 +97,5 @@ services:
 # - frontend_node_modules: caches node_modules so npm install only runs at build time,
 #   not on every container start (the bind mount would otherwise shadow the image's node_modules)
 volumes:
-  gcloud_config:
   postgres_data:
   frontend_node_modules:

@@ -23,9 +23,9 @@ def get_exchange_rate(
                 "rates": {"EUR": 0.95534}}
     """
     import requests
+
     response = requests.get(
         f"https://api.frankfurter.app/{currency_date}",
         params={"from": currency_from, "to": currency_to},
     )
     return response.json()
-

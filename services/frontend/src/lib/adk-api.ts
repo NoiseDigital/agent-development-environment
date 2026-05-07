@@ -77,14 +77,14 @@ export class ADKApiClient {
   addAgent(agentName: string, endpoint: AgentEndpoint): void {
     this.endpoints[agentName] = endpoint;
   }
-  
+
   async listApps(): Promise<string[]> {
     // Query all configured endpoints to discover available apps
     const allApps = new Set<string>();
     const endpoints = Object.values(this.endpoints);
-    
+
     console.log('Checking endpoints for available apps:', endpoints.map(e => e.url));
-    
+
     for (const endpoint of endpoints) {
       try {
         console.log(`Checking ${endpoint.url}/list-apps`);
@@ -100,7 +100,7 @@ export class ADKApiClient {
         console.warn(`Error checking ${endpoint.url}:`, error);
       }
     }
-    
+
     const result = Array.from(allApps);
     console.log('Final combined app list:', result);
     return result;
@@ -108,10 +108,10 @@ export class ADKApiClient {
 
   async createSession(appName: string, userId: string, sessionId?: string): Promise<Session> {
     const baseUrl = this.getBaseUrl(appName);
-    const url = sessionId 
+    const url = sessionId
       ? `${baseUrl}/apps/${appName}/users/${userId}/sessions/${sessionId}`
       : `${baseUrl}/apps/${appName}/users/${userId}/sessions`;
-    
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -122,7 +122,7 @@ export class ADKApiClient {
         events: []
       }),
     });
-    
+
     if (!response.ok) throw new Error('Failed to create session');
     return response.json();
   }
@@ -158,7 +158,7 @@ export class ADKApiClient {
       },
       body: JSON.stringify(request),
     });
-    
+
     if (!response.ok) throw new Error('Failed to send message');
     return response.json();
   }

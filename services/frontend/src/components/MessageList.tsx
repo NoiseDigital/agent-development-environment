@@ -21,9 +21,10 @@ interface MessageListProps {
   messages: ChatMessage[];
   isLoading: boolean;
   selectedApp?: string | null;
+  supportsVisualization?: boolean;
 }
 
-export default function MessageList({ messages, isLoading, selectedApp }: MessageListProps) {
+export default function MessageList({ messages, isLoading, selectedApp, supportsVisualization = false }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const streamingMsgRef = useRef<HTMLDivElement>(null);
   const lastStreamingId = useRef<string | null>(null);
@@ -95,7 +96,7 @@ export default function MessageList({ messages, isLoading, selectedApp }: Messag
         </div>
       ) : (
         messages.map((message) => {
-          const hasCharts = message.charts && message.charts.length > 0;
+          const hasCharts = supportsVisualization && message.charts && message.charts.length > 0;
           const isAgent = message.author !== 'user';
           const rating = ratings[message.id] ?? null;
 

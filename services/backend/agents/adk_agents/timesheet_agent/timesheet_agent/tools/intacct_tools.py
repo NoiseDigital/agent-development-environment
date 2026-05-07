@@ -1,5 +1,6 @@
 from typing import List
 
+
 def get_user_docket_ids() -> List[str]:
     """Mock function to fetch Docket IDs the user can submit hours to.
 
@@ -28,19 +29,21 @@ def build_timesheet_xml(
     Returns:
         str: XML string representing the timesheet.
     """
-    entries_xml = "\n".join([
-        f"    <TIMESHEETENTRY>"
-        f"<ENTRYDATE>{e.get('entry_date')}</ENTRYDATE>"
-        f"<QTY>{e.get('qty')}</QTY>"
-        f"<BILLABLE>{str(e.get('billable', False)).lower()}</BILLABLE>"
-        f"<DEPARTMENTID>{e.get('department_id')}</DEPARTMENTID>"
-        f"<LOCATIONID>{e.get('location_id')}</LOCATIONID>"
-        f"<PROJECTID>{e.get('project_id')}</PROJECTID>"
-        f"<TASKKEY>{e.get('task_key')}</TASKKEY>"
-        f"<NOTES>{e.get('notes', '')}</NOTES>"
-        f"</TIMESHEETENTRY>"
-        for e in entries
-    ])
+    entries_xml = "\n".join(
+        [
+            f"    <TIMESHEETENTRY>"
+            f"<ENTRYDATE>{e.get('entry_date')}</ENTRYDATE>"
+            f"<QTY>{e.get('qty')}</QTY>"
+            f"<BILLABLE>{str(e.get('billable', False)).lower()}</BILLABLE>"
+            f"<DEPARTMENTID>{e.get('department_id')}</DEPARTMENTID>"
+            f"<LOCATIONID>{e.get('location_id')}</LOCATIONID>"
+            f"<PROJECTID>{e.get('project_id')}</PROJECTID>"
+            f"<TASKKEY>{e.get('task_key')}</TASKKEY>"
+            f"<NOTES>{e.get('notes', '')}</NOTES>"
+            f"</TIMESHEETENTRY>"
+            for e in entries
+        ]
+    )
     xml = f"""
 <create>
     <TIMESHEET>

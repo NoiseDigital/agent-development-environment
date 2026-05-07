@@ -1,5 +1,16 @@
 # Contributing
 
+## Devcontainer Setup
+
+The recommended way to work on this repo is via the VS Code devcontainer. Opening the container automatically starts all services and handles GCP authentication on first run — see [README](README.md) for the full flow.
+
+**Git identity** — ensure git is configured on your host before opening the container, so your identity is available inside:
+
+```bash
+git config --global user.email "you@example.com"
+git config --global user.name "Your Name"
+```
+
 ## Branching Strategy
 
 We follow **trunk-based development**. All work flows through `main`.
@@ -66,6 +77,39 @@ refactor(frontend): extract agent config to agentConfig.tsx
 - Use the imperative mood — "add", not "added" or "adds"
 - Reference issues where relevant: `fix(mcp): handle empty toolset (#42)`
 
+## CI Requirements
+
+All PRs must pass the following checks before merge:
+
+| Check | What it runs |
+|---|---|
+| `Backend — ruff + mypy` | `ruff check` + `ruff format --check` on `services/backend/agents/` |
+| `Frontend — ESLint + TypeScript` | `next lint` + `tsc --noEmit` on `services/frontend/` |
+| `Terraform — fmt + validate` | `terraform fmt -check` + `terraform validate` on `terraform/` |
+| `Docker Compose — config validation` | `docker compose config` on root `docker-compose.yml` |
+
+Fix lint failures locally before pushing — `ruff check --fix .` and `ruff format .` handle most Python issues automatically.
+
+## Pre-commit Hooks
+
+Hooks are installed automatically in the devcontainer. Outside the devcontainer, run once:
+
+```bash
+uv tool install pre-commit   # or: pipx install pre-commit
+pre-commit install
+```
+
+Hooks run on every `git commit`:
+- **ruff** — lint + autofix Python
+- **ruff-format** — format Python
+- **detect-private-key** — blocks accidental credential commits
+- **check-ast** — validates Python syntax
+- **check-added-large-files** — warns on files > 1 MB
+- **terraform_fmt** — formats `.tf` files
+- Standard hygiene (trailing whitespace, EOF, YAML/JSON/TOML validity)
+
+To run all hooks manually: `pre-commit run --all-files`
+
 ## Pull Requests
 
 The repo enforces **squash merges only**. The PR title and description become the single commit on `main` — individual commit messages are not read by release tooling (unless there is only one commit, in which case it becomes the PR title automatically).
@@ -93,7 +137,10 @@ Other guidelines:
 
 1. Create `services/backend/agents/adk_agents/<agent_name>/`
 2. Add `__init__.py` and `agent.py` with a top-level `root_agent` variable
-3. Add display config (name, description, icon) to `services/frontend/src/config/agentConfig.tsx`
+3. Add display config to `services/frontend/src/config/agentConfig.tsx`:
+   - `hidden: true` — agent exists in backend but is not shown in the UI
+   - `comingSoon: true` — agent appears in the library as a disabled card with a "Coming soon" badge
+   - Omit both (or set neither) for a fully active agent
 4. Document any new env vars in `.env.example`
 
 ## Adding MCP Tools

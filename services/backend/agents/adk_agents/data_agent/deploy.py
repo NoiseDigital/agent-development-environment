@@ -25,9 +25,11 @@ from services.backend.agents.adk_agents.data_agent.utils.constants import (
     get_resource_engine_id,
     get_agent_name,
     get_agent_display_name,
-    get_agent_display_description
+    get_agent_display_description,
 )
-from services.backend.agents.src.shared.vertex_agent_deploy import deploy_or_update_agent
+from services.backend.agents.src.shared.vertex_agent_deploy import (
+    deploy_or_update_agent,
+)
 
 # Load environment variables
 PROJECT_ID = os.environ["GOOGLE_CLOUD_PROJECT"]
@@ -48,14 +50,11 @@ requirements = [
     "matplotlib",
     "scikit-learn",
     "tabulate",
-    "platformdirs"
+    "platformdirs",
 ]
 
 # Include the entire agents directory
-extra_packages = [
-    "agents/data_agent",
-    "src"
-]
+extra_packages = ["agents/data_agent", "src"]
 
 # Optionally, set environment variables required by your agent
 # env_vars = {"MY_ENV_VAR": "my_value"}
@@ -81,4 +80,3 @@ deploy_or_update_agent(
     location=LOCATION,
     staging_bucket=STAGING_BUCKET,
 )
-

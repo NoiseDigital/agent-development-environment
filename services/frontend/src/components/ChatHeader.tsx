@@ -114,14 +114,3 @@ export default function ChatHeader({
     </div>
   );
 }
-      
-      {error && (
-        <div className="mt-3 p-3 bg-red-950 border border-red-800 rounded-xl">
-          <div className="text-red-200 text-sm">
-            {error}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}

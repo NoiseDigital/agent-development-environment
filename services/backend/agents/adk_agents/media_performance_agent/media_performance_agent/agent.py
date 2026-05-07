@@ -1,5 +1,6 @@
 import os
 import logging
+from datetime import date
 
 from google.adk.agents import LlmAgent
 from google.adk.tools.agent_tool import AgentTool
@@ -9,6 +10,12 @@ from .subagents import agent as react_charts_agent
 from toolbox_core import ToolboxSyncClient
 from toolbox_core.protocol import Protocol
 
+
+def today() -> str:
+    """Returns today's date in YYYY-MM-DD format."""
+    return date.today().isoformat()
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -16,22 +23,26 @@ logger = logging.getLogger(__name__)
 # This part is specifically for enabling ADK Web usage
 # It expects a top-level LlmAgent instance named 'root_agent'.
 
+
 # Define a function to build the LlmAgent instance.
 def _build_llm_agent() -> LlmAgent:
     model_name = os.getenv("GOOGLE_MODEL_NAME", "gemini-2.5-flash")
-    TOOLBOX_ENDPOINT = os.getenv("TOOLBOX_ENDPOINT", "https://mcp-toolbox-192748761045.us-central1.run.app")
+    TOOLBOX_ENDPOINT = os.getenv(
+        "TOOLBOX_ENDPOINT", "https://mcp-toolbox-192748761045.us-central1.run.app"
+    )
     # TOOLBOX_ENDPOINT = "http://localhost:8080"
     # MCP Toolbox server v1.1.0 speaks protocol 2025-03-26. The toolbox-core SDK defaults
     # to 2025-06-18, causing a version mismatch error. Pin to MCP_v20250326 until the
     # server is upgraded to a version that supports a newer protocol.
     toolbox = ToolboxSyncClient(TOOLBOX_ENDPOINT, protocol=Protocol.MCP_v20250326)
     tools = toolbox.load_toolset("media_performance_recharts_friendly")
+    tools.append(today)
     tools.append(AgentTool(react_charts_agent.root_agent))
     return LlmAgent(
-    model=model_name,
-    name="MediaPerformanceAgent",
-    description="Agent to answer questions about Media Performance with data visualizations and insights.",
-    instruction="""
+        model=model_name,
+        name="MediaPerformanceAgent",
+        description="Agent to answer questions about Media Performance with data visualizations and insights.",
+        instruction="""
         You are a Media Performance Analytics agent that helps users understand their campaign data through intelligent querying and visualization.
 
         ## YOUR ROLE
@@ -100,7 +111,7 @@ def _build_llm_agent() -> LlmAgent:
 
         Structure your text content as:
         1. **Executive Summary**: Brief overview of findings
-        2. **Key Insights**: 2-3 bullet points highlighting important patterns  
+        2. **Key Insights**: 2-3 bullet points highlighting important patterns
         3. **Detailed Analysis**: Deeper dive into the data
         4. **Recommendations**: Actionable next steps
 
@@ -108,7 +119,7 @@ def _build_llm_agent() -> LlmAgent:
 
         **User**: "Show me our campaign performance trend over the last month"
         **Your approach**:
-        1. Query: `daily_performance_trend` 
+        1. Query: `daily_performance_trend`
         2. Analyze the time series data
         3. **IMMEDIATELY** call ReactChartsAgent tool with the data for line chart
         4. Return ReactChartsAgent's complete JSON response
@@ -157,19 +168,23 @@ def _build_llm_agent() -> LlmAgent:
 
         ## COLLABORATION WITH REACTCHARTSAGENT TOOL
         When using the ReactChartsAgent tool:
-        1. Call the tool immediately after querying data for visualization requests
-        2. Pass the raw query results to the tool
-        3. Specify the recommended chart type based on data type
-        4. Include analysis context in the tool call
-        5. Return the tool's complete JSON response (text + visualization)
+        1. Call the data tools FIRST to fetch the actual results
+        2. Only AFTER you have the data, call ReactChartsAgent with the results
+        3. Return the tool's complete JSON response (text + visualization)
 
         **TOOL USAGE PATTERN:**
         ```
-        Step 1: Query BigQuery data
+        Step 1: Call a data tool (e.g. daily_spend_trend) to fetch real results
         Step 2: Recognize visualization need
-        Step 3: Call ReactChartsAgent tool with data
+        Step 3: Call ReactChartsAgent tool — pass ALL fetched data as a plain text STRING in the `request` field
         Step 4: Return tool response directly
         ```
+
+        **CRITICAL — ReactChartsAgent `request` MUST be a plain text STRING:**
+        - CORRECT: request = "Here is the daily spend data: [{'date': '2024-01-01', 'spend': 1200}, ...]. Please create a line chart."
+        - WRONG:   request = {"date_from": "2024-01-01", "date_to": "2024-01-31"}  ← this will crash
+        - NEVER pass a dict, query parameters, or tool arguments as the request
+        - ALWAYS include the actual data values returned by the data tool in your string
 
         **CRITICAL: Ensure ReactChartsAgent tool follows frontend data format:**
         - Data must use ONLY {"name": "Label", "value": number} format
@@ -208,8 +223,8 @@ def _build_llm_agent() -> LlmAgent:
 
         Remember: Always return valid JSON strings. Your goal is to turn raw media performance data into actionable business intelligence that drives better campaign decisions.
         """,
-    tools=tools,
-)
+        tools=tools,
+    )
 
 
 # Instantiate the LlmAgent at the global level for ADK Web deployments

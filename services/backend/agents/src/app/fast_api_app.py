@@ -57,23 +57,21 @@ from google.adk.sessions import Session, VertexAiSessionService as SessionServic
 
 logger = logging.getLogger(__name__)
 
+
 class ApiServerSpanExporter(export.SpanExporter):
-
     def __init__(self, trace_dict):
-      self.trace_dict = trace_dict
+        self.trace_dict = trace_dict
 
-    def export(
-        self, spans: typing.Sequence[ReadableSpan]
-    ) -> export.SpanExportResult:
+    def export(self, spans: typing.Sequence[ReadableSpan]) -> export.SpanExportResult:
         for span in spans:
             if (
                 span.name == "call_llm"
                 or span.name == "send_data"
                 or span.name.startswith("tool_response")
             ):
-                attributes = dict(span.attributes) # type: ignore
-                attributes["trace_id"] = span.get_span_context().trace_id # type: ignore
-                attributes["span_id"] = span.get_span_context().span_id # type: ignore
+                attributes = dict(span.attributes)  # type: ignore
+                attributes["trace_id"] = span.get_span_context().trace_id  # type: ignore
+                attributes["span_id"] = span.get_span_context().span_id  # type: ignore
         return export.SpanExportResult.SUCCESS
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
@@ -87,6 +85,7 @@ class AgentRunRequest(BaseModel):
     new_message: types.Content
     streaming: bool = False
 
+
 # TODO: Update so agent_dir points to resource engine instances
 def get_fast_api_app(
     *,
@@ -94,7 +93,7 @@ def get_fast_api_app(
     allow_origins: Optional[list[str]] = None,
     trace_to_cloud: bool = False,
     lifespan: Optional[Lifespan[FastAPI]] = None,
-    artifact_service: Optional[BaseArtifactService] = None
+    artifact_service: Optional[BaseArtifactService] = None,
 ) -> FastAPI:
     # InMemory tracing dict.
     trace_dict: dict[str, Any] = {}
@@ -105,16 +104,16 @@ def get_fast_api_app(
         export.SimpleSpanProcessor(ApiServerSpanExporter(trace_dict))
     )
     if trace_to_cloud:
-      if project_id := os.environ.get("GOOGLE_CLOUD_PROJECT", None):
-          processor = export.BatchSpanProcessor(
-              CloudTraceSpanExporter(project_id=project_id)
-          )
-          provider.add_span_processor(processor)
-      else:
-          logging.warning(
-              "GOOGLE_CLOUD_PROJECT environment variable is not set. Tracing will"
-              " not be enabled."
-          )
+        if project_id := os.environ.get("GOOGLE_CLOUD_PROJECT", None):
+            processor = export.BatchSpanProcessor(
+                CloudTraceSpanExporter(project_id=project_id)
+            )
+            provider.add_span_processor(processor)
+        else:
+            logging.warning(
+                "GOOGLE_CLOUD_PROJECT environment variable is not set. Tracing will"
+                " not be enabled."
+            )
 
     trace.set_tracer_provider(provider)
 
@@ -123,7 +122,7 @@ def get_fast_api_app(
     @asynccontextmanager
     async def internal_lifespan(app: FastAPI):
         if lifespan:
-            async with lifespan(app) as lifespan_context:
+            async with lifespan(app):
                 yield
 
                 if exit_stacks:
@@ -158,9 +157,10 @@ def get_fast_api_app(
     session_service = SessionService(
         project=os.environ["GOOGLE_CLOUD_PROJECT"],
         location=os.environ.get("GOOGLE_CLOUD_LOCATION", "global"),
-        agent_engine_id=os.environ["AGENT_ENGINE_ID"], ## TODO: Update to fetch ID dynamically based on {app_name}
+        agent_engine_id=os.environ[
+            "AGENT_ENGINE_ID"
+        ],  ## TODO: Update to fetch ID dynamically based on {app_name}
     )
-
 
     @app.get("/debug/trace/{event_id}")
     def get_trace_dict(event_id: str) -> Any:
@@ -174,12 +174,12 @@ def get_fast_api_app(
         response_model_exclude_none=True,
     )
     async def get_session(app_name: str, user_id: str, session_id: str) -> Session:
-      session = await session_service.get_session(
-          app_name=app_name, user_id=user_id, session_id=session_id
-      )
-      if not session:
-          raise HTTPException(status_code=404, detail="Session not found")
-      return session
+        session = await session_service.get_session(
+            app_name=app_name, user_id=user_id, session_id=session_id
+        )
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        return session
 
     @app.get(
         "/apps/{app_name}/users/{user_id}/sessions",
@@ -188,9 +188,9 @@ def get_fast_api_app(
     async def list_sessions(app_name: str, user_id: str) -> list[Session]:
         return [
             session
-            for session in (await session_service.list_sessions(
-                app_name=app_name, user_id=user_id
-            )).sessions
+            for session in (
+                await session_service.list_sessions(app_name=app_name, user_id=user_id)
+            ).sessions
         ]
 
     @app.post(
@@ -210,10 +210,10 @@ def get_fast_api_app(
             )
             is not None
         ):
-          logger.warning("Session already exists: %s", session_id)
-          raise HTTPException(
-              status_code=400, detail=f"Session already exists: {session_id}"
-          )
+            logger.warning("Session already exists: %s", session_id)
+            raise HTTPException(
+                status_code=400, detail=f"Session already exists: {session_id}"
+            )
 
         logger.info("New session created: %s", session_id)
         return await session_service.create_session(
@@ -229,10 +229,10 @@ def get_fast_api_app(
         user_id: str,
         state: Optional[dict[str, Any]] = None,
     ) -> Session:
-      logger.info("New session created")
-      return await session_service.create_session(
-          app_name=app_name, user_id=user_id, state=state
-      )
+        logger.info("New session created")
+        return await session_service.create_session(
+            app_name=app_name, user_id=user_id, state=state
+        )
 
     @app.delete("/apps/{app_name}/users/{user_id}/sessions/{session_id}")
     async def delete_session(app_name: str, user_id: str, session_id: str):
@@ -291,9 +291,9 @@ def get_fast_api_app(
     async def list_artifact_names(
         app_name: str, user_id: str, session_id: str
     ) -> list[str]:
-      return await artifact_service.list_artifact_keys(
-          app_name=app_name, user_id=user_id, session_id=session_id
-      )
+        return await artifact_service.list_artifact_keys(
+            app_name=app_name, user_id=user_id, session_id=session_id
+        )
 
     @app.get(
         "/apps/{app_name}/users/{user_id}/sessions/{session_id}/artifacts/{artifact_name}/versions",
@@ -328,7 +328,7 @@ def get_fast_api_app(
             app_name=req.app_name, user_id=req.user_id, session_id=req.session_id
         )
         if not session:
-          raise HTTPException(status_code=404, detail="Session not found")
+            raise HTTPException(status_code=404, detail="Session not found")
         runner = await _get_runner_async(req.app_name)
         events = [
             event
@@ -353,8 +353,7 @@ def get_fast_api_app(
         # Convert the events to properly formatted SSE
         async def event_generator():
             try:
-                stream_mode = (StreamingMode.SSE if req.streaming
-                               else StreamingMode.NONE)
+                stream_mode = StreamingMode.SSE if req.streaming else StreamingMode.NONE
                 runner = await _get_runner_async(req.app_name)
                 async for event in runner.run_async(
                     user_id=req.user_id,
@@ -377,7 +376,6 @@ def get_fast_api_app(
             media_type="text/event-stream",
         )
 
-
     @app.websocket("/run_live")
     async def agent_live_run(
         websocket: WebSocket,
@@ -388,62 +386,60 @@ def get_fast_api_app(
             default=["TEXT", "AUDIO"]
         ),  # Only allows "TEXT" or "AUDIO"
     ) -> None:
-      await websocket.accept()
-      session = await session_service.get_session(
-          app_name=app_name, user_id=user_id, session_id=session_id
-      )
-      if not session:
-          # Accept first so that the client is aware of connection establishment,
-          # then close with a specific code.
-          await websocket.close(code=1002, reason="Session not found")
-          return
+        await websocket.accept()
+        session = await session_service.get_session(
+            app_name=app_name, user_id=user_id, session_id=session_id
+        )
+        if not session:
+            # Accept first so that the client is aware of connection establishment,
+            # then close with a specific code.
+            await websocket.close(code=1002, reason="Session not found")
+            return
 
-      live_request_queue = LiveRequestQueue()
+        live_request_queue = LiveRequestQueue()
 
-      async def forward_events():
-        runner = await _get_runner_async(app_name)
-        async for event in runner.run_live(
-            session=session, live_request_queue=live_request_queue
-        ):
-          await websocket.send_text(
-              event.model_dump_json(exclude_none=True, by_alias=True)
-          )
+        async def forward_events():
+            runner = await _get_runner_async(app_name)
+            async for event in runner.run_live(
+                session=session, live_request_queue=live_request_queue
+            ):
+                await websocket.send_text(
+                    event.model_dump_json(exclude_none=True, by_alias=True)
+                )
 
-      async def process_messages():
-          try:
-              while True:
-                  data = await websocket.receive_text()
-                  # Validate and send the received message to the live queue.
-                  live_request_queue.send(LiveRequest.model_validate_json(data))
-          except ValidationError as ve:
-              logger.error("Validation error in process_messages: %s", ve)
+        async def process_messages():
+            try:
+                while True:
+                    data = await websocket.receive_text()
+                    # Validate and send the received message to the live queue.
+                    live_request_queue.send(LiveRequest.model_validate_json(data))
+            except ValidationError as ve:
+                logger.error("Validation error in process_messages: %s", ve)
 
-      # Run both tasks concurrently and cancel all if one fails.
-      tasks = [
-          asyncio.create_task(forward_events()),
-          asyncio.create_task(process_messages()),
-      ]
-      done, pending = await asyncio.wait(
-          tasks, return_when=asyncio.FIRST_EXCEPTION
-      )
-      try:
-          # This will re-raise any exception from the completed tasks.
-          for task in done:
-              task.result()
-      except WebSocketDisconnect:
-          logger.info("Client disconnected during process_messages.")
-      except Exception as e:
-          logger.exception("Error during live websocket communication: %s", e)
-          traceback.print_exc()
-          WEBSOCKET_INTERNAL_ERROR_CODE = 1011
-          WEBSOCKET_MAX_BYTES_FOR_REASON = 123
-          await websocket.close(
-              code=WEBSOCKET_INTERNAL_ERROR_CODE,
-              reason=str(e)[:WEBSOCKET_MAX_BYTES_FOR_REASON],
-          )
-      finally:
-          for task in pending:
-              task.cancel()
+        # Run both tasks concurrently and cancel all if one fails.
+        tasks = [
+            asyncio.create_task(forward_events()),
+            asyncio.create_task(process_messages()),
+        ]
+        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+        try:
+            # This will re-raise any exception from the completed tasks.
+            for task in done:
+                task.result()
+        except WebSocketDisconnect:
+            logger.info("Client disconnected during process_messages.")
+        except Exception as e:
+            logger.exception("Error during live websocket communication: %s", e)
+            traceback.print_exc()
+            WEBSOCKET_INTERNAL_ERROR_CODE = 1011
+            WEBSOCKET_MAX_BYTES_FOR_REASON = 123
+            await websocket.close(
+                code=WEBSOCKET_INTERNAL_ERROR_CODE,
+                reason=str(e)[:WEBSOCKET_MAX_BYTES_FOR_REASON],
+            )
+        finally:
+            for task in pending:
+                task.cancel()
 
     async def _get_root_agent_async(app_name: str) -> Agent:
         """Returns the root agent for the given app."""

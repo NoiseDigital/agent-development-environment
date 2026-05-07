@@ -21,18 +21,18 @@ import sys
 
 
 _env_requirements = {
-    "GOOGLE_CLOUD_PROJECT": None, # None value means it has to be non-empty
+    "GOOGLE_CLOUD_PROJECT": None,  # None value means it has to be non-empty
     "GOOGLE_CLOUD_LOCATION": None,
-
     # `$`` at the beginning refers to another variable
     "BQ_PROJECT_ID": "$GOOGLE_CLOUD_PROJECT",
     "SFDC_DATA_PROJECT_ID": "$BQ_PROJECT_ID",
     "SFDC_BQ_DATASET": None,
     "BQ_LOCATION": "US",
-    "SFDC_METADATA_FILE": "sfdc_metadata.json", # default value
+    "SFDC_METADATA_FILE": "sfdc_metadata.json",  # default value
     "AI_STORAGE_BUCKET": None,
 }
 _prepared = False
+
 
 # TODO: Point path to agents dir
 def _get_dotenv_file() -> str:
@@ -41,6 +41,7 @@ def _get_dotenv_file() -> str:
         logging.warning(f"{dotenv_path} not found.")
         return ""
     return str(dotenv_path)
+
 
 def get_env_values() -> dict:
     env_file = _get_dotenv_file()
@@ -70,8 +71,9 @@ def prepare_environment():
         if name in os.environ and len(os.environ[name].strip()) > 0:
             continue
         if val is None or val.strip() == "":
-            logging.error((f"{name} environment variable must be set"
-                          "(check .env file)."))
+            logging.error(
+                (f"{name} environment variable must be set(check .env file).")
+            )
             sys.exit(1)
         elif val.startswith("$"):
             ref_name = val[1:]
@@ -80,6 +82,7 @@ def prepare_environment():
             os.environ[name] = val
 
     from google.cloud.aiplatform import init
+
     init(location="global")
 
     _prepared = True

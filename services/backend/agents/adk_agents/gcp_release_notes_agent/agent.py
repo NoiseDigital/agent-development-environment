@@ -8,7 +8,9 @@ from toolbox_core.protocol import Protocol
 # TOOLBOX_ENDPOINT = "http://localhost:8080"
 
 # Remote URL (deployed Cloud Run MCP Toolbox)
-TOOLBOX_ENDPOINT = os.getenv("TOOLBOX_ENDPOINT", "https://mcp-toolbox-192748761045.us-central1.run.app")
+TOOLBOX_ENDPOINT = os.getenv(
+    "TOOLBOX_ENDPOINT", "https://mcp-toolbox-192748761045.us-central1.run.app"
+)
 
 # MCP Toolbox server v1.1.0 speaks protocol 2025-03-26. The toolbox-core SDK defaults
 # to 2025-06-18, causing a version mismatch error. Pin to MCP_v20250326 until the

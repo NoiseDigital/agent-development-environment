@@ -32,6 +32,7 @@ MAX_RUN_RETRIES = 10
 
 logger = logging.getLogger(__name__)
 
+
 class AgentRuntime(ABC):
     def __init__(self, session: Session):
         self.session = session
@@ -60,30 +61,36 @@ async def sse_client(url, request, headers):
         # timeout=None can be used for very long-lived connections,
         # but be aware of potential indefinite blocking if server misbehaves.
         # A specific timeout (e.g., (3.05, 60)) for connect and read can be safer.
-        with requests.post(url, json=request, stream=True, headers=headers, timeout=(60, 60*60*24*7)) as response:
+        with requests.post(
+            url,
+            json=request,
+            stream=True,
+            headers=headers,
+            timeout=(60, 60 * 60 * 24 * 7),
+        ) as response:
             response.raise_for_status()  # Raise an exception for HTTP error codes (4xx or 5xx)
             logger.info(f"Connected to SSE stream at {url}")
 
             current_event_data_lines = []
-            for line_bytes in response.iter_lines(): # iter_lines gives bytes
-                if not line_bytes: # An empty line signifies the end of an event
+            for line_bytes in response.iter_lines():  # iter_lines gives bytes
+                if not line_bytes:  # An empty line signifies the end of an event
                     if current_event_data_lines:
                         # Join accumulated data lines for the event
                         full_data_string = "\n".join(current_event_data_lines)
                         yield full_data_string
-                        current_event_data_lines = [] # Reset for the next event
-                    continue # Skip further processing for this empty line
+                        current_event_data_lines = []  # Reset for the next event
+                    continue  # Skip further processing for this empty line
 
                 # Decode bytes to string (SSE is typically UTF-8)
-                line = line_bytes.decode('utf-8')
+                line = line_bytes.decode("utf-8")
 
-                if line.startswith(':'): # Comment line, ignore
+                if line.startswith(":"):  # Comment line, ignore
                     continue
 
                 # We are only interested in 'data:' lines for this minimal client
-                if line.startswith('data:'):
+                if line.startswith("data:"):
                     # Strip "data:" prefix and any leading/trailing whitespace from the value part
-                    data_value = line[len('data:'):].lstrip()
+                    data_value = line[len("data:") :].lstrip()
                     current_event_data_lines.append(data_value)
 
                 # Other SSE fields like 'event:', 'id:', 'retry:' are ignored here.
@@ -100,10 +107,9 @@ async def sse_client(url, request, headers):
     finally:
         logging.info("SSE client finished.")
 
+
 class FastAPIEngineRuntime(AgentRuntime):
-    def __init__(self,
-                 session: Session,
-                 server_url: Optional[str] = None ):
+    def __init__(self, session: Session, server_url: Optional[str] = None):
         super().__init__(session)
         if not server_url:
             server_url = "http://127.0.0.1:8000"
@@ -111,23 +117,16 @@ class FastAPIEngineRuntime(AgentRuntime):
         self.streaming = False
         self.connection = None
 
-
     @override
     async def stream_query(
-        self,
-        message: Union[str, Content]
+        self, message: Union[str, Content]
     ) -> AsyncGenerator[Event, None]:
         self.streaming = True
         try:
             if not message:
                 content = None
             if message and isinstance(message, str):
-                content = Content(
-                    parts=[
-                        Part.from_text(text=message)
-                    ],
-                    role="user"
-                )
+                content = Content(parts=[Part.from_text(text=message)], role="user")
             else:
                 content = message
             if content:
@@ -139,12 +138,12 @@ class FastAPIEngineRuntime(AgentRuntime):
                 "user_id": self.session.user_id,
                 "session_id": self.session.id,
                 "new_message": content_dict,
-                "streaming": False
+                "streaming": False,
             }
 
-            async for event_str in sse_client(f"{self.server_url}/run_sse",
-                                          request=request,
-                                          headers=None):
+            async for event_str in sse_client(
+                f"{self.server_url}/run_sse", request=request, headers=None
+            ):
                 try:
                     yield Event.model_validate_json(event_str)
                 except ValidationError as e:

@@ -28,15 +28,19 @@ parameters:
   - name: date_from
     type: string
     description: Start date for analysis (YYYY-MM-DD format, optional)
+    required: false
   - name: date_to
     type: string
     description: End date for analysis (YYYY-MM-DD format, optional)
+    required: false
   - name: campaign_phase_filter
     type: string
     description: Filter by campaign phase (optional)
+    required: false
   - name: publisher_filter
     type: string
     description: Filter by publisher (optional)
+    required: false
 statement: |
   SELECT
     date_time as date,
@@ -68,9 +72,11 @@ parameters:
   - name: date_from
     type: string
     description: Start date for summary (YYYY-MM-DD format, optional)
+    required: false
   - name: date_to
     type: string
     description: End date for summary (YYYY-MM-DD format, optional)
+    required: false
 statement: |
   SELECT
     SUM(impressions) AS total_impressions,
@@ -146,6 +152,7 @@ parameters:
   - name: campaign_filter
     type: string
     description: Filter by campaign phase (optional)
+    required: false
 statement: |
   SELECT
     date_time as date,
@@ -176,9 +183,11 @@ parameters:
   - name: days_back
     type: integer
     description: Number of days to look back (default 30)
+    required: false
   - name: campaign_phase_filter
     type: string
     description: Filter by campaign phase (optional)
+    required: false
 statement: |
   SELECT
     date_time as name,
@@ -200,9 +209,11 @@ parameters:
   - name: date_from
     type: string
     description: Start date (YYYY-MM-DD format, optional)
+    required: false
   - name: date_to
     type: string
     description: End date (YYYY-MM-DD format, optional)
+    required: false
 statement: |
   SELECT
     publisher as name,
@@ -225,12 +236,15 @@ parameters:
   - name: metric
     type: string
     description: Metric to compare (spend, impressions, clicks, landing_page_views)
+    required: false
   - name: date_from
     type: string
     description: Start date (YYYY-MM-DD format, optional)
+    required: false
   - name: date_to
     type: string
     description: End date (YYYY-MM-DD format, optional)
+    required: false
 statement: |
   SELECT
     campaign_phase as name,
@@ -260,9 +274,11 @@ parameters:
   - name: date_from
     type: string
     description: Start date (YYYY-MM-DD format, optional)
+    required: false
   - name: date_to
     type: string
     description: End date (YYYY-MM-DD format, optional)
+    required: false
 statement: |
   SELECT
     platform as name,
@@ -287,9 +303,11 @@ parameters:
   - name: weeks_back
     type: integer
     description: Number of weeks to look back (default 12)
+    required: false
   - name: metric
     type: string
     description: Metric to trend (spend, impressions, clicks, landing_page_views)
+    required: false
 statement: |
   SELECT
     FORMAT_DATE('%Y-W%U', date_time) as name,
@@ -316,15 +334,19 @@ parameters:
   - name: metric
     type: string
     description: Metric to rank by (spend, impressions, clicks, landing_page_views)
+    required: false
   - name: limit_rows
     type: integer
     description: Number of top campaigns to return (default 10)
+    required: false
   - name: date_from
     type: string
     description: Start date (YYYY-MM-DD format, optional)
+    required: false
   - name: date_to
     type: string
     description: End date (YYYY-MM-DD format, optional)
+    required: false
 statement: |
   SELECT
     CONCAT(campaign_phase, ' (', publisher, ')') as name,
@@ -355,12 +377,15 @@ parameters:
   - name: campaign_phase_filter
     type: string
     description: Filter by campaign phase (optional)
+    required: false
   - name: date_from
     type: string
     description: Start date (YYYY-MM-DD format, optional)
+    required: false
   - name: date_to
     type: string
     description: End date (YYYY-MM-DD format, optional)
+    required: false
 statement: |
   WITH funnel_data AS (
     SELECT
@@ -411,4 +436,3 @@ tools:
   - weekly_performance_trend
   - top_performing_campaigns
   - conversion_funnel_data
-
