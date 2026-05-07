@@ -1,6 +1,6 @@
 {
   "name": "noise-agent-platform",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "WATCHPACK_POLLING=true next dev -H 0.0.0.0 -p 3000",
