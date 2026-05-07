@@ -20,6 +20,15 @@
   }
 }
 
+@keyframes verb-fade-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-verb {
+  animation: verb-fade-up 0.35s ease-out forwards;
+}
+
 /* Custom scrollbar styles */
 * {
   scrollbar-width: thin;

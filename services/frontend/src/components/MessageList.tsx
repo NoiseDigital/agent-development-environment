@@ -23,12 +23,31 @@ interface MessageListProps {
   supportsVisualization?: boolean;
 }
 
+const THINKING_VERBS = [
+  'Thinking', 'Analyzing', 'Reasoning', 'Researching', 'Processing',
+  'Synthesizing', 'Exploring', 'Calculating', 'Reviewing', 'Crafting',
+  'Connecting the dots', 'Consulting the oracle', 'Digging in',
+  'On it', 'Unpacking that', 'Investigating',
+];
+
 export default function MessageList({ messages, selectedApp, supportsVisualization = false }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const streamingMsgRef = useRef<HTMLDivElement>(null);
   const lastStreamingId = useRef<string | null>(null);
   const prevLengthRef = useRef(messages.length);
   const [ratings, setRatings] = useState<Record<string, 'up' | 'down' | null>>({});
+  const [verbIndex, setVerbIndex] = useState(0);
+
+  // Cycle verbs while any message is loading
+  const isLoading = messages.some(m => m.isStreaming && m.content === '');
+  useEffect(() => {
+    if (!isLoading) return;
+    setVerbIndex(Math.floor(Math.random() * THINKING_VERBS.length));
+    const id = setInterval(() => {
+      setVerbIndex(i => (i + 1) % THINKING_VERBS.length);
+    }, 1800);
+    return () => clearInterval(id);
+  }, [isLoading]);
 
   const rate = (msgId: string, value: 'up' | 'down') => {
     setRatings(prev => ({ ...prev, [msgId]: prev[msgId] === value ? null : value }));
@@ -108,15 +127,20 @@ export default function MessageList({ messages, selectedApp, supportsVisualizati
             <div className={`${isAgent ? 'max-w-2xl w-full' : 'max-w-lg'}`}>
               {isAgent ? (
                 <div className="group">
+                  {message.isStreaming && message.content === '' ? (
+                    /* Loading indicator — no bubble, bare text + square snake spinner */
+                    <div className="inline-flex items-center gap-3 py-1">
+                      {/* Square snake spinner */}
+                      <span className="w-4 h-4 border-2 border-zinc-700 border-t-zinc-300 animate-spin flex-shrink-0" />
+                      <span
+                        key={verbIndex}
+                        className="text-sm text-zinc-300 font-medium animate-verb"
+                      >
+                        {THINKING_VERBS[verbIndex]}…
+                      </span>
+                    </div>
+                  ) : (
                   <div className="px-4 py-3.5 rounded-2xl bg-zinc-900 border border-zinc-800 text-white">
-                    {message.isStreaming && message.content === '' ? (
-                      /* Loading animation — shown before first token arrives */
-                      <div className="flex gap-1.5 items-center py-0.5">
-                        <div className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <div className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '160ms' }} />
-                        <div className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '320ms' }} />
-                      </div>
-                    ) : (
                       <div className="prose prose-invert prose-sm max-w-none
                         prose-p:my-1.5 prose-p:leading-relaxed
                         prose-headings:font-semibold prose-headings:text-white
@@ -129,8 +153,8 @@ export default function MessageList({ messages, selectedApp, supportsVisualizati
                           <span className="inline-block w-1.5 h-3.5 ml-0.5 bg-zinc-400 rounded-sm animate-pulse align-middle" />
                         )}
                       </div>
-                    )}
                   </div>
+                  )}
 
                   {/* Timestamp + thumbs row — always visible when rated, hover-only otherwise */}
                   {!message.isStreaming && (
