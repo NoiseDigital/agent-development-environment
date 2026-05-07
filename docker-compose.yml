@@ -1,6 +1,6 @@
 services:
-  # Auth: run `gcloud auth application-default login` in the devcontainer to authenticate.
-  # ADC credentials are bind-mounted from /root/.config/gcloud in the devcontainer.
+  # Auth: run `gcloud auth application-default login` in the workspace container to authenticate.
+  # ADC credentials are shared through the named gcloud_config volume.
   # IAM roles needed: Vertex AI User, Cloud Trace Agent
   agent:
     build:
@@ -8,7 +8,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./services/backend/agents:/workspace
-      - /root/.config/gcloud:/root/.config/gcloud:ro
+      - gcloud_config:/root/.config/gcloud:ro
     ports:
       - "${AGENT_PORT:-8000}:${AGENT_PORT:-8000}"
     environment:
@@ -21,7 +21,6 @@ services:
       - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
       - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-northamerica-northeast1}
       - TOOLBOX_ENDPOINT=${TOOLBOX_ENDPOINT:-http://mcp:5000}
-      - GOOGLE_MODEL_NAME=${GOOGLE_MODEL_NAME:-gemini-2.5-flash}
       - UV_LINK_MODE=copy
     depends_on:
       postgres:
@@ -32,7 +31,7 @@ services:
     tty: true
     command: uv run uvicorn main:app --host 0.0.0.0 --port ${AGENT_PORT:-8000} --reload
 
-  # Auth: shares ADC credentials from the devcontainer via /root/.config/gcloud.
+  # Auth: shares ADC credentials from the workspace container via gcloud_config.
   # IAM roles needed: BigQuery Data Viewer, BigQuery Job User
   mcp:
     build:
@@ -40,7 +39,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./services/backend/mcp:/workspace
-      - /root/.config/gcloud:/root/.config/gcloud:ro
+      - gcloud_config:/root/.config/gcloud:ro
     ports:
       - "${MCP_PORT:-5000}:${MCP_PORT:-5000}"
     environment:
@@ -97,5 +96,6 @@ services:
 # - frontend_node_modules: caches node_modules so npm install only runs at build time,
 #   not on every container start (the bind mount would otherwise shadow the image's node_modules)
 volumes:
+  gcloud_config:
   postgres_data:
   frontend_node_modules:

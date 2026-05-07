@@ -1,27 +1,15 @@
 {
     "name": "Agent Platform",
-    "runArgs": ["--name=agent-platform-devcontainer"],
-    "privileged": true,
-    "features": {
-        "ghcr.io/devcontainers/features/docker-in-docker:2": {
-            "moby": false,
-            "version": "latest",
-            "dockerDashComposeVersion": "v2",
-            "installDockerBuildx": true
-        }
-    },
-    "build": {
-        "dockerfile": "Dockerfile"
-    },
-    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
-    "mounts": [
-        {
-            "source": "${localWorkspaceFolderBasename}_gcloud_config",
-            "target": "/root/.config/gcloud",
-            "type": "volume"
-        }
+    "dockerComposeFile": [
+        "../docker-compose.yml",
+        "docker-compose.devcontainer.yml"
     ],
+    "service": "workspace",
+    "runServices": ["workspace"],
+    "shutdownAction": "none",
+    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
     "containerEnv": {
+        "AGENT_PLATFORM_DEVCONTAINER": "1",
         "SHELL": "/bin/bash",
         "LANG": "C.UTF-8",
         "LANGUAGE": "C.UTF-8",
@@ -49,9 +37,6 @@
         }
     },
     "postCreateCommand": "pre-commit install",
-    "postAttachCommand": {
-        "services": "bash ${containerWorkspaceFolder}/scripts/start_services.sh"
-    },
     "customizations": {
         "vscode": {
             "extensions": [

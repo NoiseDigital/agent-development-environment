@@ -4,7 +4,6 @@ ARG APP_PATH=/workspace
 ENV APP_PATH="${APP_PATH}"
 
 WORKDIR "${APP_PATH}"
-ENTRYPOINT ["bash"]
 
 RUN apt-get update -y \
     && apt-get upgrade -y -o APT::Keep-Downloaded-Packages=false \
