@@ -33,6 +33,7 @@ export default function ChatSessionPage() {
     createNewSession,
     selectSession,
     deleteSession,
+    renameSession,
     saveSessionName,
   } = useChat(agentId);
 
@@ -99,6 +100,7 @@ export default function ChatSessionPage() {
           createNewSession={handleNewSession}
           selectSession={handleSelectSession}
           deleteSession={deleteSession}
+          renameSession={renameSession}
           saveSessionName={saveSessionName}
           sessionNames={sessionNames}
           onBackToLibrary={handleBackToLibrary}

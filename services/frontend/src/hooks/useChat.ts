@@ -279,8 +279,11 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
       isStreaming: true,
     };
 
-    // Capture whether this is the first exchange (for auto-naming)
-    const isFirstMessage = messages.filter(m => m.author !== 'user').length === 0;
+    // Capture agent message count before this exchange (for auto-naming every N messages)
+    const AUTO_RENAME_EVERY = 10;
+    const agentMsgCountBefore = messages.filter(m => m.author !== 'user').length;
+    const newAgentCount = agentMsgCountBefore + 1;
+    const shouldAutoRename = newAgentCount === 1 || newAgentCount % AUTO_RENAME_EVERY === 0;
 
     setMessages(prev => [...prev, userMessage, streamingPlaceholder]);
 
@@ -334,8 +337,9 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
       const updatedSession = await adkApi.getSession(selectedApp, userId, currentSession.id);
       setCurrentSession(updatedSession);
 
-      // Auto-name the session after the first exchange if it has no stored name
-      if (isFirstMessage && !sessionNames[currentSession.id]) {
+      // Auto-rename the session at message 1, 10, 20, 30… so the name stays
+      // fresh as the conversation evolves.
+      if (shouldAutoRename) {
         try {
           const name = await adkApi.nameSession(selectedApp, [
             { content: content.trim(), role: 'user' },
@@ -356,21 +360,47 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
     }
   };
 
-  const renameSession = async (sessionId: string) => {
-    if (!selectedApp) return;
+  const renameSession = async (sessionId: string): Promise<string | null> => {
+    if (!selectedApp) return null;
     try {
       const session = sessions.find(s => s.id === sessionId);
-      if (!session) return;
-      const textEvents = session.events.filter(e => e.content?.parts?.some(p => p.text));
-      const msgs = textEvents.slice(0, 8).map(e => ({
+      if (!session) return null;
+
+      // Session lists can contain lightweight metadata only. Pull full session events when needed.
+      let sourceEvents = session.events ?? [];
+      if (!sourceEvents.some(e => e.content?.parts?.some(p => p.text))) {
+        try {
+          const fullSession = await adkApi.getSession(selectedApp, userId, sessionId);
+          sourceEvents = fullSession.events ?? [];
+        } catch {
+          // Fallback to whatever is already loaded below.
+        }
+      }
+
+      const textEvents = sourceEvents.filter(e => e.content?.parts?.some(p => p.text));
+      let msgs = textEvents.slice(0, 8).map(e => ({
         content: e.content!.parts.find(p => p.text)!.text!.slice(0, 300),
-        role: e.author === 'user' ? 'user' : 'model',
+        role: e.author === 'user' ? 'user' : 'model' as const,
       }));
-      if (msgs.length === 0) return;
+
+      // Fallback to in-memory rendered messages if session events are not available.
+      if (msgs.length === 0 && currentSession?.id === sessionId) {
+        msgs = messages
+          .filter(m => m.content?.trim())
+          .slice(0, 8)
+          .map(m => ({
+            content: m.content.slice(0, 300),
+            role: m.author === 'user' ? 'user' : 'model' as const,
+          }));
+      }
+
+      if (msgs.length === 0) return null;
       const name = await adkApi.nameSession(selectedApp, msgs);
       saveSessionName(sessionId, name);
+      return name;
     } catch (err) {
       setError(`Failed to rename session: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      return null;
     }
   };
 
