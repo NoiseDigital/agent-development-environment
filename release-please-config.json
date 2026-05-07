@@ -1,23 +1,25 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "include-component-in-tag": true,
+  "include-component-in-tag": false,
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
   "packages": {
-    "services/frontend": {
-      "release-type": "node",
-      "component": "frontend",
-      "changelog-path": "CHANGELOG.md"
-    },
-    "services/backend/agents": {
-      "release-type": "python",
-      "component": "agents",
-      "changelog-path": "CHANGELOG.md"
-    },
-    "services/backend/mcp": {
+    ".": {
       "release-type": "simple",
-      "component": "mcp",
-      "changelog-path": "CHANGELOG.md"
+      "component": "platform",
+      "version-file": "services/backend/mcp/version.txt",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "services/frontend/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "toml",
+          "path": "services/backend/agents/pyproject.toml",
+          "jsonpath": "$.project.version"
+        }
+      ]
     }
   }
 }
