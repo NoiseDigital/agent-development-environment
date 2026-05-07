@@ -300,7 +300,13 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
         if (event.author && event.author !== 'user') agentAuthor = event.author;
         const textPart = event.content?.parts?.find(p => p.text);
         if (textPart?.text) {
-          accumulated += textPart.text;
+          // partial === true → streaming delta, append.
+          // partial === false / undefined (complete event) → full text, replace to avoid duplication.
+          if (event.partial === true) {
+            accumulated += textPart.text;
+          } else {
+            accumulated = textPart.text;
+          }
           setMessages(prev =>
             prev.map(m =>
               m.id === streamingId ? { ...m, content: accumulated, author: agentAuthor } : m
