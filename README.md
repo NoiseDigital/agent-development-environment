@@ -31,7 +31,8 @@
 - Runs `scripts/devcontainer_start.sh`
 - Creates `.env` from `.env.example` if it doesn't exist — review `GOOGLE_CLOUD_PROJECT` before first use
 - Prompts for GCP authentication if credentials are missing — click the URL, sign in, paste the code back
-- Starts all app services (`postgres`, `mcp`, `agent`, `frontend`)
+- Starts core app services (`postgres`, `mcp-toolbox`, `agent`, `frontend`)
+- Bootstraps optional MCP profile env files from `.env.example` to `.env` under `services/backend/mcp/_images/`
 
    On subsequent opens, if credentials already exist the auth step is skipped and services start immediately.
 
@@ -55,6 +56,8 @@ git config --global user.name "Your Name"
 | <http://localhost:3000> | Frontend chat UI | true |
 | <http://localhost:8000/dev-ui> | ADK API / dev UI | true |
 | <http://localhost:5000/ui> | MCP Toolbox UI | false |
+| <http://localhost:5001/mcp> | Google Ads MCP (optional profile) | false |
+| <http://localhost:5002/mcp> | Math MCP (optional profile) | false |
 | <http://localhost:5432> | Postgres DB | false |
 
 ## Project Structure
@@ -66,7 +69,9 @@ services/
 │   ├── agents/             # ADK agents + FastAPI host
 │   │   ├── adk_agents/     # Individual agent packages
 │   │   └── main.py         # get_fast_api_app() entrypoint
-│   ├── mcp/                # MCP Toolbox server + tools.yaml
+│   ├── mcp/                # MCP servers (image-based + code-based)
+│   │   ├── _images/        # Image-based MCP configs and thin-wrapper images
+│   │   └── math/           # Code-based MCP server
 │   └── database/           # Postgres
 terraform/                  # GCP infrastructure
 ```
@@ -89,7 +94,7 @@ root_agent = Agent(
 
 ## Using MCP Toolbox
 
-Tools are defined in `services/backend/mcp/mcp-toolbox/tools.yaml` using the v1.0+ flat document format. The MCP service is available at `http://mcp:5000` inside the Docker network.
+Tools are defined in `services/backend/mcp/_images/toolbox/tools.yaml` using the v1.0+ flat document format. The MCP Toolbox service is available at `http://mcp-toolbox:5000` inside the Docker network.
 
 > **Note:** MCP Toolbox server v1.1.0 speaks protocol `2025-03-26`. Pass `protocol=Protocol.MCP_v20250326` to `ToolboxSyncClient` to avoid a version mismatch error until the server supports a newer protocol spec.
 
@@ -98,10 +103,23 @@ import os
 from toolbox_core import ToolboxSyncClient
 from toolbox_core.protocol import Protocol
 
-TOOLBOX_ENDPOINT = os.getenv("TOOLBOX_ENDPOINT", "http://mcp:5000")
+TOOLBOX_ENDPOINT = os.getenv("TOOLBOX_ENDPOINT", "http://mcp-toolbox:5000")
 toolbox = ToolboxSyncClient(TOOLBOX_ENDPOINT, protocol=Protocol.MCP_v20250326)
 tools = toolbox.load_toolset("my_toolset")
 ```
+
+## Optional MCP Profiles
+
+Core services start automatically in the devcontainer. Optional MCP servers are profile-gated and must be started explicitly.
+
+```bash
+docker compose --profile google-ads up -d mcp-google-ads
+docker compose --profile math up -d mcp-math
+```
+
+Notes:
+- `mcp-google-ads` reads credentials from `services/backend/mcp/_images/google-ads/.env`
+- HTTP mode (`/mcp`) for Google Ads MCP requires OAuth proxy env vars (`GOOGLE_ADS_MCP_OAUTH_CLIENT_ID` and `GOOGLE_ADS_MCP_OAUTH_CLIENT_SECRET`)
 
 ## Contributing
 

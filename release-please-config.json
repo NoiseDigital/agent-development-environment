@@ -20,7 +20,7 @@
     ".": {
       "release-type": "simple",
       "component": "platform",
-      "version-file": "services/backend/mcp/version.txt",
+      "version-file": "VERSION",
       "extra-files": [
         {
           "type": "json",
@@ -31,7 +31,14 @@
           "type": "toml",
           "path": "services/backend/agents/pyproject.toml",
           "jsonpath": "$.project.version"
-        }
+        },
+        {
+          "type": "toml",
+          "path": "services/backend/mcp/math/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        "services/backend/mcp/_images/toolbox/version.txt",
+        "services/backend/mcp/_images/google-ads/version.txt"
       ]
     }
   }

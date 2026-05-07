@@ -15,7 +15,7 @@
         "LANGUAGE": "C.UTF-8",
         "LC_ALL": "C.UTF-8"
     },
-    "forwardPorts": [8000, 5000, 3000, 5432],
+    "forwardPorts": [8000, 5000, 5001, 5002, 3000, 5432],
     "portsAttributes": {
         "8000": {
             "label": "ADK Agent Server",
@@ -24,6 +24,14 @@
         },
         "5000": {
             "label": "MCP Toolbox",
+            "requireLocalPort": true
+        },
+        "5001": {
+            "label": "MCP Google Ads",
+            "requireLocalPort": true
+        },
+        "5002": {
+            "label": "MCP Math",
             "requireLocalPort": true
         },
         "3000": {

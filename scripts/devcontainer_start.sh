@@ -41,6 +41,16 @@ if [ ! -f .env ]; then
     echo ""
 fi
 
+# Bootstrap .env files for optional (profile-based) MCP servers.
+for mcp_dir in "$PROJECT_ROOT"/services/backend/mcp/_images/*/; do
+    example="$mcp_dir/.env.example"
+    dotenv="$mcp_dir/.env"
+    if [ -f "$example" ] && [ ! -f "$dotenv" ]; then
+        cp "$example" "$dotenv"
+        echo "  Created $dotenv — fill in credentials before starting this MCP server."
+    fi
+done
+
 # Export .env so gcloud quota-project and compose pick up the values.
 set -a
 # shellcheck disable=SC1091 # .env is created from .env.example during bootstrap.
@@ -89,7 +99,7 @@ COMPOSE_IGNORE_ORPHANS=1 docker compose \
     --project-directory "$HOST_PROJECT_ROOT" \
     -f "$PROJECT_ROOT/docker-compose.yml" \
     up -d --wait --wait-timeout 120 \
-    postgres mcp agent frontend
+    postgres mcp-toolbox agent frontend
 
 echo ""
 echo "✔ All services running."
@@ -97,4 +107,8 @@ echo ""
 echo "  Frontend  → http://localhost:3000"
 echo "  ADK Agent → http://localhost:8000/dev-ui"
 echo "  MCP UI    → http://localhost:5000/ui"
+echo ""
+echo "Optional MCP servers (not started by default):"
+echo "  Google Ads  → docker compose --profile google-ads up -d mcp-google-ads"
+echo "  Math        → docker compose --profile math up -d mcp-math"
 echo ""
