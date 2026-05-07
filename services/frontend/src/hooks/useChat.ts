@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { adkApi, Session, AgentRunRequest } from '../lib/adk-api';
+import { adkApi } from '../lib/adk-api';
+import type { Session, AgentRunRequest, Event as AdkEvent } from '../lib/adk-api';
 import { ChartData } from '../types/chart';
 import type { AgentJsonResponse } from '../types/agent-response';
 import { getAgentConfiguration } from '../config/agentConfig';
@@ -100,7 +101,7 @@ const parseAgentResponse = (text: string): { content: string; charts?: ChartData
 };
 
 // Helper function to convert ADK events to chat messages
-const eventsToMessages = (events: Event[], supportsVisualization: boolean): ChatMessage[] => {
+const eventsToMessages = (events: AdkEvent[], supportsVisualization: boolean): ChatMessage[] => {
   return events
     .filter(event => event.content?.parts?.some(part => part.text))
     .map(event => {
@@ -108,7 +109,7 @@ const eventsToMessages = (events: Event[], supportsVisualization: boolean): Chat
       const rawText = part?.text || '';
       const parsedResponse = supportsVisualization
         ? parseAgentResponse(rawText)
-        : { content: rawText };
+        : { content: rawText, charts: undefined };
       return {
         id: event.id,
         content: parsedResponse.content,
