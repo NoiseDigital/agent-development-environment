@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/noise_agent_platform_icon.png" alt="Noise Agent Platform" width="500" />
+  <img src="assets/noise_agent_platform_icon_transparent.png" alt="Noise Agent Platform" width="500" />
 </p>
 
 <p align="center">
