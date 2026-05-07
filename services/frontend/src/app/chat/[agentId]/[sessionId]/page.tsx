@@ -117,7 +117,6 @@ export default function ChatSessionPage() {
         />
         <MessageList
           messages={messages}
-          isLoading={isLoading}
           selectedApp={selectedApp}
           supportsVisualization={supportsVisualization}
         />

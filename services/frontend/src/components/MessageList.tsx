@@ -19,12 +19,11 @@ interface ChatMessage {
 
 interface MessageListProps {
   messages: ChatMessage[];
-  isLoading: boolean;
   selectedApp?: string | null;
   supportsVisualization?: boolean;
 }
 
-export default function MessageList({ messages, isLoading, selectedApp, supportsVisualization = false }: MessageListProps) {
+export default function MessageList({ messages, selectedApp, supportsVisualization = false }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const streamingMsgRef = useRef<HTMLDivElement>(null);
   const lastStreamingId = useRef<string | null>(null);
