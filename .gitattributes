@@ -1,0 +1,19 @@
+# Normalize line endings to LF on commit for all text files.
+# This prevents mixed-line-ending pre-commit failures when contributors
+# work on Windows (where git may check out CRLF by default).
+* text=auto eol=lf
+
+# Shell scripts must always be LF or they will break in Linux containers
+*.sh text eol=lf
+
+# Explicitly binary — never mangle these
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary

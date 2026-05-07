@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  # ── Python backend lint + type check ──────────────────────────────────────
+  backend-lint:
+    name: Backend — ruff + mypy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/backend/agents
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install linting tools
+        run: pip install ruff mypy
+
+      - name: Install project dependencies
+        run: pip install -e ".[dev]" --quiet || pip install -e . --quiet || true
+
+      - name: ruff check
+        run: ruff check .
+
+      - name: ruff format check
+        run: ruff format --check .
+
+      # Uncomment when mypy stubs and type coverage improve:
+      # - name: mypy
+      #   run: mypy . --ignore-missing-imports --no-error-summary
+
+  # ── Frontend lint ──────────────────────────────────────────────────────────
+  frontend-lint:
+    name: Frontend — ESLint + TypeScript
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: services/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit
+
+  # ── Terraform fmt + validate ───────────────────────────────────────────────
+  terraform-check:
+    name: Terraform — fmt + validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: terraform fmt check
+        run: terraform fmt -check -recursive
+
+      - name: terraform init (for validate)
+        run: terraform init -backend=false
+
+      - name: terraform validate
+        run: terraform validate
+
+  # ── Docker Compose config validation ──────────────────────────────────────
+  compose-check:
+    name: Docker Compose — config validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml
+        run: docker compose config --quiet

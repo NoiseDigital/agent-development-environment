@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: adk-agents
+Version: 0.0.1
+Summary: ADK Agent Development Environment
+Requires-Python: ==3.13.*
+Description-Content-Type: text/markdown
+Requires-Dist: google-adk==1.32.0
+Requires-Dist: fastapi>=0.116.0
+Requires-Dist: uvicorn>=0.35.0
+Requires-Dist: asyncpg>=0.30.0
+Requires-Dist: toolbox-core>=0.5.4

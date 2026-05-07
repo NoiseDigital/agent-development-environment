@@ -1,36 +1,51 @@
-# Python Devcontainer Dockerfile
-FROM mcr.microsoft.com/devcontainers/python:3.11
+FROM google/cloud-sdk:slim
 
-ENV GOOGLE_CLOUD_PROJECT=nd-agentspace-sbx
-ENV GOOGLE_CLOUD_LOCATION=us-central1
-ENV AI_STORAGE_BUCKET=nd-agent-engine-artifacts-sbx
+ARG APP_PATH=/workspace
+ENV APP_PATH="${APP_PATH}"
 
-RUN apt-get update && \
-    apt-get install -y curl apt-transport-https ca-certificates gnupg && \
-    echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" > /etc/apt/sources.list.d/google-cloud-sdk.list && \
-    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg && \
-    apt-get update && \
-    apt-get install -y google-cloud-sdk
+WORKDIR "${APP_PATH}"
+ENTRYPOINT ["bash"]
 
-# Install Terraform
-RUN wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | tee /usr/share/keyrings/hashicorp-archive-keyring.gpg && \
-    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com bookworm main" > /etc/apt/sources.list.d/hashicorp.list && \
-    apt-get update && \
-    apt-get install -y terraform
+RUN apt-get update -y \
+    && apt-get upgrade -y -o APT::Keep-Downloaded-Packages=false \
+    && apt-get install -y -o APT::Keep-Downloaded-Packages=false --no-install-recommends \
+       curl \
+       gnupg \
+       jq \
+       shellcheck \
+       nodejs \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Docker CLI
-RUN apt-get update && \
-    apt-get install -y ca-certificates curl gnupg lsb-release && \
-    install -m 0755 -d /etc/apt/keyrings && \
-    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list && \
-    apt-get update && \
-    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+ENV LANG=C.UTF-8 \
+    LANGUAGE=C.UTF-8 \
+    LC_ALL=C.UTF-8
 
-# Install pip requirements
-COPY requirements.txt /tmp/pip-tmp/
-RUN pip install --upgrade pip \
-    && pip install -r /tmp/pip-tmp/requirements.txt \
-    && rm -rf /tmp/pip-tmp
+# Install Docker CE CLI + Compose plugin from the official Docker apt repo
+# (avoids moby packages which are unavailable on Debian trixie)
+RUN install -m 0755 -d /etc/apt/keyrings \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg \
+       | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+    && chmod a+r /etc/apt/keyrings/docker.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+       https://download.docker.com/linux/debian \
+       $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+       | tee /etc/apt/sources.list.d/docker.list > /dev/null \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-EXPOSE 8080
+# Install Terraform via HashiCorp apt repo
+RUN curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(. /etc/os-release && echo "$VERSION_CODENAME") main" \
+    > /etc/apt/sources.list.d/hashicorp.list \
+    && apt-get update -y \
+    && apt-get install -y --no-install-recommends terraform \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv for Python environment management and pre-commit for repo hooks
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"
+RUN uv tool install pre-commit

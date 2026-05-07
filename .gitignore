@@ -1,8 +1,22 @@
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
 .local
 .venv
 data
 .env
 .vscode/
 .DS_Store
-terraform/.terraform/providers/registry.terraform.io/hashicorp/google/6.40.0/linux_amd64/terraform-provider-google_v6.40.0_x5
+
+# Credential files — never commit keys or ADC files
+*.pem
+*.key
+*service-account*.json
+*-credentials.json
+application_default_credentials.json
+
+# Terraform — ignore the entire .terraform working dir, not a versioned binary path
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
