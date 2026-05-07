@@ -77,7 +77,6 @@ refactor(frontend): extract agent config to agentConfig.tsx
 - Use the imperative mood — "add", not "added" or "adds"
 - Reference issues where relevant: `fix(mcp): handle empty toolset (#42)`
 
-> **Releases:** `feat`, `fix`, and `perf` commits in `frontend`, `agents`, and `mcp` scopes trigger automated release PRs via release-please. `chore`, `docs`, and `refactor` do not bump versions. See [Releases](#releases) below.
 
 ## Releases
 
