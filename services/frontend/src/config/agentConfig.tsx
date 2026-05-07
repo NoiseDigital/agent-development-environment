@@ -42,7 +42,7 @@ export const agentConfigurations: Record<string, AgentConfig> = {
   },
   'timesheet_agent': {
     name: 'timesheet_agent',
-    displayName: 'Timesheet Assistant',
+    displayName: 'Timesheet Agent',
     description: 'I help you populate and submit your timesheets efficiently. Track time, categorize work, and ensure accurate timesheet completion.',
     url: process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'https://agent-timesheets-192748761045.us-central1.run.app',
     icon: React.createElement('svg', {
@@ -156,6 +156,7 @@ export const getAgentConfiguration = (agentName: string): AgentConfig => {
     name: agentName,
     displayName: defaultDisplayName,
     description: 'AI agent specialized in various tasks',
+    hidden: true,
     url: '', // No URL for unconfigured agents - will need to be added manually
     icon: defaultIcon
   };

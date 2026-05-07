@@ -101,6 +101,7 @@ export default function ChatSidebar({
     grouped[key].push(s);
   }
   const dayKeys = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+  const visibleApps = availableApps.filter(app => !getAgentConfiguration(app).hidden);
 
   return (
     <div className="h-full bg-black flex flex-col">
@@ -123,7 +124,7 @@ export default function ChatSidebar({
 
         {isLoadingApps ? (
           <div className="p-4 bg-zinc-900 rounded-xl border border-zinc-800 text-sm text-zinc-400">Loading agents…</div>
-        ) : availableApps.length > 0 ? (
+        ) : visibleApps.length > 0 ? (
           <div className="space-y-3">
             <label className="block text-sm font-medium text-zinc-300">Select Agent</label>
             <select
@@ -132,7 +133,7 @@ export default function ChatSidebar({
               className="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-zinc-600 focus:border-transparent"
             >
               <option value="">Choose an agent…</option>
-              {availableApps.map((app) => (
+              {visibleApps.map((app) => (
                 <option key={app} value={app} className="bg-zinc-900">
                   {getAgentConfiguration(app).displayName}
                 </option>
