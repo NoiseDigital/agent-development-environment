@@ -77,6 +77,35 @@ refactor(frontend): extract agent config to agentConfig.tsx
 - Use the imperative mood — "add", not "added" or "adds"
 - Reference issues where relevant: `fix(mcp): handle empty toolset (#42)`
 
+> **Releases:** `feat`, `fix`, and `perf` commits in `frontend`, `agents`, and `mcp` scopes trigger automated release PRs via release-please. `chore`, `docs`, and `refactor` do not bump versions. See [Releases](#releases) below.
+
+## Releases
+
+Releases are automated via [release-please](https://github.com/googleapis/release-please). On every merge to `main`, release-please scans conventional commit messages and, when version-bumping commits are present, opens a Release PR that:
+
+- increments the version in the relevant version file
+- appends a `CHANGELOG.md` entry for that service
+
+Each service is versioned and released independently:
+
+| Service path | Version file | Tag format |
+|---|---|---|
+| `services/frontend` | `package.json` | `frontend-vX.Y.Z` |
+| `services/backend/agents` | `pyproject.toml` | `agents-vX.Y.Z` |
+| `services/backend/mcp` | `version.txt` | `mcp-vX.Y.Z` |
+
+**A release PR is only opened for a service when it has unreleased `feat`, `fix`, or `perf` commits.** `chore`, `docs`, and `refactor` commits do not trigger a release on their own.
+
+**Examples — scoped to trigger a specific service release:**
+```
+feat(frontend): add dark mode toggle          # bumps frontend only
+fix(agents): handle ADK timeout gracefully    # bumps agents only
+feat(mcp): add BigQuery spend toolset         # bumps mcp only
+feat(agents/media-agent): add pacing report   # bumps agents only
+```
+
+**Adding a new service:** add an entry to `release-please-config.json` and seed its starting version in `.release-please-manifest.json`.
+
 ## CI Requirements
 
 All PRs must pass the following checks before merge:

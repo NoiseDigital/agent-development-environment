@@ -1,0 +1,5 @@
+{
+  "services/frontend": "0.1.0",
+  "services/backend/agents": "0.0.1",
+  "services/backend/mcp": "0.0.1"
+}

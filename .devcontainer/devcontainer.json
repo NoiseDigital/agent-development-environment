@@ -47,7 +47,9 @@
                 "tamasfe.even-better-toml",
                 "hediet.vscode-drawio",
                 "bierner.markdown-preview-github-styles",
-                "bierner.github-markdown-preview"
+                "bierner.github-markdown-preview",
+                "eamodio.gitlens",
+                "DavidAnson.vscode-markdownlint"
             ]
         }
     },
