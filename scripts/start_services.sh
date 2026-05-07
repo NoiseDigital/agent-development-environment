@@ -22,21 +22,46 @@ HOST_PROJECT_ROOT="$(docker inspect "$CONTAINER_ID" \
     --format '{{range .Mounts}}{{if eq .Destination "/workspaces/agent-platform"}}{{.Source}}{{end}}{{end}}' \
     2>/dev/null || true)"
 
+normalize_host_path() {
+    local host_path="$1"
+
+    # Windows drive letter path (e.g. C:\Users\...)
+    if [[ "$host_path" =~ ^([A-Za-z]):[/\\](.*) ]]; then
+        local drive="${BASH_REMATCH[1],,}"
+        local rest="${BASH_REMATCH[2]//\\//}"
+        echo "/${drive}/${rest}"
+        return
+    fi
+
+    # Windows UNC WSL path (e.g. \\wsl.localhost\Ubuntu\home\user\repo)
+    if [[ "$host_path" =~ ^\\\\wsl\.localhost\\([^\\]+)\\(.*) ]]; then
+        local distro="${BASH_REMATCH[1]}"
+        local rest="${BASH_REMATCH[2]//\\//}"
+        echo "/run/desktop/mnt/host/wsl/${distro}/${rest}"
+        return
+    fi
+
+    # Slash-style WSL UNC path (e.g. //wsl.localhost/Ubuntu/home/user/repo)
+    if [[ "$host_path" =~ ^//wsl\.localhost/([^/]+)/(.*) ]]; then
+        local distro="${BASH_REMATCH[1]}"
+        local rest="${BASH_REMATCH[2]}"
+        echo "/run/desktop/mnt/host/wsl/${distro}/${rest}"
+        return
+    fi
+
+    echo "$host_path"
+}
+
 if [ -z "$HOST_PROJECT_ROOT" ]; then
     echo "⚠ Could not detect host project path from container mounts."
     echo "  Falling back to container path — bind mounts may not resolve correctly."
     HOST_PROJECT_ROOT="$PROJECT_ROOT"
 fi
 
-# Convert Windows-style paths (e.g. C:\Users\...) to /drive/path format so the
-# Linux Docker CLI does not treat them as relative paths when passed to
-# --project-directory (Docker Desktop on Windows returns Windows paths from inspect).
-if [[ "$HOST_PROJECT_ROOT" =~ ^([A-Za-z]):[/\\](.*) ]]; then
-    _drive="${BASH_REMATCH[1],,}"
-    _rest="${BASH_REMATCH[2]//\\//}"
-    HOST_PROJECT_ROOT="/${_drive}/${_rest}"
-    unset _drive _rest
-fi
+HOST_PROJECT_ROOT="$(normalize_host_path "$HOST_PROJECT_ROOT")"
+
+echo "Resolved compose build root: $PROJECT_ROOT"
+echo "Resolved compose host root:  $HOST_PROJECT_ROOT"
 
 cd "$PROJECT_ROOT"
 
