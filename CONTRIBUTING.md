@@ -77,7 +77,6 @@ refactor(frontend): extract agent config to agentConfig.tsx
 - Use the imperative mood — "add", not "added" or "adds"
 - Reference issues where relevant: `fix(mcp): handle empty toolset (#42)`
 
-
 ## Releases
 
 Releases are automated via [release-please](https://github.com/googleapis/release-please). On every merge to `main`, release-please scans conventional commit messages and, when version-bumping commits are present, opens a Release PR that:
@@ -104,6 +103,8 @@ feat(agents/media-agent): add pacing report   # bumps agents only
 ```
 
 **Adding a new service:** add an entry to `release-please-config.json` and seed its starting version in `.release-please-manifest.json`.
+
+**Pre-1.0 version policy:** `release-please-config.json` has `bump-minor-pre-major` and `bump-patch-for-minor-pre-major` set to `true`. While any service is below `1.0.0`, this prevents a breaking change from jumping straight to `1.0.0` — instead, `feat!`/breaking bumps `0.x → 0.(x+1)` and `feat` bumps `0.x.y → 0.x.(y+1)`. Remove these flags (or set them to `false`) once all services have reached `1.0.0` stability.
 
 ## CI Requirements
 
