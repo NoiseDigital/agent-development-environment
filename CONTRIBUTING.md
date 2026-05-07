@@ -2,7 +2,7 @@
 
 ## Devcontainer Setup
 
-Open the repo in VS Code and select **Reopen in Container**. The **Start Services** task runs automatically on open — it handles `.env` creation, GCP authentication, and starting all app services. See [README](README.md) for the full flow.
+Open the repo in VS Code and select **Reopen in Container**. The **Start Services** task runs automatically on open and runs `scripts/devcontainer_start.sh`. It handles `.env` creation, GCP authentication, and starting all app services. See [README](README.md) for the full flow.
 
 **Git identity** — ensure git is configured on your host before opening the container, so your identity is available inside:
 

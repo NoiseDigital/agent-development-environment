@@ -27,6 +27,7 @@
 2. Open the repo in VS Code and select **Reopen in Container**.
 
 3. The **Start Services** task runs automatically in a terminal panel and handles everything:
+  - Runs `scripts/devcontainer_start.sh`
    - Creates `.env` from `.env.example` if it doesn't exist — review `GOOGLE_CLOUD_PROJECT` before first use
    - Prompts for GCP authentication if credentials are missing — click the URL, sign in, paste the code back
    - Starts all app services (`postgres`, `mcp`, `agent`, `frontend`)
