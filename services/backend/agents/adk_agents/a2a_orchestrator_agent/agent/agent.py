@@ -1,21 +1,18 @@
-import os
 from a2a.client import A2AClient, A2ACardResolver
 import logging
 from uuid import uuid4
 from google.adk.tools.function_tool import FunctionTool
 from google.adk.agents.llm_agent import LlmAgent
 import httpx
-from dotenv import load_dotenv
 from a2a.types import AgentCard
 
 from a2a.types import (
     SendMessageRequest,
 )
 
-load_dotenv()
 logger = logging.getLogger(__name__)
 
-model_name = os.getenv("GOOGLE_MODEL_NAME", "gemini-2.5-flash")
+MODEL_NAME = "gemini-2.5-flash"
 
 # Retrieve the A2A agent registry base URL from environment variables with a default fallback.
 # NOTE: Update to math agent, media performance agent was taken off A2A
@@ -115,7 +112,7 @@ system_instr = (
 
 # Create the LlmAgent instance directly
 root_agent = LlmAgent(
-    model=model_name,
+    model=MODEL_NAME,
     name="root_orchestrator",
     description="Discovers and orchestrates other agents",
     instruction=system_instr,

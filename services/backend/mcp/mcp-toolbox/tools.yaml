@@ -27,11 +27,11 @@ source: my-bq-source
 parameters:
   - name: date_from
     type: string
-    description: Start date for analysis (YYYY-MM-DD format, optional)
+    description: Start date for analysis. Must be a YYYY-MM-DD string; omit this parameter if unknown.
     required: false
   - name: date_to
     type: string
-    description: End date for analysis (YYYY-MM-DD format, optional)
+    description: End date for analysis. Must be a YYYY-MM-DD string; omit this parameter if unknown.
     required: false
   - name: campaign_phase_filter
     type: string
@@ -71,11 +71,11 @@ source: my-bq-source
 parameters:
   - name: date_from
     type: string
-    description: Start date for summary (YYYY-MM-DD format, optional)
+    description: Start date for summary. Must be a YYYY-MM-DD string; omit this parameter if unknown.
     required: false
   - name: date_to
     type: string
-    description: End date for summary (YYYY-MM-DD format, optional)
+    description: End date for summary. Must be a YYYY-MM-DD string; omit this parameter if unknown.
     required: false
 statement: |
   SELECT
@@ -208,11 +208,11 @@ source: my-bq-source
 parameters:
   - name: date_from
     type: string
-    description: Start date (YYYY-MM-DD format, optional)
+    description: Start date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
     required: false
   - name: date_to
     type: string
-    description: End date (YYYY-MM-DD format, optional)
+    description: End date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
     required: false
 statement: |
   SELECT
@@ -239,11 +239,11 @@ parameters:
     required: false
   - name: date_from
     type: string
-    description: Start date (YYYY-MM-DD format, optional)
+    description: Start date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
     required: false
   - name: date_to
     type: string
-    description: End date (YYYY-MM-DD format, optional)
+    description: End date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
     required: false
 statement: |
   SELECT
@@ -273,11 +273,11 @@ source: my-bq-source
 parameters:
   - name: date_from
     type: string
-    description: Start date (YYYY-MM-DD format, optional)
+    description: Start date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
     required: false
   - name: date_to
     type: string
-    description: End date (YYYY-MM-DD format, optional)
+    description: End date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
     required: false
 statement: |
   SELECT
@@ -341,11 +341,11 @@ parameters:
     required: false
   - name: date_from
     type: string
-    description: Start date (YYYY-MM-DD format, optional)
+    description: Start date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
     required: false
   - name: date_to
     type: string
-    description: End date (YYYY-MM-DD format, optional)
+    description: End date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
     required: false
 statement: |
   SELECT
@@ -380,11 +380,11 @@ parameters:
     required: false
   - name: date_from
     type: string
-    description: Start date (YYYY-MM-DD format, optional)
+    description: Start date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
     required: false
   - name: date_to
     type: string
-    description: End date (YYYY-MM-DD format, optional)
+    description: End date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
     required: false
 statement: |
   WITH funnel_data AS (

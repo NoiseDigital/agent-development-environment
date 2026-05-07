@@ -1,0 +1,21 @@
+services:
+  workspace:
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+    working_dir: /workspaces/agent-platform
+    volumes:
+      - .:/workspaces/agent-platform
+      - gcloud_config:/root/.config/gcloud
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: sleep infinity
+    tty: true
+    stdin_open: true
+    environment:
+      SHELL: /bin/bash
+      LANG: C.UTF-8
+      LANGUAGE: C.UTF-8
+      LC_ALL: C.UTF-8
+
+volumes:
+  gcloud_config:

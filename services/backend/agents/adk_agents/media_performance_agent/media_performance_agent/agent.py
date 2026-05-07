@@ -18,6 +18,7 @@ def today() -> str:
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+MODEL_NAME = "gemini-2.5-flash"
 
 # --- ADK Web Global Agent Instance ---
 # This part is specifically for enabling ADK Web usage
@@ -26,7 +27,6 @@ logger = logging.getLogger(__name__)
 
 # Define a function to build the LlmAgent instance.
 def _build_llm_agent() -> LlmAgent:
-    model_name = os.getenv("GOOGLE_MODEL_NAME", "gemini-2.5-flash")
     TOOLBOX_ENDPOINT = os.getenv(
         "TOOLBOX_ENDPOINT", "https://mcp-toolbox-192748761045.us-central1.run.app"
     )
@@ -39,7 +39,7 @@ def _build_llm_agent() -> LlmAgent:
     tools.append(today)
     tools.append(AgentTool(react_charts_agent.root_agent))
     return LlmAgent(
-        model=model_name,
+        model=MODEL_NAME,
         name="MediaPerformanceAgent",
         description="Agent to answer questions about Media Performance with data visualizations and insights.",
         instruction="""
@@ -208,6 +208,12 @@ def _build_llm_agent() -> LlmAgent:
         - User asks for summary/overview only
         - Question is about specific numbers/KPIs
         - Data is not suitable for visualization
+
+        ## TOOL ARGUMENT RULES (STRICT)
+        - Optional parameters must be omitted when unknown.
+        - Never send `{}` or `null` for optional string fields.
+        - For date fields (`date_from`, `date_to`), send only `YYYY-MM-DD` strings.
+        - If no date is provided by the user, do not include `date_from`/`date_to` in the tool call at all.
 
         ## JSON CONSISTENCY
         Both scenarios result in consistent JSON format for the frontend:

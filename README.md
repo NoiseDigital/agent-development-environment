@@ -16,27 +16,30 @@
 ## Prerequisites
 
 - Docker Desktop
-- Copy `.env.example` to `.env` and fill in GCP project details:
-  ```bash
-  cp .env.example .env
-  ```
+- Git installed and configured
+- IAM permissions to nd-agentspace
 
 ## Getting Started
 
-### Devcontainer
+1. Enable automatic tasks:
+   - Command Palette → **Tasks: Manage Automatic Tasks in Folder** → **Allow Automatic Tasks in Folder**
 
-Open the repo in VS Code and select **Reopen in Container**.
+2. Open the repo in VS Code and select **Reopen in Container**.
 
-On first open, a terminal will open and run startup (/scripts/start_services.sh) automatically:
-1. If GCP credentials are missing, a browser window opens for `gcloud auth application-default login`
-2. All services start (postgres, mcp, agent, frontend)
-3. All services are on hot reload, but you can manage the compose services in the root container with standard `docker-compose` commands if necessary
+3. The **Start Services** task runs automatically in a terminal panel and handles everything:
+   - Creates `.env` from `.env.example` if it doesn't exist — review `GOOGLE_CLOUD_PROJECT` before first use
+   - Prompts for GCP authentication if credentials are missing — click the URL, sign in, paste the code back
+   - Starts all app services (`postgres`, `mcp`, `agent`, `frontend`)
 
-On every subsequent attach, services start automatically without credential prompts.
+   On subsequent opens, if credentials already exist the auth step is skipped and services start immediately.
 
-Credentials are written to `/root/.config/gcloud` in the devcontainer and bind-mounted read-only into the relevant service containers.
+4. Pre-commit hooks are installed automatically on first container create.
 
-**Service logs** — run the **Compose Logs** task (**Terminal → Run Task → Compose Logs**) to stream live logs from all services.
+5. All services should be up and running, attachable in their own VSCode windows
+
+> To restart services: **Terminal → Run Task → Start Services**
+> To inspect compose logs: **Terminal → Run Task → Compose Logs**
+> GCP credentials are stored in the `gcloud_config` Docker volume and shared with all services that need ADC.
 
 **Git identity** — the devcontainer mounts your host `~/.gitconfig` so your name and email carry over automatically. If you see *"Author identity unknown"*, configure git on your host first:
 
@@ -99,17 +102,7 @@ toolbox = ToolboxSyncClient(TOOLBOX_ENDPOINT, protocol=Protocol.MCP_v20250326)
 tools = toolbox.load_toolset("my_toolset")
 ```
 
-## Environment Variables
 
-Key variables with their defaults (set in `.env` or shell to override):
-
-| Variable | Default | Description |
-|---|---|---|
-| `GOOGLE_CLOUD_PROJECT` | `nd-agentspace-sbx` | GCP project |
-| `GOOGLE_CLOUD_LOCATION` | `northamerica-northeast1` | GCP region |
-| `GOOGLE_MODEL_NAME` | `gemini-2.5-flash` | Default model |
-| `TOOLBOX_ENDPOINT` | `http://mcp:5000` | MCP Toolbox URL |
-| `AGENTS_BASE_URL` | `http://localhost:8000` | Agent API (browser-side) |
 
 ## Contributing
 
