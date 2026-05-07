@@ -81,30 +81,23 @@ refactor(frontend): extract agent config to agentConfig.tsx
 
 Releases are automated via [release-please](https://github.com/googleapis/release-please). On every merge to `main`, release-please scans conventional commit messages and, when version-bumping commits are present, opens a Release PR that:
 
-- increments the version in the relevant version file
-- appends a `CHANGELOG.md` entry for that service
+- bumps a single platform version (`vX.Y.Z` tag)
+- updates all service version files together
+- appends a repo-level changelog entry
 
-Each service is versioned and released independently:
+**A release PR is opened when the repo has unreleased `feat`, `fix`, or `perf` commits.** `chore`, `docs`, and `refactor` do not trigger a version bump on their own.
 
-| Service path | Version file | Tag format |
-|---|---|---|
-| `services/frontend` | `package.json` | `frontend-vX.Y.Z` |
-| `services/backend/agents` | `pyproject.toml` | `agents-vX.Y.Z` |
-| `services/backend/mcp` | `version.txt` | `mcp-vX.Y.Z` |
-
-**A release PR is only opened for a service when it has unreleased `feat`, `fix`, or `perf` commits.** `chore`, `docs`, and `refactor` commits do not trigger a release on their own.
-
-**Examples — scoped to trigger a specific service release:**
+**Examples — commits that trigger a platform release:**
 ```
-feat(frontend): add dark mode toggle          # bumps frontend only
-fix(agents): handle ADK timeout gracefully    # bumps agents only
-feat(mcp): add BigQuery spend toolset         # bumps mcp only
-feat(agents/media-agent): add pacing report   # bumps agents only
+feat(frontend): add dark mode toggle
+fix(agents): handle ADK timeout gracefully
+feat(mcp): add BigQuery spend toolset
+perf(agents/media-agent): reduce tool latency
 ```
 
-**Adding a new service:** add an entry to `release-please-config.json` and seed its starting version in `.release-please-manifest.json`.
+**Adding a new versioned service:** add its version file to `extra-files` in `release-please-config.json` so it stays in lockstep with the platform version.
 
-**Pre-1.0 version policy:** `release-please-config.json` has `bump-minor-pre-major` and `bump-patch-for-minor-pre-major` set to `true`. While any service is below `1.0.0`, this prevents a breaking change from jumping straight to `1.0.0` — instead, `feat!`/breaking bumps `0.x → 0.(x+1)` and `feat` bumps `0.x.y → 0.x.(y+1)`. Remove these flags (or set them to `false`) once all services have reached `1.0.0` stability.
+**Pre-1.0 version policy:** `release-please-config.json` has `bump-minor-pre-major` and `bump-patch-for-minor-pre-major` set to `true`. While the platform version is below `1.0.0`, this prevents a breaking change from jumping straight to `1.0.0` — `feat!`/breaking bumps `0.x → 0.(x+1)` and `feat` bumps `0.x.y → 0.x.(y+1)`. Remove these flags (or set them to `false`) when you are ready to allow major `1.x` releases.
 
 ## CI Requirements
 
