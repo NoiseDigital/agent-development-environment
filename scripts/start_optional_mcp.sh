@@ -14,7 +14,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CREDS_FILE="/root/.config/gcloud/application_default_credentials.json"
 
 usage() {
-  echo "Usage: $0 <google-ads|math>"
+  echo "Usage: $0 <google-ads|math|asana>"
 }
 
 if [ "${1:-}" = "" ]; then
@@ -165,6 +165,21 @@ if [ "$PROFILE" = "math" ]; then
       --profile math up -d --no-build mcp-math
 
   echo "mcp-math started at http://localhost:${MATH_MCP_PORT:-5002}/mcp"
+  exit 0
+fi
+
+if [ "$PROFILE" = "asana" ]; then
+  docker compose \
+      --project-directory "$PROJECT_ROOT" \
+      -f "$PROJECT_ROOT/docker-compose.yml" \
+      --profile asana build mcp-asana
+
+  COMPOSE_IGNORE_ORPHANS=1 docker compose \
+      --project-directory "$HOST_PROJECT_ROOT" \
+      -f "$PROJECT_ROOT/docker-compose.yml" \
+      --profile asana up -d --no-build mcp-asana
+
+  echo "mcp-asana started at http://localhost:${ASANA_MCP_PORT:-5003}"
   exit 0
 fi
 
