@@ -10,7 +10,7 @@ RUN pip install uv
 
 # Copy the pyproject.toml and install dependencies.
 COPY pyproject.toml .
-RUN uv pip install --system .
+RUN uv pip install --system ".[test]"
 
 # Copy the rest of the application's code.
 COPY . .
