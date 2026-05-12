@@ -21,3 +21,4 @@ application_default_credentials.json
 terraform/.terraform/
 terraform/*.tfstate
 terraform/*.tfstate.backup
+/services/backend/agents/adk_agents.egg-info
