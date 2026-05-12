@@ -2,11 +2,12 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
 .local
 .venv
 data
 .env
-.vscode/
+.vscode/settings.json
 .DS_Store
 
 # Credential files — never commit keys or ADC files
@@ -20,3 +21,4 @@ application_default_credentials.json
 terraform/.terraform/
 terraform/*.tfstate
 terraform/*.tfstate.backup
+/services/backend/agents/adk_agents.egg-info

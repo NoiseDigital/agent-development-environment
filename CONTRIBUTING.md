@@ -2,7 +2,7 @@
 
 ## Devcontainer Setup
 
-Open the repo in VS Code and select **Reopen in Container**. The **Start Services** task runs automatically on open and runs `scripts/devcontainer_start.sh`. It handles `.env` creation, GCP authentication, and starting all app services. See [README](README.md) for the full flow.
+Open the repo in VS Code and select **Reopen in Container**. The **Start Services** task runs automatically on open and runs `scripts/start_services.sh`. It handles `.env` creation, GCP authentication, and starting core services (`postgres`, `mcp-toolbox`, `agent`, `frontend`). Optional profile MCP servers are started manually. See [README](README.md) for the full flow.
 
 **Git identity** — ensure git is configured on your host before opening the container, so your identity is available inside:
 
@@ -56,7 +56,7 @@ Use the **service name** as scope, and drill down to the agent if the change is 
 | `agents` | Changes across the agent service generally |
 | `agents/media-agent` | Changes specific to one agent |
 | `database` | DB schema, init scripts |
-| `mcp` | MCP Toolbox service or `tools.yaml` |
+| `mcp` | MCP services/configs (`images/*`, `math`, and toolbox tool definitions) |
 | `frontend` | Next.js app |
 | `infra` | docker-compose, Dockerfiles, Terraform |
 | `deps` | Dependency bumps |
@@ -167,9 +167,30 @@ Other guidelines:
 
 ## Adding MCP Tools
 
-1. Add `source`, `tool`, and `toolset` documents to `services/backend/mcp/mcp-toolbox/tools.yaml`
+1. Add `source`, `tool`, and `toolset` documents to `services/backend/mcp/images/toolbox/tools.yaml`
 2. Each document is separated by `---` (v1.0+ flat format)
-3. Restart the mcp service to reload: `docker compose restart mcp`
+3. Restart the toolbox service to reload: `docker compose restart mcp-toolbox`
+
+## Adding MCP Servers
+
+- Image-based MCPs live under `services/backend/mcp/images/<name>/` (configs, `.env.example`, optional thin-wrapper Dockerfile)
+- Code-based MCPs live under `services/backend/mcp/<name>/` (source code + Dockerfile)
+
+If a server is optional in local development, gate it behind a compose profile and start it manually, for example:
+
+```bash
+./scripts/start_optional_mcp.sh google-ads
+./scripts/start_optional_mcp.sh math
+```
+
+Google Ads MCP credentials are Secret Manager-backed. Configure these variables in root `.env`:
+
+- `GOOGLE_ADS_MCP_ENV_SECRET_NAME` (required)
+- `GOOGLE_ADS_MCP_ENV_SECRET_PROJECT` (optional; defaults to `GOOGLE_CLOUD_PROJECT`)
+- `GOOGLE_ADS_MCP_ENV_SECRET_VERSION` (optional; defaults to `latest`)
+- `GOOGLE_IMPERSONATE_SERVICE_ACCOUNT` (optional; IAM SA impersonation, no local key secret)
+
+On devcontainer start, `scripts/start_services.sh` fetches that secret into `services/backend/mcp/images/google-ads/.env`. If the user lacks Secret Manager access, the file is removed and `mcp-google-ads` cannot be started.
 
 ## Environment Variables
 
