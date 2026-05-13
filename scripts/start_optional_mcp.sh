@@ -168,5 +168,20 @@ if [ "$PROFILE" = "math" ]; then
   exit 0
 fi
 
+if [ "$PROFILE" = "asana" ]; then
+  docker compose \
+      --project-directory "$PROJECT_ROOT" \
+      -f "$PROJECT_ROOT/docker-compose.yml" \
+      --profile asana build mcp-asana
+
+  COMPOSE_IGNORE_ORPHANS=1 docker compose \
+      --project-directory "$HOST_PROJECT_ROOT" \
+      -f "$PROJECT_ROOT/docker-compose.yml" \
+      --profile asana up -d --no-build mcp-asana
+
+  echo "mcp-asana started at http://localhost:${ASANA_MCP_PORT:-5003}"
+  exit 0
+fi
+
 usage
 exit 1

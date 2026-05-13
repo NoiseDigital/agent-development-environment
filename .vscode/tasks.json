@@ -62,6 +62,22 @@
                 "clear": true
             },
             "problemMatcher": []
+        },
+        {
+            "label": "Start MCP: Asana",
+            "type": "shell",
+            "command": "bash scripts/start_optional_mcp.sh asana",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "focus": true,
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": []
         }
     ]
 }
