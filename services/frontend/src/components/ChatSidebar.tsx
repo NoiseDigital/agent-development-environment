@@ -271,7 +271,7 @@ export default function ChatSidebar({
                             <div className="flex items-center gap-0.5 shrink-0">
 
                               {/* Expanding buttons container */}
-                              <div className="flex items-center gap-0.5 overflow-hidden max-w-0 opacity-0 group-hover:max-w-[4rem] group-hover:opacity-100 transition-all duration-200">
+                              <div className={`flex items-center gap-0.5 max-w-0 opacity-0 group-hover:max-w-[4rem] group-hover:opacity-100 transition-all duration-200 ${isConfirmingDelete ? 'overflow-visible !max-w-[4rem] !opacity-100' : 'overflow-hidden'}`}>
                                 {/* Pencil */}
                                 <button
                                   onClick={e => startEdit(e, session)}
