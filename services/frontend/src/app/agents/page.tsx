@@ -13,7 +13,7 @@ export default function AgentsPage() {
   };
 
   return (
-    <div className="flex h-screen bg-black">
+    <div className="flex flex-1 h-full bg-black">
       <AgentLibrary
         availableApps={availableApps}
         isLoadingApps={isLoadingApps}

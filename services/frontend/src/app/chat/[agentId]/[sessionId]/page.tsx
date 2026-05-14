@@ -83,7 +83,7 @@ export default function ChatSessionPage() {
   const handleBackToLibrary = () => router.push('/agents');
 
   return (
-    <div className="flex h-screen bg-black">
+    <div className="flex flex-1 h-full bg-black">
       {/* Sidebar */}
       <div
         className={`bg-black border-r border-zinc-800 flex flex-col overflow-hidden transition-[width] duration-300 ease-in-out ${

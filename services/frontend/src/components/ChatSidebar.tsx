@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import Image from 'next/image';
 import { Session } from '../lib/adk-api';
 import { getAgentConfiguration } from '../config/agentConfig';
 
@@ -42,6 +41,7 @@ interface ChatSidebarProps {
   sessionNames: Record<string, string>;
   onBackToLibrary?: () => void;
 }
+// Note: availableApps, setSelectedApp, isLoadingApps, onBackToLibrary are kept for API compat
 
 export default function ChatSidebar({
   availableApps,
@@ -58,6 +58,8 @@ export default function ChatSidebar({
   sessionNames,
   onBackToLibrary,
 }: ChatSidebarProps) {
+  const agentConfig = selectedApp ? getAgentConfiguration(selectedApp) : null;
+
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
@@ -143,55 +145,26 @@ export default function ChatSidebar({
     grouped[key].push(s);
   }
   const dayKeys = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
-  const visibleApps = availableApps.filter(app => !getAgentConfiguration(app).hidden);
-
   return (
-    <div className="h-full bg-black flex flex-col">
+    <div className="h-full bg-zinc-950 flex flex-col">
       {/* Header */}
-      <div className="p-6 border-b border-zinc-800">
-        <div className="flex items-center justify-between mb-4">
-          <Image src="/noise_white.svg" alt="Noise Digital Logo" width={120} height={32} className="h-8 w-auto" />
-          {selectedApp && onBackToLibrary && (
-            <button
-              onClick={onBackToLibrary}
-              className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors duration-200"
-              title="Back to Agent Library"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-              </svg>
-            </button>
-          )}
+      <div className="px-4 py-4 border-b border-zinc-800 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-0.5">Conversations</p>
+          <p className="text-sm font-medium text-white truncate">
+            {agentConfig?.displayName ?? 'Agent'}
+          </p>
         </div>
-
-        {isLoadingApps ? (
-          <div className="p-4 bg-zinc-900 rounded-xl border border-zinc-800 text-sm text-zinc-400">Loading agents…</div>
-        ) : visibleApps.length > 0 ? (
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-zinc-300">Select Agent</label>
-            <select
-              value={selectedApp || ''}
-              onChange={(e) => setSelectedApp(e.target.value)}
-              className="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-zinc-600 focus:border-transparent"
-            >
-              <option value="">Choose an agent…</option>
-              {visibleApps.map((app) => (
-                <option key={app} value={app} className="bg-zinc-900">
-                  {getAgentConfiguration(app).displayName}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : (
-          <div className="p-4 bg-zinc-900 rounded-xl border border-zinc-800 text-sm text-zinc-400">No agents available</div>
-        )}
-
         {selectedApp && (
           <button
             onClick={createNewSession}
-            className="mt-4 w-full px-4 py-3 bg-white text-black rounded-xl hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-zinc-400 transition-colors font-medium"
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium rounded-lg transition-colors duration-150"
+            title="New chat"
           >
-            New Chat
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+            </svg>
+            New
           </button>
         )}
       </div>
