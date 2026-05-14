@@ -15,9 +15,6 @@
         "LANGUAGE": "C.UTF-8",
         "LC_ALL": "C.UTF-8"
     },
-    "mounts": [
-        "type=bind,source=/run/user/1000/gnupg/S.gpg-agent,target=/root/.gnupg/S.gpg-agent"
-    ],
     "forwardPorts": [8000, 5000, 5001, 5002, 3000, 5432],
     "portsAttributes": {
         "8000": {

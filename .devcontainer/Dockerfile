@@ -5,16 +5,6 @@ ENV APP_PATH="${APP_PATH}"
 
 WORKDIR "${APP_PATH}"
 
-# Generate en_US.UTF-8 locale
-RUN apt-get update -y \
-    && apt-get install -y --no-install-recommends locales \
-    && sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
-    && locale-gen
-
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US:en \
-    LC_ALL=en_US.UTF-8
-
 RUN apt-get update -y \
     && apt-get upgrade -y -o APT::Keep-Downloaded-Packages=false \
     && apt-get install -y -o APT::Keep-Downloaded-Packages=false --no-install-recommends \
