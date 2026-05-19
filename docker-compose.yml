@@ -92,6 +92,16 @@ services:
     stdin_open: true
     tty: true
 
+  mcp-asana:
+    build:
+      context: ./services/backend/mcp/asana
+    ports:
+      - "${ASANA_MCP_PORT:-5003}:8080"
+    profiles:
+      - asana
+    stdin_open: true
+    tty: true
+
   frontend:
     build:
       context: ./services/frontend
