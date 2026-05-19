@@ -1,13 +1,23 @@
 'use client';
 
-import { useState } from 'react';
-import { mockDashboards, Dashboard, DashboardOwnership } from '../../data/mockDashboardData';
-import ChartVisualization from '../../components/ChartVisualization';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { mockDashboards, Dashboard, DashboardOwnership, DashboardTile } from '../../data/mockDashboardData';
+import type { Layout } from 'react-grid-layout';
+import DashboardCanvas from '../../components/DashboardCanvas';
+import { loadDashboardTiles, saveDashboardTiles } from '../../lib/dashboardStore';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' });
+  // Format in UTC so server and client agree — a YYYY-MM-DD string parses as
+  // UTC midnight, and a local-timezone format would shift the day and break hydration.
+  return new Date(iso).toLocaleDateString('en-CA', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
 }
 
 const tabs: { key: DashboardOwnership | 'all'; label: string }[] = [
@@ -36,34 +46,36 @@ function DashboardCard({ dashboard, onClick }: { dashboard: Dashboard; onClick: 
     <button
       type="button"
       onClick={onClick}
-      className="w-full text-left rounded-xl border border-zinc-800 bg-zinc-950 p-5 hover:border-zinc-700 hover:bg-zinc-900/60 transition-all duration-150 group"
+      className="w-full h-full text-left rounded-xl border border-zinc-800 bg-zinc-950 p-5 hover:border-zinc-700 hover:bg-zinc-900/60 transition-all duration-150 group flex flex-col"
     >
-      <div className="flex items-start justify-between gap-3">
-        {/* Client logo */}
+      {/* Header row: initials + badge */}
+      <div className="flex items-start justify-between gap-3 shrink-0">
         <div className="w-9 h-9 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 text-xs font-bold text-zinc-300 group-hover:border-zinc-600 transition-colors">
           {dashboard.clientInitials}
         </div>
-        {/* Ownership badge */}
         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${ownershipBadge[dashboard.ownership]}`}>
           {ownershipLabel[dashboard.ownership]}
         </span>
       </div>
 
-      <div className="mt-3">
+      {/* Body: title + description — grows to push footer down */}
+      <div className="mt-3 flex-1">
         <h3 className="text-sm font-semibold text-white group-hover:text-zinc-100 transition-colors line-clamp-2 leading-snug">
           {dashboard.name}
         </h3>
         <p className="text-xs text-zinc-500 mt-1 line-clamp-2 leading-relaxed">{dashboard.description}</p>
       </div>
 
-      <div className="mt-4 flex items-center justify-between text-[11px] text-zinc-600">
-        <span>{dashboard.client}</span>
-        <span>Updated {fmtDate(dashboard.lastUpdated)}</span>
+      {/* Footer: pinned to bottom, consistent height across all cards */}
+      <div className="mt-4 shrink-0 text-[11px] text-zinc-600 space-y-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate">{dashboard.client}</span>
+          <span className="shrink-0 whitespace-nowrap">Updated {fmtDate(dashboard.lastUpdated)}</span>
+        </div>
+        <p className="h-[1em]">
+          {dashboard.ownership !== 'owned' ? `By ${dashboard.owner}` : ''}
+        </p>
       </div>
-
-      {dashboard.ownership !== 'owned' && (
-        <p className="mt-1 text-[11px] text-zinc-600">By {dashboard.owner}</p>
-      )}
     </button>
   );
 }
@@ -71,8 +83,50 @@ function DashboardCard({ dashboard, onClick }: { dashboard: Dashboard; onClick: 
 // ── Dashboard detail view ─────────────────────────────────────────────────────
 
 function DashboardDetail({ dashboard, onBack }: { dashboard: Dashboard; onBack: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [tiles, setTiles] = useState<DashboardTile[]>(() => loadDashboardTiles(dashboard));
+
+  // Persist layout/text edits so they survive a refresh.
+  useEffect(() => {
+    saveDashboardTiles(dashboard.id, tiles);
+  }, [dashboard.id, tiles]);
+
+  const handleLayoutChange = useCallback((layout: Layout) => {
+    setTiles((prev) =>
+      prev.map((t) => {
+        const pos = layout.find((item) => item.i === t.id);
+        return pos ? { ...t, layout: { ...t.layout, x: pos.x, y: pos.y, w: pos.w, h: pos.h } } : t;
+      }),
+    );
+  }, []);
+
+  const handleTextChange = useCallback((id: string, text: string) => {
+    setTiles((prev) => prev.map((t) => (t.id === id && t.type === 'text' ? { ...t, text } : t)));
+  }, []);
+
+  const handleAddText = useCallback(() => {
+    setTiles((prev) => {
+      const bottom = prev.reduce((max, t) => Math.max(max, t.layout.y + t.layout.h), 0);
+      const newTile: DashboardTile = {
+        id: `text-${Date.now()}`,
+        type: 'text',
+        text: '',
+        layout: { x: 0, y: bottom, w: 4, h: 3, minW: 2, minH: 1 },
+      };
+      return [...prev, newTile];
+    });
+  }, []);
+
+  const handleRemoveTile = useCallback((id: string) => {
+    setTiles((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setTiles(dashboard.tiles);
+  }, [dashboard.tiles]);
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-black">
       {/* Header */}
       <div className="flex items-center gap-4 px-8 py-5 border-b border-zinc-800 shrink-0">
         <button
@@ -95,35 +149,71 @@ function DashboardDetail({ dashboard, onBack }: { dashboard: Dashboard; onBack: 
             {ownershipLabel[dashboard.ownership]}
           </span>
         </div>
+
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[11px] text-zinc-600">Updated {fmtDate(dashboard.lastUpdated)}</span>
-          <button
-            type="button"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-zinc-400 bg-zinc-900 border border-zinc-800 rounded-lg hover:border-zinc-700 hover:text-white transition-colors"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-            Export
-          </button>
+          {editing ? (
+            <>
+              <button
+                type="button"
+                onClick={handleAddText}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-zinc-300 bg-zinc-900 border border-zinc-800 rounded-lg hover:border-zinc-700 hover:text-white transition-colors"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add text
+              </button>
+              <button
+                type="button"
+                onClick={handleReset}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-zinc-400 bg-zinc-900 border border-zinc-800 rounded-lg hover:border-zinc-700 hover:text-white transition-colors"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                className="px-3 py-1.5 text-[11px] font-semibold text-black bg-white rounded-lg hover:bg-zinc-200 transition-colors"
+              >
+                Done
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="text-[11px] text-zinc-600">Updated {fmtDate(dashboard.lastUpdated)}</span>
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-zinc-300 bg-zinc-900 border border-zinc-800 rounded-lg hover:border-zinc-700 hover:text-white transition-colors"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Edit layout
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Charts */}
+      {/* Canvas */}
       <div className="flex-1 overflow-y-auto px-8 py-6">
-        <p className="text-xs text-zinc-500 mb-6 max-w-2xl">{dashboard.description}</p>
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {dashboard.charts.map((chart, i) => (
-            <div key={i} className={chart.type === 'funnel' ? 'xl:col-span-2' : ''}>
-              <ChartVisualization
-                type={chart.type}
-                data={chart.data}
-                title={chart.title}
-                insight={chart.insight}
-              />
-            </div>
-          ))}
-        </div>
+        {editing && (
+          <div className="mb-4 flex items-center gap-2 text-[11px] text-zinc-500">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+            Edit mode — drag a tile to move it, drag its bottom-right corner to resize.
+          </div>
+        )}
+        <DashboardCanvas
+          tiles={tiles}
+          editing={editing}
+          onLayoutChange={handleLayoutChange}
+          onTextChange={handleTextChange}
+          onRemoveTile={handleRemoveTile}
+        />
       </div>
     </div>
   );
@@ -131,9 +221,13 @@ function DashboardDetail({ dashboard, onBack }: { dashboard: Dashboard; onBack: 
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default function DashboardsPage() {
+function DashboardsBrowser() {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<DashboardOwnership | 'all'>('all');
-  const [selected, setSelected] = useState<Dashboard | null>(null);
+  // Deep-link support: /dashboards?id=<id> opens that dashboard directly.
+  const [selected, setSelected] = useState<Dashboard | null>(
+    () => mockDashboards.find((d) => d.id === searchParams.get('id')) ?? null,
+  );
   const [search, setSearch] = useState('');
 
   if (selected) {
@@ -212,7 +306,7 @@ export default function DashboardsPage() {
       {/* Cards grid */}
       <div className="flex-1 overflow-y-auto px-8 py-6">
         {filtered.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-stretch">
             {filtered.map((dashboard) => (
               <DashboardCard
                 key={dashboard.id}
@@ -229,5 +323,14 @@ export default function DashboardsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// useSearchParams requires a Suspense boundary around the component that reads it.
+export default function DashboardsPage() {
+  return (
+    <Suspense fallback={null}>
+      <DashboardsBrowser />
+    </Suspense>
   );
 }

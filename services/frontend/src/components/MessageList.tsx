@@ -4,6 +4,7 @@ import { useRef, useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { getAgentConfiguration } from '../config/agentConfig';
 import ChartVisualization from './ChartVisualization';
+import SaveToDashboardButton from './SaveToDashboardButton';
 import { ChartData } from '../types/chart';
 
 // MessageList component for displaying chat messages
@@ -199,6 +200,7 @@ export default function MessageList({ messages, selectedApp, supportsVisualizati
                           data={chart.data}
                           title={chart.title}
                           insight={chart.insight}
+                          headerAction={<SaveToDashboardButton chart={chart} />}
                         />
                       ))}
                     </div>

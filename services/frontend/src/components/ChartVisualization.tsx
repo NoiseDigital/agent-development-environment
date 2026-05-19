@@ -11,6 +11,7 @@ import {
   Legend, FunnelChart, Funnel,
   LabelList
 } from 'recharts';
+import type { ReactNode } from 'react';
 import { ChartDataPoint, ChartType } from '../types/chart';
 
 interface ChartVisualizationProps {
@@ -18,9 +19,14 @@ interface ChartVisualizationProps {
   data: ChartDataPoint[];
   title?: string;
   insight?: string;
+  /** When true, the chart fills its container height — used for resizable dashboard tiles. */
+  fill?: boolean;
+  /** Optional control rendered in the chart header (e.g. a save action in chat). */
+  headerAction?: ReactNode;
 }
 
-export default function ChartVisualization({ type, data, title, insight }: ChartVisualizationProps) {
+export default function ChartVisualization({ type, data, title, insight, fill = false, headerAction }: ChartVisualizationProps) {
+  const chartHeight: number | string = fill ? '100%' : 300;
   // Function to determine if data has multiple metrics
   const hasMultipleMetrics = (data: ChartDataPoint[]): boolean => {
     if (!data || data.length === 0) return false;
@@ -48,7 +54,7 @@ export default function ChartVisualization({ type, data, title, insight }: Chart
         if (hasMultipleMetrics(data)) {
           // Multi-metric line chart
           return (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={chartHeight}>
               <LineChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis
@@ -95,7 +101,7 @@ export default function ChartVisualization({ type, data, title, insight }: Chart
         } else {
           // Single metric line chart
           return (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={chartHeight}>
               <LineChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis
@@ -131,7 +137,7 @@ export default function ChartVisualization({ type, data, title, insight }: Chart
         if (hasMultipleMetrics(data)) {
           // Stacked Bar Chart for multiple metrics
           return (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={chartHeight}>
               <BarChart data={data} stackOffset="sign">
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis
@@ -177,7 +183,7 @@ export default function ChartVisualization({ type, data, title, insight }: Chart
         } else {
           // Regular Bar Chart
           return (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={chartHeight}>
               <BarChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis
@@ -206,7 +212,7 @@ export default function ChartVisualization({ type, data, title, insight }: Chart
       case 'pie':
         const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
         return (
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={chartHeight}>
             <PieChart>
               <Pie
                 data={data}
@@ -235,7 +241,7 @@ export default function ChartVisualization({ type, data, title, insight }: Chart
 
       case 'area':
         return (
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={chartHeight}>
             <AreaChart data={data}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis
@@ -268,7 +274,7 @@ export default function ChartVisualization({ type, data, title, insight }: Chart
 
       case 'funnel':
         return (
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={chartHeight}>
             <FunnelChart layout="horizontal">
               <Tooltip
                 contentStyle={{
@@ -309,10 +315,27 @@ export default function ChartVisualization({ type, data, title, insight }: Chart
     }
   };
 
+  // Fill mode: chart stretches to its container — used inside resizable dashboard tiles.
+  if (fill) {
+    return (
+      <div className="h-full flex flex-col">
+        {title && (
+          <h4 className="text-white font-medium text-sm mb-2 shrink-0 truncate">{title}</h4>
+        )}
+        <div className="flex-1 min-h-0">
+          {renderChart()}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4 mt-3">
-      {title && (
-        <h4 className="text-white font-medium mb-3">{title}</h4>
+      {(title || headerAction) && (
+        <div className="flex items-start gap-3 mb-3">
+          {title && <h4 className="text-white font-medium">{title}</h4>}
+          {headerAction && <div className="ml-auto shrink-0">{headerAction}</div>}
+        </div>
       )}
 
       <div className="mb-4">
