@@ -19,7 +19,7 @@ def get_asana_tasks(
     """
     try:
         with httpx.Client() as client:
-            response = client.post(
+            response = client.get(
                 f"{ASANA_MCP_URL}/get_tasks",
                 params={"project_id": project_id, "completed_since": completed_since},
                 timeout=10.0,
