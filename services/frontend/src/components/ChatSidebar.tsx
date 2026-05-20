@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Session } from '../lib/adk-api';
 import { getAgentConfiguration } from '../config/agentConfig';
+import { useResizable } from '../hooks/useResizable';
+import ResizeHandle from './ResizeHandle';
 
 const normalizeTimestamp = (timestamp: number | string): number => {
   let ts = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
@@ -27,37 +29,30 @@ const formatTime = (ts: number) =>
   new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 
 interface ChatSidebarProps {
-  availableApps: string[];
   selectedApp: string | null;
-  setSelectedApp: (app: string) => void;
   sessions: Session[];
   currentSession: Session | null;
-  isLoadingApps: boolean;
   createNewSession: () => void;
   selectSession: (sessionId: string) => void;
   deleteSession: (sessionId: string) => void;
   renameSession?: (sessionId: string) => Promise<string | null>;
   saveSessionName: (sessionId: string, name: string) => void;
   sessionNames: Record<string, string>;
-  onBackToLibrary?: () => void;
 }
-// Note: availableApps, setSelectedApp, isLoadingApps, onBackToLibrary are kept for API compat
 
 export default function ChatSidebar({
-  availableApps,
   selectedApp,
-  setSelectedApp,
   sessions,
   currentSession,
-  isLoadingApps,
   createNewSession,
   selectSession,
   deleteSession,
   renameSession,
   saveSessionName,
   sessionNames,
-  onBackToLibrary,
 }: ChatSidebarProps) {
+  const { width, startResize } = useResizable({ initial: 320, min: 240, max: 460, edge: 'right' });
+  const [collapsed, setCollapsed] = useState(false);
   const agentConfig = selectedApp ? getAgentConfiguration(selectedApp) : null;
 
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
@@ -145,8 +140,41 @@ export default function ChatSidebar({
     grouped[key].push(s);
   }
   const dayKeys = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+  if (collapsed) {
+    return (
+      <aside className="w-12 shrink-0 flex flex-col h-full bg-zinc-950 border-r border-zinc-800 items-center py-3 gap-1">
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          title="Expand conversations"
+          className="w-9 h-9 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors duration-150"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+        {selectedApp && (
+          <button
+            type="button"
+            onClick={createNewSession}
+            title="New chat"
+            className="w-9 h-9 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-900 rounded-lg transition-colors duration-150"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+        )}
+      </aside>
+    );
+  }
+
   return (
-    <div className="h-full bg-zinc-950 flex flex-col">
+    <aside
+      className="relative shrink-0 h-full bg-zinc-950 border-r border-zinc-800 flex flex-col"
+      style={{ width }}
+    >
+      <ResizeHandle side="right" onPointerDown={startResize} />
       {/* Header */}
       <div className="px-4 py-4 border-b border-zinc-800 flex items-center justify-between gap-2">
         <div className="min-w-0">
@@ -155,18 +183,30 @@ export default function ChatSidebar({
             {agentConfig?.displayName ?? 'Agent'}
           </p>
         </div>
-        {selectedApp && (
+        <div className="flex items-center gap-1 shrink-0">
+          {selectedApp && (
+            <button
+              onClick={createNewSession}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium rounded-lg transition-colors duration-150"
+              title="New chat"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+              New
+            </button>
+          )}
           <button
-            onClick={createNewSession}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium rounded-lg transition-colors duration-150"
-            title="New chat"
+            type="button"
+            onClick={() => setCollapsed(true)}
+            title="Collapse conversations"
+            className="p-1.5 text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 rounded-md transition-colors duration-150"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            New
           </button>
-        )}
+        </div>
       </div>
 
       {/* Session list grouped by day */}
@@ -335,6 +375,6 @@ export default function ChatSidebar({
           )}
         </div>
       </div>
-    </div>
+    </aside>
   );
 }

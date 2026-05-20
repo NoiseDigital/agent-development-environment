@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { mockDashboards } from '../data/mockDashboardData';
-import { addChartToDashboard } from '../lib/dashboardStore';
+import { addChartToDashboard } from '../lib/dashboard-store';
 import { ChartData } from '../types/chart';
 
 // Lets the user save a chat-generated visual into one of the existing dashboards.
-// Persistence is mocked through localStorage (see dashboardStore).
+// Persistence is mocked through localStorage (see dashboard-store).
 export default function SaveToDashboardButton({ chart }: { chart: ChartData }) {
   const [open, setOpen] = useState(false);
   const [savedTo, setSavedTo] = useState<{ id: string; name: string } | null>(null);

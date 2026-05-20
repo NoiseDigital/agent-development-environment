@@ -8,8 +8,6 @@ interface ChatHeaderProps {
   selectedApp: string | null;
   currentSession: Session | null;
   error: string | null;
-  isSidebarOpen: boolean;
-  onToggleSidebar: () => void;
   sessionNames?: Record<string, string>;
 }
 
@@ -17,8 +15,6 @@ export default function ChatHeader({
   selectedApp,
   currentSession,
   error,
-  isSidebarOpen,
-  onToggleSidebar,
   sessionNames = {},
 }: ChatHeaderProps) {
   const agentConfig = selectedApp ? getAgentConfiguration(selectedApp) : null;
@@ -43,20 +39,6 @@ export default function ChatHeader({
     <div className="px-4 py-3 border-b border-zinc-800 bg-black">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {/* Sidebar Toggle */}
-          <button
-            onClick={onToggleSidebar}
-            className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors duration-200 shrink-0"
-            title={isSidebarOpen ? 'Hide Sidebar' : 'Show Sidebar'}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {isSidebarOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              )}
-            </svg>
-          </button>
           {selectedApp && sessionLabel && (
             <h2 className="text-sm font-medium text-white truncate">{sessionLabel}</h2>
           )}

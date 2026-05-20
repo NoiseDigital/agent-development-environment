@@ -9,6 +9,8 @@ from pydantic import BaseModel
 from google.adk.cli.fast_api import get_fast_api_app
 from google import genai
 
+from sources.api import router as sources_router
+
 AGENTS_DIR = str(Path(__file__).resolve().parent / "adk_agents")
 
 app = get_fast_api_app(
@@ -18,6 +20,9 @@ app = get_fast_api_app(
     web=True,
     trace_to_cloud=False,
 )
+
+# Data sources registry (uploads + BigQuery tables) for the analysis workflow.
+app.include_router(sources_router)
 
 
 _genai_client = genai.Client()

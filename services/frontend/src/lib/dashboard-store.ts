@@ -7,7 +7,7 @@ import { Dashboard, DashboardTile, ChartTile } from '../data/mockDashboardData';
 
 const KEY_PREFIX = 'noise:dashboard:';
 
-export function dashboardStorageKey(id: string): string {
+function storageKey(id: string): string {
   return `${KEY_PREFIX}${id}`;
 }
 
@@ -15,7 +15,7 @@ export function dashboardStorageKey(id: string): string {
 export function loadDashboardTiles(dashboard: Dashboard): DashboardTile[] {
   if (typeof window === 'undefined') return dashboard.tiles;
   try {
-    const raw = window.localStorage.getItem(dashboardStorageKey(dashboard.id));
+    const raw = window.localStorage.getItem(storageKey(dashboard.id));
     if (raw) return JSON.parse(raw) as DashboardTile[];
   } catch {
     /* ignore corrupt storage */
@@ -27,7 +27,7 @@ export function loadDashboardTiles(dashboard: Dashboard): DashboardTile[] {
 export function saveDashboardTiles(id: string, tiles: DashboardTile[]): void {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(dashboardStorageKey(id), JSON.stringify(tiles));
+    window.localStorage.setItem(storageKey(id), JSON.stringify(tiles));
   } catch {
     /* ignore quota errors */
   }

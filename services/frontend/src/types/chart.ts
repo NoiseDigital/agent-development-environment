@@ -7,11 +7,19 @@ export type ChartDataPoint = {
   [key: string]: string | number | undefined;
 };
 
-export interface ChartData {
-  type: 'line' | 'bar' | 'pie' | 'funnel' | 'area';
-  title: string;
-  insight: string;
-  data: ChartDataPoint[];
-}
+export type ChartType = 'line' | 'bar' | 'pie' | 'funnel' | 'area' | 'heatmap';
 
-export type ChartType = 'line' | 'bar' | 'pie' | 'funnel' | 'area';
+// A single visualization — produced by agents (parsed from JSON) and by the
+// Analyze page, rendered by ChartVisualization, and stored in dashboard tiles.
+export interface ChartData {
+  type: ChartType;
+  title?: string;
+  insight?: string;
+  // Series data for line/bar/pie/funnel/area charts.
+  data?: ChartDataPoint[];
+  // Correlation-matrix fields for heatmap charts.
+  rows?: string[];
+  cols?: string[];
+  matrix?: (number | null)[][];
+  significant?: boolean[][];
+}

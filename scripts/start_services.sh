@@ -169,13 +169,13 @@ docker volume create agent-platform_gcloud_config >/dev/null 2>&1 || true
 docker compose \
     --project-directory "$PROJECT_ROOT" \
     -f "$PROJECT_ROOT/docker-compose.yml" \
-    build agent frontend
+    build agent frontend mcp-stats
 
 COMPOSE_IGNORE_ORPHANS=1 docker compose \
     --project-directory "$HOST_PROJECT_ROOT" \
     -f "$PROJECT_ROOT/docker-compose.yml" \
     up -d --no-build --wait --wait-timeout 120 \
-    postgres mcp-toolbox agent frontend
+    postgres mcp-toolbox agent frontend mcp-stats
 
 echo ""
 echo "✔ All services running."

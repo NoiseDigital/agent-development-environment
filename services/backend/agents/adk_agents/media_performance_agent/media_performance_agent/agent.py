@@ -4,6 +4,7 @@ from datetime import date
 
 from google.adk.agents import LlmAgent
 from google.adk.tools.agent_tool import AgentTool
+from google.adk.tools.mcp_tool import MCPToolset, SseConnectionParams
 
 from .subagents import agent as react_charts_agent
 
@@ -38,6 +39,10 @@ def _build_llm_agent() -> LlmAgent:
     tools = toolbox.load_toolset("media_performance_recharts_friendly")
     tools.append(today)
     tools.append(AgentTool(react_charts_agent.root_agent))
+
+    # Statistical analysis tools (correlation, regression, QA) from the stats MCP server.
+    stats_url = os.getenv("MCP_STATS_URL", "http://mcp-stats:8080/sse")
+    tools.append(MCPToolset(connection_params=SseConnectionParams(url=stats_url)))
     return LlmAgent(
         model=MODEL_NAME,
         name="MediaPerformanceAgent",
@@ -59,6 +64,41 @@ def _build_llm_agent() -> LlmAgent:
         5. **Provide Complete Response**: Return ReactChartsAgent's JSON response (includes both text and visualization)
 
         **IMPORTANT**: Never ask permission to create visualizations - just do it when appropriate.
+
+        ## STATISTICAL & CORRELATION ANALYSIS
+        When the user asks about correlations, relationships, what drives a KPI,
+        statistical significance, or regression, use the stats analysis tools:
+        `describe_source`, `qa_report`, `correlate`, and `regress`. These run on
+        the user's selected data sources.
+
+        - The user's active data sources are listed at the START of their message as:
+          `[Active data sources: "name" (source: <ref>), ...]` where each <ref> is
+          `upload:<id>` or `bigquery:<dataset>.<table>`. Pass that exact `source`
+          ref to the stats tools — never guess one.
+        - If no source ref is available, ask the user to select a data source in the
+          Sources panel.
+        - Typical flow: `describe_source` to see columns, then `correlate` or `regress`.
+        - `correlate` returns rows, cols, matrix, significant, and top_signals arrays.
+
+        **Returning a correlation result** — emit a heatmap visualization and pass the
+        `correlate` tool's arrays through UNCHANGED (never recompute or reshape them):
+        ```json
+        {
+          "text": "Your interpretation of the strongest and notable correlations.",
+          "visualization": {
+            "type": "heatmap",
+            "title": "Correlation - drivers vs KPIs",
+            "insight": "Key takeaway about the relationships.",
+            "rows": <correlate.rows>,
+            "cols": <correlate.cols>,
+            "matrix": <correlate.matrix>,
+            "significant": <correlate.significant>
+          }
+        }
+        ```
+        Do NOT route correlation/regression through ReactChartsAgent - emit the JSON
+        yourself. After a result, proactively suggest a relevant next step in the text
+        (test a lag, run a regression, segment by a group).
 
         ## WHEN TO USE REACTCHARTSAGENT TOOL
         **ALWAYS** use the ReactChartsAgent tool when the user asks for:

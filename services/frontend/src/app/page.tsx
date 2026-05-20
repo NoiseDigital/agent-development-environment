@@ -29,6 +29,18 @@ const sections = [
     ),
   },
   {
+    key: 'analyze',
+    href: '/analyze',
+    label: 'Analyze',
+    description: 'Correlate drivers against KPIs across any data source. Upload data, run the analysis, save the visuals.',
+    icon: (
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+          d="M9 3h6m-5 0v6.5L5.5 17A2 2 0 007.2 20h9.6a2 2 0 001.7-3L14 9.5V3M7.5 14h9" />
+      </svg>
+    ),
+  },
+  {
     key: 'agents',
     href: '/agents',
     label: 'Agents',
@@ -68,7 +80,7 @@ export default function Home() {
         </div>
 
         {/* Section cards */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           {sections.map((s) => (
             <button
               key={s.key}

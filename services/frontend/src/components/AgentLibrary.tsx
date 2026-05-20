@@ -96,7 +96,7 @@ export default function AgentLibrary({
           </p>
           <h1 className="mb-3 text-3xl font-semibold text-white sm:text-4xl">Agent Library</h1>
           <p className="mx-auto max-w-2xl text-sm leading-relaxed text-zinc-400 sm:text-base">
-            Choose an agent to start a conversation. The library stays centered as agents are added or hidden.
+            Choose an agent to start a conversation
           </p>
         </div>
 

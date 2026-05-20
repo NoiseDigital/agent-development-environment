@@ -152,10 +152,7 @@ function AssistantWidget() {
                           {m.charts.map((chart, i) => (
                             <ChartVisualization
                               key={`${m.id}-chart-${i}`}
-                              type={chart.type}
-                              data={chart.data}
-                              title={chart.title}
-                              insight={chart.insight}
+                              chart={chart}
                               headerAction={<SaveToDashboardButton chart={chart} />}
                             />
                           ))}

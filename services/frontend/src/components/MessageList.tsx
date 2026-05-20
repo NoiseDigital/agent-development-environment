@@ -196,10 +196,7 @@ export default function MessageList({ messages, selectedApp, supportsVisualizati
                       {message.charts!.map((chart, index) => (
                         <ChartVisualization
                           key={`${message.id}-chart-${index}`}
-                          type={chart.type}
-                          data={chart.data}
-                          title={chart.title}
-                          insight={chart.insight}
+                          chart={chart}
                           headerAction={<SaveToDashboardButton chart={chart} />}
                         />
                       ))}

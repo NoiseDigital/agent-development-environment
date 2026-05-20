@@ -12,20 +12,20 @@ import {
   LabelList
 } from 'recharts';
 import type { ReactNode } from 'react';
-import { ChartDataPoint, ChartType } from '../types/chart';
+import { ChartData, ChartDataPoint } from '../types/chart';
+import HeatmapChart from './HeatmapChart';
 
 interface ChartVisualizationProps {
-  type: ChartType;
-  data: ChartDataPoint[];
-  title?: string;
-  insight?: string;
+  chart: ChartData;
   /** When true, the chart fills its container height — used for resizable dashboard tiles. */
   fill?: boolean;
   /** Optional control rendered in the chart header (e.g. a save action in chat). */
   headerAction?: ReactNode;
 }
 
-export default function ChartVisualization({ type, data, title, insight, fill = false, headerAction }: ChartVisualizationProps) {
+export default function ChartVisualization({ chart, fill = false, headerAction }: ChartVisualizationProps) {
+  const { type, title, insight } = chart;
+  const data: ChartDataPoint[] = chart.data ?? [];
   const chartHeight: number | string = fill ? '100%' : 300;
   // Function to determine if data has multiple metrics
   const hasMultipleMetrics = (data: ChartDataPoint[]): boolean => {
@@ -308,6 +308,16 @@ export default function ChartVisualization({ type, data, title, insight, fill = 
               </Funnel>
             </FunnelChart>
           </ResponsiveContainer>
+        );
+
+      case 'heatmap':
+        return (
+          <HeatmapChart
+            rows={chart.rows ?? []}
+            cols={chart.cols ?? []}
+            matrix={chart.matrix ?? []}
+            significant={chart.significant}
+          />
         );
 
       default:

@@ -1,20 +1,23 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useChat } from '../../../../hooks/useChat';
 import ChatSidebar from '../../../../components/ChatSidebar';
 import ChatHeader from '../../../../components/ChatHeader';
 import MessageList from '../../../../components/MessageList';
 import MessageInput from '../../../../components/MessageInput';
+import SourcesSidebar from '../../../../components/SourcesSidebar';
+import { getAgentConfiguration } from '../../../../config/agentConfig';
+import type { SourceRef } from '../../../../types/source';
+import { sourceUri, sourceLabel } from '../../../../types/source';
 
 export default function ChatSessionPage() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const agentId = typeof params.agentId === 'string' ? params.agentId : '';
   const sessionId = typeof params.sessionId === 'string' ? params.sessionId : '';
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [selectedSources, setSelectedSources] = useState<SourceRef[]>([]);
   const didInit = useRef(false);
 
   const {
@@ -44,19 +47,11 @@ export default function ChatSessionPage() {
     }
   }, [isLoadingApps, availableApps, agentId, router]);
 
-  // On mount: either honour ?new=1 (create fresh session) or select the sessionId from URL
+  // On mount: select the session from the URL.
   useEffect(() => {
     if (!selectedApp || isLoadingApps || isLoadingSessions || didInit.current) return;
     didInit.current = true;
-
-    const wantsNew = searchParams.get('new') === '1';
-    if (wantsNew) {
-      createNewSession().then(s => {
-        if (s) router.replace(`/chat/${agentId}/${s.id}`);
-      });
-    } else if (sessionId) {
-      selectSession(sessionId);
-    }
+    if (sessionId) selectSession(sessionId);
   }, [selectedApp, isLoadingApps, isLoadingSessions]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep URL in sync when currentSession changes (e.g. after create)
@@ -76,36 +71,28 @@ export default function ChatSessionPage() {
     router.push(`/chat/${agentId}/${id}`);
   };
 
-  const handleSwitchAgent = (app: string) => {
-    if (app && app !== agentId) router.push(`/chat/${app}?new=1`);
-  };
-
-  const handleBackToLibrary = () => router.push('/agents');
+  const showSources = getAgentConfiguration(agentId).supportsSources ?? false;
+  // Compact manifest prepended (agent-side only) so the analyst knows which
+  // data sources to run the stats tools against.
+  const sourceManifest = selectedSources.length
+    ? `[Active data sources: ${selectedSources
+        .map((s) => `"${sourceLabel(s)}" (source: ${sourceUri(s)})`)
+        .join(', ')}]`
+    : undefined;
 
   return (
     <div className="flex flex-1 h-full bg-black">
-      {/* Sidebar */}
-      <div
-        className={`bg-black border-r border-zinc-800 flex flex-col overflow-hidden transition-[width] duration-300 ease-in-out ${
-          isSidebarOpen ? 'w-80' : 'w-0'
-        }`}
-      >
-        <ChatSidebar
-          availableApps={availableApps}
-          selectedApp={selectedApp}
-          setSelectedApp={handleSwitchAgent}
-          sessions={sessions}
-          currentSession={currentSession}
-          isLoadingApps={isLoadingApps}
-          createNewSession={handleNewSession}
-          selectSession={handleSelectSession}
-          deleteSession={deleteSession}
-          renameSession={renameSession}
-          saveSessionName={saveSessionName}
-          sessionNames={sessionNames}
-          onBackToLibrary={handleBackToLibrary}
-        />
-      </div>
+      <ChatSidebar
+        selectedApp={selectedApp}
+        sessions={sessions}
+        currentSession={currentSession}
+        createNewSession={handleNewSession}
+        selectSession={handleSelectSession}
+        deleteSession={deleteSession}
+        renameSession={renameSession}
+        saveSessionName={saveSessionName}
+        sessionNames={sessionNames}
+      />
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -113,8 +100,6 @@ export default function ChatSessionPage() {
           selectedApp={selectedApp}
           currentSession={currentSession}
           error={error}
-          isSidebarOpen={isSidebarOpen}
-          onToggleSidebar={() => setIsSidebarOpen(o => !o)}
           sessionNames={sessionNames}
         />
         <MessageList
@@ -126,9 +111,14 @@ export default function ChatSessionPage() {
           selectedApp={selectedApp}
           currentSession={currentSession}
           isLoading={isLoading}
-          onSendMessage={sendMessage}
+          onSendMessage={(text) => sendMessage(text, sourceManifest)}
         />
       </div>
+
+      {/* Right-hand data sources panel — agents with supportsSources only */}
+      {showSources && (
+        <SourcesSidebar selected={selectedSources} onChange={setSelectedSources} />
+      )}
     </div>
   );
 }

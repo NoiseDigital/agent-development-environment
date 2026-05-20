@@ -77,11 +77,9 @@ const tryParseAgentJson = (raw: string): { content: string; charts?: ChartData[]
     const result: { content: string; charts?: ChartData[] } = { content: parsed.text };
 
     if (parsed.visualization) {
-      if (!Array.isArray(parsed.visualization) && parsed.visualization.type && parsed.visualization.data) {
-        result.charts = [parsed.visualization as ChartData];
-      } else if (Array.isArray(parsed.visualization)) {
-        result.charts = parsed.visualization as ChartData[];
-      }
+      // Series charts carry `data`; heatmaps carry a correlation `matrix`.
+      const viz = parsed.visualization;
+      result.charts = Array.isArray(viz) ? viz : [viz];
     }
     return result;
   } catch {
@@ -257,7 +255,9 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
     }
   };
 
-  const sendMessage = async (content: string) => {
+  // `agentPrefix` is prepended to the text sent to the agent (e.g. an active-
+  // sources manifest) but is not shown in the user's displayed message.
+  const sendMessage = async (content: string, agentPrefix?: string) => {
     if (!currentSession || !content.trim() || !selectedApp) return;
 
     setIsLoading(true);
@@ -288,11 +288,14 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
     setMessages(prev => [...prev, userMessage, streamingPlaceholder]);
 
     try {
+      const agentText = agentPrefix
+        ? `${agentPrefix}\n\n${content.trim()}`
+        : content.trim();
       const request: AgentRunRequest = {
         appName: selectedApp,
         userId,
         sessionId: currentSession.id,
-        newMessage: { parts: [{ text: content.trim() }], role: 'user' },
+        newMessage: { parts: [{ text: agentText }], role: 'user' },
         streaming: true,
       };
 

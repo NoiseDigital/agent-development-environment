@@ -17,6 +17,11 @@ export interface AgentConfig {
    * return plain text should leave this false (default).
    */
   supportsVisualization?: boolean;
+  /**
+   * When true, the chat shows the right-hand data sources panel so the
+   * user can upload files / pick BigQuery tables for the conversation.
+   */
+  supportsSources?: boolean;
 }
 
 // Complete agent configurations
@@ -27,6 +32,7 @@ export const agentConfigurations: Record<string, AgentConfig> = {
     description: 'I\'m here to help you analyze media content, unlock performance insights, examine data trends, and assist with your media analytics tasks.',
     url: process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'https://agent-media-performance-192748761045.us-central1.run.app',
     supportsVisualization: true,
+    supportsSources: true,
     icon: React.createElement('svg', {
       className: 'w-8 h-8',
       fill: 'none',

@@ -9,6 +9,7 @@ services:
     volumes:
       - ./services/backend/agents:/workspace
       - gcloud_config:/root/.config/gcloud:ro
+      - uploads:/data/uploads
     ports:
       - "${AGENT_PORT:-8000}:${AGENT_PORT:-8000}"
     environment:
@@ -21,7 +22,11 @@ services:
       - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
       - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-northamerica-northeast1}
       - TOOLBOX_ENDPOINT=${TOOLBOX_ENDPOINT:-http://mcp-toolbox:5000}
+      - MCP_STATS_URL=${MCP_STATS_URL:-http://mcp-stats:8080/sse}
       - UV_LINK_MODE=copy
+      # Uploaded data sources — local volume in dev, swap to STORAGE_BACKEND=gcs when deployed.
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-local}
+      - STORAGE_LOCAL_PATH=/data/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,6 +97,27 @@ services:
     stdin_open: true
     tty: true
 
+  # Statistics & correlation analysis engine. Resolves data sources via the
+  # agent API and reads uploads from the shared volume.
+  mcp-stats:
+    build:
+      context: ./services/backend/mcp/stats
+    volumes:
+      - uploads:/data/uploads:ro
+      - gcloud_config:/root/.config/gcloud:ro
+    ports:
+      - "${STATS_MCP_PORT:-5003}:8080"
+    environment:
+      - AGENT_URL=${AGENT_URL:-http://agent:8000}
+      - STORAGE_LOCAL_PATH=/data/uploads
+      - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
+    depends_on:
+      agent:
+        condition: service_started
+    stdin_open: true
+    tty: true
+
   frontend:
     build:
       context: ./services/frontend
@@ -106,6 +132,7 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-development}
       - NEXT_PUBLIC_AGENTS_BASE_URL=${NEXT_PUBLIC_AGENTS_BASE_URL:-http://localhost:8000}
+      - NEXT_PUBLIC_STATS_BASE_URL=${NEXT_PUBLIC_STATS_BASE_URL:-http://localhost:5003}
     depends_on:
       agent:
         condition: service_started
@@ -134,7 +161,9 @@ services:
 # - postgres_data: retains DB data so it survives container recreation
 # - frontend_node_modules: caches node_modules so npm install only runs at build time,
 #   not on every container start (the bind mount would otherwise shadow the image's node_modules)
+# - uploads: stores uploaded analysis data sources; shared with the stats MCP server
 volumes:
   gcloud_config:
   postgres_data:
   frontend_node_modules:
+  uploads:

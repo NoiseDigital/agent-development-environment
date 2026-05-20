@@ -1,10 +1,12 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import Image from 'next/image';
 import { agentConfigurations } from '../config/agentConfig';
 import { adkApi } from '../lib/adk-api';
+import { useResizable } from '../hooks/useResizable';
+import ResizeHandle from './ResizeHandle';
 
 // ── Icons ────────────────────────────────────────────────────────────────────
 
@@ -19,6 +21,13 @@ const DashboardsIcon = () => (
   <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
       d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+  </svg>
+);
+
+const AnalyzeIcon = () => (
+  <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+      d="M9 3h6m-5 0v6.5L5.5 17A2 2 0 007.2 20h9.6a2 2 0 001.7-3L14 9.5V3M7.5 14h9" />
   </svg>
 );
 
@@ -50,6 +59,7 @@ const ViewAllIcon = () => (
 export default function PlatformSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { width, startResize } = useResizable({ initial: 224, min: 180, max: 340, edge: 'right' });
 
   const inAgentsSection = pathname.startsWith('/agents') || pathname.startsWith('/chat');
   const [agentsExpanded, setAgentsExpanded] = useState(inAgentsSection);
@@ -74,24 +84,44 @@ export default function PlatformSidebar() {
     }`;
 
   if (collapsed) {
+    const collapsedItem = (active: boolean, onClick: () => void, label: string, icon: ReactNode) => (
+      <button
+        type="button"
+        onClick={onClick}
+        title={label}
+        className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors duration-150 ${
+          active ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'
+        }`}
+      >
+        {icon}
+      </button>
+    );
     return (
-      <aside className="w-12 shrink-0 flex flex-col h-full bg-zinc-950 border-r border-zinc-800 items-center py-3 gap-3">
+      <aside className="w-12 shrink-0 flex flex-col h-full bg-zinc-950 border-r border-zinc-800 items-center py-3 gap-1">
         <button
           type="button"
           onClick={() => setCollapsed(false)}
-          className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors duration-150"
+          className="w-9 h-9 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors duration-150 mb-1"
           title="Expand sidebar"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>
+        {collapsedItem(pathname.startsWith('/plan'), () => router.push('/plan'), 'Plan', <PlanIcon />)}
+        {collapsedItem(pathname.startsWith('/dashboards'), () => router.push('/dashboards'), 'Dashboards', <DashboardsIcon />)}
+        {collapsedItem(pathname.startsWith('/analyze'), () => router.push('/analyze'), 'Analyze', <AnalyzeIcon />)}
+        {collapsedItem(inAgentsSection, () => router.push('/agents'), 'Agents', <AgentsIcon />)}
       </aside>
     );
   }
 
   return (
-    <aside className="w-56 shrink-0 flex flex-col h-full bg-zinc-950 border-r border-zinc-800">
+    <aside
+      className="relative shrink-0 flex flex-col h-full bg-zinc-950 border-r border-zinc-800"
+      style={{ width }}
+    >
+      <ResizeHandle side="right" onPointerDown={startResize} />
       {/* ── Brand ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between pl-4 pr-2 py-[14px] border-b border-zinc-800">
         <div className="flex items-end gap-1.5 min-w-0 cursor-pointer" onClick={() => router.push('/')}>
@@ -133,6 +163,16 @@ export default function PlatformSidebar() {
           <span>Dashboards</span>
         </button>
 
+        {/* Analyze */}
+        <button
+          type="button"
+          onClick={() => router.push('/analyze')}
+          className={navItem(pathname.startsWith('/analyze'))}
+        >
+          <AnalyzeIcon />
+          <span>Analyze</span>
+        </button>
+
         {/* Agents — label navigates, chevron toggles */}
         <div>
           <div className={`flex items-center w-full rounded-lg transition-colors duration-150 ${inAgentsSection ? 'bg-zinc-800' : 'hover:bg-zinc-900'}`}>
@@ -166,7 +206,7 @@ export default function PlatformSidebar() {
                   <button
                     key={agent.name}
                     type="button"
-                    onClick={() => router.push(`/chat/${agent.name}?new=1`)}
+                    onClick={() => router.push(`/chat/${agent.name}`)}
                     className={`flex items-center gap-2.5 w-full px-2.5 py-[7px] rounded-md text-[12.5px] cursor-pointer select-none transition-colors duration-150 ${
                       active
                         ? 'bg-zinc-800 text-white font-medium'

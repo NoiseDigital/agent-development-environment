@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { mockDashboards, Dashboard, DashboardOwnership, DashboardTile } from '../../data/mockDashboardData';
 import type { Layout } from 'react-grid-layout';
 import DashboardCanvas from '../../components/DashboardCanvas';
-import { loadDashboardTiles, saveDashboardTiles } from '../../lib/dashboardStore';
+import { loadDashboardTiles, saveDashboardTiles } from '../../lib/dashboard-store';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

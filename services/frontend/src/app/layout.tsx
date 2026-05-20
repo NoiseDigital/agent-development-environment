@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Noise Digital - Agent Platform",
-  description: "Noise Digital Agent Platform",
+  title: "NoiseOS",
+  description: "Noise Digital Agentic OS Platform",
 };
 
 export default function RootLayout({

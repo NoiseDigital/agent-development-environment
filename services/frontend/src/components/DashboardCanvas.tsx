@@ -76,12 +76,7 @@ export default function DashboardCanvas({
                   }`}
                 >
                   {tile.type === 'chart' ? (
-                    <ChartVisualization
-                      type={tile.chart.type}
-                      data={tile.chart.data}
-                      title={tile.chart.title}
-                      fill
-                    />
+                    <ChartVisualization chart={tile.chart} fill />
                   ) : (
                     <TextTile
                       text={tile.text}

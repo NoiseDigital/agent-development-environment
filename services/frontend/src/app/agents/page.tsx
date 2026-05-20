@@ -9,7 +9,7 @@ export default function AgentsPage() {
   const { availableApps, isLoadingApps } = useChat();
 
   const handleSelectAgent = (app: string) => {
-    router.push(`/chat/${app}?new=1`);
+    router.push(`/chat/${app}`);
   };
 
   return (
