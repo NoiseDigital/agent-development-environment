@@ -28,7 +28,7 @@ from google.adk.planners import BuiltInPlanner
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools import FunctionTool
 
-from shared.config_env import prepare_environment
+from .config_env import prepare_environment
 
 from .prompts.root_agent import (
     system_instruction as root_agent_instruction,

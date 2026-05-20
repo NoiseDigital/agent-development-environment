@@ -1,21 +1,9 @@
-import os
 from google.adk.agents import Agent
-from toolbox_core import ToolboxSyncClient
-from toolbox_core.protocol import Protocol
 
-# NOTE: This agent cannot be deployed to Agent Engine, as ToolboxSyncClient cannot be pickled
-# Local, after starting toolbox server from tools/mcp-toolbox/: ./toolbox --tools-file "tools.yaml --port 8080"
-# TOOLBOX_ENDPOINT = "http://localhost:8080"
+from shared.toolbox import get_toolbox_client
 
-# Remote URL (deployed Cloud Run MCP Toolbox)
-TOOLBOX_ENDPOINT = os.getenv(
-    "TOOLBOX_ENDPOINT", "https://mcp-toolbox-192748761045.us-central1.run.app"
-)
-
-# MCP Toolbox server v1.1.0 speaks protocol 2025-03-26. The toolbox-core SDK defaults
-# to 2025-06-18, causing a version mismatch error. Pin to MCP_v20250326 until the
-# server is upgraded to a version that supports a newer protocol.
-toolbox = ToolboxSyncClient(TOOLBOX_ENDPOINT, protocol=Protocol.MCP_v20250326)
+# NOTE: This agent cannot be deployed to Agent Engine — ToolboxSyncClient cannot be pickled.
+toolbox = get_toolbox_client()
 tools = toolbox.load_toolset("public_bq_toolset")
 
 root_agent = Agent(
