@@ -177,7 +177,7 @@ function CampaignSection({ campaign }: { campaign: Campaign }) {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-zinc-800">
+              <tr className="border-b border-zinc-800/60">
                 {/* Plan columns */}
                 <th colSpan={8} className="px-4 pt-3 pb-1">
                   <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-600">Plan</span>
@@ -188,7 +188,7 @@ function CampaignSection({ campaign }: { campaign: Campaign }) {
                   <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-blue-500">Live Performance</span>
                 </th>
               </tr>
-              <tr className="border-b border-zinc-800 bg-zinc-950/60">
+              <tr className="border-b border-zinc-800/60 bg-zinc-950/60">
                 <th className="px-4 py-2 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Ad ID</th>
                 <th className="px-4 py-2 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Name</th>
                 <th className="px-4 py-2 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Format</th>
@@ -286,7 +286,7 @@ export default function PlanPage() {
   return (
     <div className="flex flex-col h-full bg-black">
       {/* Page header */}
-      <div className="flex items-center justify-between px-8 py-5 border-b border-zinc-800 shrink-0">
+      <div className="flex items-center justify-between px-8 py-5 border-b border-zinc-800/60 shrink-0">
         <div>
           <h1 className="text-lg font-semibold text-white tracking-tight">Media Plans</h1>
           <p className="text-xs text-zinc-500 mt-0.5">

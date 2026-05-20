@@ -5,6 +5,7 @@ import { sourcesApi } from '../lib/sources-api';
 import type { Upload, SourceRef } from '../types/source';
 import { sourceUri, uploadToRef } from '../types/source';
 import { useResizable } from '../hooks/useResizable';
+import { useSidebarCollapsed } from '../contexts/SidebarContext';
 import ResizeHandle from './ResizeHandle';
 
 interface SourcesSidebarProps {
@@ -22,7 +23,7 @@ function fmtSize(bytes?: number | null): string {
 
 export default function SourcesSidebar({ selected, onChange }: SourcesSidebarProps) {
   const { width, startResize } = useResizable({ initial: 288, min: 240, max: 460, edge: 'left' });
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useSidebarCollapsed('sources');
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -117,7 +118,7 @@ export default function SourcesSidebar({ selected, onChange }: SourcesSidebarPro
 
   if (collapsed) {
     return (
-      <aside className="w-10 shrink-0 border-l border-zinc-800 bg-black flex flex-col items-center py-3">
+      <aside className="w-10 shrink-0 border-l border-zinc-800/60 bg-black flex flex-col items-center py-3">
         <button
           type="button"
           onClick={() => setCollapsed(false)}
@@ -134,12 +135,12 @@ export default function SourcesSidebar({ selected, onChange }: SourcesSidebarPro
 
   return (
     <aside
-      className="relative shrink-0 border-l border-zinc-800 bg-black flex flex-col"
+      className="relative shrink-0 border-l border-zinc-800/60 bg-black flex flex-col"
       style={{ width }}
     >
       <ResizeHandle side="left" onPointerDown={startResize} />
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/60 shrink-0">
         <div>
           <h2 className="text-sm font-semibold text-white">Sources</h2>
           <p className="text-[11px] text-zinc-500">{selected.length} active in chat</p>
@@ -160,7 +161,7 @@ export default function SourcesSidebar({ selected, onChange }: SourcesSidebarPro
         {error && <p className="text-[11px] text-red-400 px-4 py-2">{error}</p>}
 
         {/* ── Uploads ─────────────────────────────────────────────────────── */}
-        <div className="p-3 border-b border-zinc-800">
+        <div className="p-3 border-b border-zinc-800/60">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Uploads</h3>
             <input ref={fileInput} type="file" accept=".csv,.txt,.xlsx,.xls,.xlsb" onChange={handleUpload} className="hidden" />
@@ -265,7 +266,7 @@ export default function SourcesSidebar({ selected, onChange }: SourcesSidebarPro
         </div>
       </div>
 
-      <div className="px-4 py-2.5 border-t border-zinc-800 shrink-0">
+      <div className="px-4 py-2.5 border-t border-zinc-800/60 shrink-0">
         <p className="text-[10px] text-zinc-600 leading-relaxed">
           Checked sources are passed to the analyst with your next message.
         </p>

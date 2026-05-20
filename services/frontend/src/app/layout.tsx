@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import PlatformSidebar from "../components/PlatformSidebar";
 import FloatingAssistant from "../components/FloatingAssistant";
+import { SidebarProvider } from "../contexts/SidebarContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,13 +30,15 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <div className="flex h-screen bg-black overflow-hidden">
-          <PlatformSidebar />
-          <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
-            {children}
+        <SidebarProvider>
+          <div className="flex h-screen bg-black overflow-hidden">
+            <PlatformSidebar />
+            <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
+              {children}
+            </div>
           </div>
-        </div>
-        <FloatingAssistant />
+          <FloatingAssistant />
+        </SidebarProvider>
       </body>
     </html>
   );

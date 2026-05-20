@@ -11,22 +11,25 @@ import {
   Legend, FunnelChart, Funnel,
   LabelList
 } from 'recharts';
-import type { ReactNode } from 'react';
+import { useRef } from 'react';
 import { ChartData, ChartDataPoint } from '../types/chart';
 import HeatmapChart from './HeatmapChart';
+import ChartActions from './ChartActions';
 
 interface ChartVisualizationProps {
   chart: ChartData;
   /** When true, the chart fills its container height — used for resizable dashboard tiles. */
   fill?: boolean;
-  /** Optional control rendered in the chart header (e.g. a save action in chat). */
-  headerAction?: ReactNode;
+  /** When true, show the "+" actions menu (save to dashboard, PNG, raw data). */
+  saveable?: boolean;
 }
 
-export default function ChartVisualization({ chart, fill = false, headerAction }: ChartVisualizationProps) {
+export default function ChartVisualization({ chart, fill = false, saveable = false }: ChartVisualizationProps) {
   const { type, title, insight } = chart;
   const data: ChartDataPoint[] = chart.data ?? [];
   const chartHeight: number | string = fill ? '100%' : 300;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const headerAction = saveable ? <ChartActions chart={chart} captureRef={rootRef} /> : null;
   // Function to determine if data has multiple metrics
   const hasMultipleMetrics = (data: ChartDataPoint[]): boolean => {
     if (!data || data.length === 0) return false;
@@ -340,7 +343,7 @@ export default function ChartVisualization({ chart, fill = false, headerAction }
   }
 
   return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4 mt-3">
+    <div ref={rootRef} className="bg-zinc-900 border border-zinc-700 rounded-xl p-4 mt-3">
       {(title || headerAction) && (
         <div className="flex items-start gap-3 mb-3">
           {title && <h4 className="text-white font-medium">{title}</h4>}

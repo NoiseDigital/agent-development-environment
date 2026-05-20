@@ -7,7 +7,6 @@ import type { Upload, SourceRef, BigQueryTableRef } from '../../types/source';
 import { sourceUri, sourceLabel } from '../../types/source';
 import type { ChartData } from '../../types/chart';
 import ChartVisualization from '../../components/ChartVisualization';
-import SaveToDashboardButton from '../../components/SaveToDashboardButton';
 
 // ── Control helpers ───────────────────────────────────────────────────────────
 
@@ -272,7 +271,7 @@ export default function AnalyzePage() {
   return (
     <div className="flex flex-col h-full bg-black">
       {/* Header */}
-      <div className="flex items-center justify-between px-8 py-5 border-b border-zinc-800 shrink-0">
+      <div className="flex items-center justify-between px-8 py-5 border-b border-zinc-800/60 shrink-0">
         <div>
           <h1 className="text-lg font-semibold text-white tracking-tight">Analyze</h1>
           <p className="text-xs text-zinc-500 mt-0.5">
@@ -283,7 +282,7 @@ export default function AnalyzePage() {
 
       <div className="flex flex-1 min-h-0">
         {/* ── Controls ──────────────────────────────────────────────────── */}
-        <aside className="w-80 shrink-0 border-r border-zinc-800 overflow-y-auto p-4 space-y-5">
+        <aside className="w-80 shrink-0 border-r border-zinc-800/60 overflow-y-auto p-4 space-y-5">
           {/* Source */}
           <div className="space-y-2">
             <h2 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Data source</h2>
@@ -466,12 +465,7 @@ export default function AnalyzePage() {
             </div>
           ) : (
             <div className="space-y-6 max-w-4xl">
-              {heatmapChart && (
-                <ChartVisualization
-                  chart={heatmapChart}
-                  headerAction={<SaveToDashboardButton chart={heatmapChart} />}
-                />
-              )}
+              {heatmapChart && <ChartVisualization chart={heatmapChart} saveable />}
 
               {/* Top signals */}
               <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4">
@@ -481,7 +475,7 @@ export default function AnalyzePage() {
                 ) : (
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="text-zinc-500 text-left border-b border-zinc-800">
+                      <tr className="text-zinc-500 text-left border-b border-zinc-800/60">
                         <th className="py-1.5 font-medium">A</th>
                         <th className="py-1.5 font-medium">B</th>
                         <th className="py-1.5 font-medium text-right">r</th>

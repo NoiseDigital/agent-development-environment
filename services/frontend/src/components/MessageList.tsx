@@ -4,7 +4,6 @@ import { useRef, useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { getAgentConfiguration } from '../config/agentConfig';
 import ChartVisualization from './ChartVisualization';
-import SaveToDashboardButton from './SaveToDashboardButton';
 import { ChartData } from '../types/chart';
 
 // MessageList component for displaying chat messages
@@ -123,7 +122,7 @@ export default function MessageList({ messages, selectedApp, supportsVisualizati
           <div
             key={message.id}
             ref={message.isStreaming ? streamingMsgRef : undefined}
-            className={`flex ${isAgent ? 'justify-start' : 'justify-end'}`}
+            className={`flex animate-message-in ${isAgent ? 'justify-start' : 'justify-end'}`}
           >
             <div className={`${isAgent ? 'max-w-2xl w-full' : 'max-w-lg'}`}>
               {isAgent ? (
@@ -197,7 +196,7 @@ export default function MessageList({ messages, selectedApp, supportsVisualizati
                         <ChartVisualization
                           key={`${message.id}-chart-${index}`}
                           chart={chart}
-                          headerAction={<SaveToDashboardButton chart={chart} />}
+                          saveable
                         />
                       ))}
                     </div>

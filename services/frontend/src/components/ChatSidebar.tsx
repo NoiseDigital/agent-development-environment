@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Session } from '../lib/adk-api';
 import { getAgentConfiguration } from '../config/agentConfig';
 import { useResizable } from '../hooks/useResizable';
+import { useSidebarCollapsed } from '../contexts/SidebarContext';
 import ResizeHandle from './ResizeHandle';
 
 const normalizeTimestamp = (timestamp: number | string): number => {
@@ -52,7 +53,7 @@ export default function ChatSidebar({
   sessionNames,
 }: ChatSidebarProps) {
   const { width, startResize } = useResizable({ initial: 320, min: 240, max: 460, edge: 'right' });
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useSidebarCollapsed('chat');
   const agentConfig = selectedApp ? getAgentConfiguration(selectedApp) : null;
 
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
@@ -142,7 +143,7 @@ export default function ChatSidebar({
   const dayKeys = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
   if (collapsed) {
     return (
-      <aside className="w-12 shrink-0 flex flex-col h-full bg-zinc-950 border-r border-zinc-800 items-center py-3 gap-1">
+      <aside className="w-12 shrink-0 flex flex-col h-full bg-zinc-950 border-r border-zinc-800/60 items-center py-3 gap-1">
         <button
           type="button"
           onClick={() => setCollapsed(false)}
@@ -171,12 +172,12 @@ export default function ChatSidebar({
 
   return (
     <aside
-      className="relative shrink-0 h-full bg-zinc-950 border-r border-zinc-800 flex flex-col"
+      className="relative shrink-0 h-full bg-zinc-950 border-r border-zinc-800/60 flex flex-col"
       style={{ width }}
     >
       <ResizeHandle side="right" onPointerDown={startResize} />
       {/* Header */}
-      <div className="px-4 py-4 border-b border-zinc-800 flex items-center justify-between gap-2">
+      <div className="px-4 py-4 border-b border-zinc-800/60 flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-0.5">Conversations</p>
           <p className="text-sm font-medium text-white truncate">

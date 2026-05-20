@@ -128,7 +128,7 @@ function DashboardDetail({ dashboard, onBack }: { dashboard: Dashboard; onBack: 
   return (
     <div className="flex flex-col h-full bg-black">
       {/* Header */}
-      <div className="flex items-center gap-4 px-8 py-5 border-b border-zinc-800 shrink-0">
+      <div className="flex items-center gap-4 px-8 py-5 border-b border-zinc-800/60 shrink-0">
         <button
           type="button"
           onClick={onBack}
@@ -246,7 +246,7 @@ function DashboardsBrowser() {
   return (
     <div className="flex flex-col h-full bg-black">
       {/* Page header */}
-      <div className="flex items-center justify-between px-8 py-5 border-b border-zinc-800 shrink-0">
+      <div className="flex items-center justify-between px-8 py-5 border-b border-zinc-800/60 shrink-0">
         <div>
           <h1 className="text-lg font-semibold text-white tracking-tight">Dashboards</h1>
           <p className="text-xs text-zinc-500 mt-0.5">{mockDashboards.length} dashboards across {new Set(mockDashboards.map((d) => d.client)).size} clients</p>
@@ -277,7 +277,7 @@ function DashboardsBrowser() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 px-8 pt-4 pb-0 border-b border-zinc-800 shrink-0">
+      <div className="flex items-center gap-1 px-8 pt-4 pb-0 border-b border-zinc-800/60 shrink-0">
         {tabs.map((tab) => {
           const count = tab.key === 'all'
             ? mockDashboards.length

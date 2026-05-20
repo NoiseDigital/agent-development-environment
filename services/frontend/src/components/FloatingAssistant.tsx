@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import { useChat } from '../hooks/useChat';
 import ChartVisualization from './ChartVisualization';
-import SaveToDashboardButton from './SaveToDashboardButton';
 
 // Defacto Plan & Dashboard assistant. For now every request is routed to the
 // Media Analyst agent; a dedicated plan/dashboard agent can replace this later.
@@ -70,7 +69,7 @@ function AssistantWidget() {
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col w-[400px] max-w-[calc(100vw-3rem)] h-[600px] max-h-[calc(100vh-3rem)] rounded-2xl border border-zinc-800 bg-zinc-950 shadow-[0_16px_50px_rgba(0,0,0,0.6)] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800 shrink-0">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800/60 shrink-0">
         <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-white shrink-0">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -123,7 +122,7 @@ function AssistantWidget() {
           messages.map((m) => {
             const isAgent = m.author !== 'user';
             return (
-              <div key={m.id} className={`flex ${isAgent ? 'justify-start' : 'justify-end'}`}>
+              <div key={m.id} className={`flex animate-message-in ${isAgent ? 'justify-start' : 'justify-end'}`}>
                 <div className={isAgent ? 'w-full' : 'max-w-[85%]'}>
                   {isAgent ? (
                     <div>
@@ -153,7 +152,7 @@ function AssistantWidget() {
                             <ChartVisualization
                               key={`${m.id}-chart-${i}`}
                               chart={chart}
-                              headerAction={<SaveToDashboardButton chart={chart} />}
+                              saveable
                             />
                           ))}
                         </div>
@@ -173,7 +172,7 @@ function AssistantWidget() {
       </div>
 
       {/* Input */}
-      <div className="border-t border-zinc-800 p-3 shrink-0">
+      <div className="border-t border-zinc-800/60 p-3 shrink-0">
         <div className="flex items-end gap-2 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 focus-within:border-zinc-600 transition-colors">
           <textarea
             value={input}

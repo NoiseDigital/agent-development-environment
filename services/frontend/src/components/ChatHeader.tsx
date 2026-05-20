@@ -36,7 +36,7 @@ export default function ChatHeader({
   }, []);
 
   return (
-    <div className="px-4 py-3 border-b border-zinc-800 bg-black">
+    <div className="px-4 py-3 border-b border-zinc-800/60 bg-black">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {selectedApp && sessionLabel && (
@@ -58,7 +58,7 @@ export default function ChatHeader({
 
           {profileOpen && (
             <div className="absolute right-0 mt-2 w-52 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl z-50 overflow-hidden">
-              <div className="px-4 py-3 border-b border-zinc-800">
+              <div className="px-4 py-3 border-b border-zinc-800/60">
                 <p className="text-[11px] text-zinc-500 mb-0.5">Signed in as</p>
                 <p className="text-sm font-medium text-white truncate">user@example.com</p>
               </div>

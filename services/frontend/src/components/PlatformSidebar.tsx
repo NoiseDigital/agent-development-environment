@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { agentConfigurations } from '../config/agentConfig';
 import { adkApi } from '../lib/adk-api';
 import { useResizable } from '../hooks/useResizable';
+import { useSidebarCollapsed } from '../contexts/SidebarContext';
 import ResizeHandle from './ResizeHandle';
 
 // ── Icons ────────────────────────────────────────────────────────────────────
@@ -63,7 +64,7 @@ export default function PlatformSidebar() {
 
   const inAgentsSection = pathname.startsWith('/agents') || pathname.startsWith('/chat');
   const [agentsExpanded, setAgentsExpanded] = useState(inAgentsSection);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useSidebarCollapsed('platform');
   const [onlineAgents, setOnlineAgents] = useState<Set<string>>(new Set());
 
   // Fetch which agents are live
@@ -97,7 +98,7 @@ export default function PlatformSidebar() {
       </button>
     );
     return (
-      <aside className="w-12 shrink-0 flex flex-col h-full bg-zinc-950 border-r border-zinc-800 items-center py-3 gap-1">
+      <aside className="w-12 shrink-0 flex flex-col h-full bg-zinc-950 border-r border-zinc-800/60 items-center py-3 gap-1">
         <button
           type="button"
           onClick={() => setCollapsed(false)}
@@ -118,12 +119,12 @@ export default function PlatformSidebar() {
 
   return (
     <aside
-      className="relative shrink-0 flex flex-col h-full bg-zinc-950 border-r border-zinc-800"
+      className="relative shrink-0 flex flex-col h-full bg-zinc-950 border-r border-zinc-800/60"
       style={{ width }}
     >
       <ResizeHandle side="right" onPointerDown={startResize} />
       {/* ── Brand ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between pl-4 pr-2 py-[14px] border-b border-zinc-800">
+      <div className="flex items-center justify-between pl-4 pr-2 py-[14px] border-b border-zinc-800/60">
         <div className="flex items-end gap-1.5 min-w-0 cursor-pointer" onClick={() => router.push('/')}>
           <Image src="/noise_white.svg" alt="Noise" width={72} height={20} className="h-5 w-auto shrink-0" />
           <span className="text-zinc-400 text-[11px] font-bold tracking-widest uppercase leading-none mb-[1px]">OS</span>
@@ -198,7 +199,7 @@ export default function PlatformSidebar() {
 
           {/* Agent sub-items */}
           {agentsExpanded && (
-            <div className="mt-px ml-[11px] pl-4 border-l border-zinc-800 space-y-px">
+            <div className="mt-px ml-[11px] pl-4 border-l border-zinc-800/60 space-y-px">
               {visibleAgents.map((agent) => {
                 const active = pathname.startsWith(`/chat/${agent.name}`);
                 const isOnline = onlineAgents.has(agent.name);
