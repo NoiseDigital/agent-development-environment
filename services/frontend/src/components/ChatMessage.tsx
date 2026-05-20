@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, type Ref } from 'react';
+import type { Ref } from 'react';
 import ReactMarkdown from 'react-markdown';
 import ChartVisualization from './ChartVisualization';
 import { formatMessageTime } from '../utils/timestamps';
 import type { ChatMessage as ChatMessageData } from '../hooks/useChat';
+import type { Rating } from '../lib/feedback-api';
 
 // One chat message row — shared by the full chat panel (MessageList) and the
 // floating assistant. The two contexts differ only in spacing/sizing, captured
@@ -21,6 +22,10 @@ interface ChatMessageProps {
   showCharts?: boolean;
   /** Attached to the row element so the panel can scroll a streaming reply into view. */
   rowRef?: Ref<HTMLDivElement>;
+  /** Current thumb rating for this agent message. */
+  rating?: Rating | null;
+  /** Set or clear (null) this message's rating. */
+  onRate?: (rating: Rating | null) => void;
 }
 
 const VARIANT: Record<Variant, {
@@ -64,6 +69,8 @@ export default function ChatMessage({
   loadingLabel = 'Thinking',
   showCharts = true,
   rowRef,
+  rating,
+  onRate,
 }: ChatMessageProps) {
   const v = VARIANT[variant];
   const isAgent = message.author !== 'user';
@@ -96,8 +103,8 @@ export default function ChatMessage({
               </div>
             )}
 
-            {variant === 'panel' && !message.isStreaming && (
-              <MessageFooter timestamp={message.timestamp} />
+            {!message.isStreaming && (
+              <MessageFooter timestamp={message.timestamp} rating={rating} onRate={onRate} />
             )}
 
             {charts.length > 0 && (
@@ -121,11 +128,19 @@ export default function ChatMessage({
   );
 }
 
-// Timestamp + thumbs row beneath a completed agent reply. Rating is local UI
-// state — fades in on hover, stays visible once the user rates.
-function MessageFooter({ timestamp }: { timestamp: number }) {
-  const [rating, setRating] = useState<'up' | 'down' | null>(null);
-  const toggle = (value: 'up' | 'down') => setRating((r) => (r === value ? null : value));
+// Timestamp + thumbs row beneath a completed agent reply. The rating is owned
+// by useChat (persisted via the feedback API) — fades in on hover, stays
+// visible once the message is rated.
+function MessageFooter({
+  timestamp,
+  rating = null,
+  onRate,
+}: {
+  timestamp: number;
+  rating?: Rating | null;
+  onRate?: (rating: Rating | null) => void;
+}) {
+  const toggle = (value: Rating) => onRate?.(rating === value ? null : value);
 
   return (
     <div

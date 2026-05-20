@@ -36,10 +36,10 @@ import altair as alt
 from altair.vegalite.schema import core as alt_core
 import pandas as pd
 
-from services.backend.agents.adk_agents.data_agent.prompts.bi_engineer import (
+from ..prompts.bi_engineer import (
     prompt as bi_engineer_prompt,
 )
-from services.backend.agents.adk_agents.data_agent.tools.chart_evaluator import (
+from .chart_evaluator import (
     evaluate_chart,
 )
 

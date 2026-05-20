@@ -5,17 +5,13 @@ Agent definition
 from google.adk.agents import Agent
 from google.genai import types
 
-import sys
-from pathlib import Path
-
-sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
-from services.backend.agents.adk_agents.hello_world_agent.tools.get_exhange_rate_tool import (
+from .tools.get_exhange_rate_tool import (
     get_exchange_rate,
 )
-from services.backend.agents.adk_agents.hello_world_agent.prompts.root_agent import (
+from .prompts.root_agent import (
     get_root_agent_prompt,
 )
-from services.backend.agents.adk_agents.hello_world_agent.utils.constants import (
+from .utils.constants import (
     get_agent_name,
     get_agent_description,
     get_root_agent_model,

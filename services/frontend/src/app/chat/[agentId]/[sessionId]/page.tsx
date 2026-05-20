@@ -31,6 +31,8 @@ export default function ChatSessionPage() {
     isLoadingSessions,
     error,
     sessionNames,
+    feedback,
+    rateMessage,
     supportsVisualization,
     sendMessage,
     createNewSession,
@@ -106,6 +108,8 @@ export default function ChatSessionPage() {
           messages={messages}
           selectedApp={selectedApp}
           supportsVisualization={supportsVisualization}
+          feedback={feedback}
+          onRate={rateMessage}
         />
         <MessageInput
           selectedApp={selectedApp}

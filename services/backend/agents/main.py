@@ -1,15 +1,15 @@
-import os
+"""Agent platform backend — the ADK FastAPI app plus the platform's own API."""
 
+import os
 from pathlib import Path
-from typing import List
 
 import uvicorn
-from fastapi import HTTPException
-from pydantic import BaseModel
 from google.adk.cli.fast_api import get_fast_api_app
-from google import genai
 
-from sources.api import router as sources_router
+from api.sources.routes import router as sources_router
+from api.feedback.routes import router as feedback_router
+from api.sessions.routes import router as sessions_router
+from api.naming import router as naming_router
 
 AGENTS_DIR = str(Path(__file__).resolve().parent / "adk_agents")
 
@@ -21,52 +21,11 @@ app = get_fast_api_app(
     trace_to_cloud=False,
 )
 
-# Data sources registry (uploads + BigQuery tables) for the analysis workflow.
-app.include_router(sources_router)
-
-
-_genai_client = genai.Client()
-
-
-class MessageSnippet(BaseModel):
-    content: str
-    role: str
-
-
-class NameSessionRequest(BaseModel):
-    messages: List[MessageSnippet]
-
-
-class NameSessionResponse(BaseModel):
-    name: str
-
-
-@app.post("/name_session", response_model=NameSessionResponse)
-async def name_session(request: NameSessionRequest) -> NameSessionResponse:
-    """Generate a short description name for a chat session based on the messages in the session."""
-    context = "\n".join(
-        f"{m.role.upper()} {m.content[:300]}" for m in request.messages[-8:]
-    )
-
-    prompt = (
-        "You are a helpful assistant for naming chat sessions. "
-        f"Here is the context of the chat session:\n{context}"
-        "Return ONLY the name, no quotes, no explanation, no formatting, just the name. "
-    )
-
-    try:
-        response = _genai_client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-        )
-        name = response.text.strip()
-        if not name:
-            raise ValueError("Generated name is empty")
-        return NameSessionResponse(name=name[:50])
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to generate session name: {str(e)}"
-        )
+# Platform API — everything ADK's FastAPI app doesn't already provide.
+app.include_router(sources_router)  # uploads + BigQuery catalog
+app.include_router(feedback_router)  # per-message thumb ratings
+app.include_router(sessions_router)  # session display names
+app.include_router(naming_router)  # session-name generation
 
 
 if __name__ == "__main__":

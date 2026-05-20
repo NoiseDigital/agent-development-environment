@@ -4,6 +4,7 @@ import { useRef, useEffect, useState } from 'react';
 import { getAgentConfiguration } from '../config/agent-config';
 import ChatMessage from './ChatMessage';
 import type { ChatMessage as ChatMessageData } from '../hooks/useChat';
+import type { Rating } from '../lib/feedback-api';
 
 // MessageList — the full-height chat transcript. Owns scroll behaviour and the
 // cycling "thinking" verb; each row is rendered by the shared ChatMessage.
@@ -12,6 +13,10 @@ interface MessageListProps {
   messages: ChatMessageData[];
   selectedApp?: string | null;
   supportsVisualization?: boolean;
+  /** Thumb ratings for the session, keyed by ADK event id. */
+  feedback?: Record<string, Rating>;
+  /** Set or clear (null) a message's rating. */
+  onRate?: (eventId: string, rating: Rating | null) => void;
 }
 
 const THINKING_VERBS = [
@@ -21,7 +26,13 @@ const THINKING_VERBS = [
   'On it', 'Unpacking that', 'Investigating',
 ];
 
-export default function MessageList({ messages, selectedApp, supportsVisualization = false }: MessageListProps) {
+export default function MessageList({
+  messages,
+  selectedApp,
+  supportsVisualization = false,
+  feedback,
+  onRate,
+}: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const streamingMsgRef = useRef<HTMLDivElement>(null);
   const lastStreamingId = useRef<string | null>(null);
@@ -100,6 +111,8 @@ export default function MessageList({ messages, selectedApp, supportsVisualizati
             showCharts={supportsVisualization}
             loadingLabel={THINKING_VERBS[verbIndex]}
             rowRef={message.isStreaming ? streamingMsgRef : undefined}
+            rating={feedback?.[message.id] ?? null}
+            onRate={onRate ? (rating) => onRate(message.id, rating) : undefined}
           />
         ))
       )}

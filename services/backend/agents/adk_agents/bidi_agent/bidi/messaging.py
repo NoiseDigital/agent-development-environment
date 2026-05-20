@@ -3,7 +3,7 @@ import os
 import base64
 import json
 
-from services.backend.agents.adk_agents.bidi_agent.agent import root_agent
+from ..agent import root_agent
 from dotenv import load_dotenv
 
 from google.genai.types import (

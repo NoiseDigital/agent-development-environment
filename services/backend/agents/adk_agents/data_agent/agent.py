@@ -13,8 +13,6 @@
 # limitations under the License.
 """Root agent"""
 
-from pathlib import Path
-import sys
 from typing import Optional
 
 from google.genai.types import (
@@ -30,19 +28,18 @@ from google.adk.planners import BuiltInPlanner
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools import FunctionTool
 
-sys.path.append(str(Path(__file__).parent.parent.parent))
-from services.backend.agents.src.shared.config_env import prepare_environment
+from shared.config_env import prepare_environment
 
-from services.backend.agents.adk_agents.data_agent.prompts.root_agent import (
+from .prompts.root_agent import (
     system_instruction as root_agent_instruction,
 )
-from services.backend.agents.adk_agents.data_agent.tools.bi_engineer import (
+from .tools.bi_engineer import (
     bi_engineer_tool,
 )
-from services.backend.agents.adk_agents.data_agent.tools.crm_business_analyst import (
+from .tools.crm_business_analyst import (
     crm_business_analyst_agent,
 )
-from services.backend.agents.adk_agents.data_agent.tools.data_engineer import (
+from .tools.data_engineer import (
     data_engineer,
 )
 

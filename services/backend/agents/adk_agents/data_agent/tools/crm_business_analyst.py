@@ -27,7 +27,7 @@ from google.genai.types import (
     ThinkingConfig,
 )
 
-from services.backend.agents.adk_agents.data_agent.prompts.crm_business_analyst import (
+from ..prompts.crm_business_analyst import (
     system_instruction as crm_business_analyst_instruction,
 )
 

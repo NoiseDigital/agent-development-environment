@@ -19,7 +19,7 @@ from google.genai.types import Content, GenerateContentConfig, Part, SafetySetti
 
 from pydantic import BaseModel
 
-from services.backend.agents.adk_agents.data_agent.prompts.chart_evaluator import (
+from ..prompts.chart_evaluator import (
     prompt as chart_evaluator_prompt,
 )
 

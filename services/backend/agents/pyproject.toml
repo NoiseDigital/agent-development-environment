@@ -17,8 +17,15 @@ dependencies = [
     "python-multipart>=0.0.18",
     "openpyxl>=3.1.5",
     "google-cloud-bigquery>=3.27.0",
+    "a2a-sdk>=1.0.3",
+    "altair>=6.1.0",
+    "pandas>=2.3.3",
+    "db-dtypes>=1.6.0",
+    "tabulate>=0.10.0",
 ]
 
 [tool.setuptools]
 py-modules = ["main"]
-packages = ["sources"]
+
+[tool.setuptools.packages.find]
+include = ["api*", "shared*", "adk_agents*"]

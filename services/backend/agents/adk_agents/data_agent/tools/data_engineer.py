@@ -29,11 +29,11 @@ from google.genai import Client as GenaiClient
 
 from google.adk.tools import ToolContext
 
-from services.backend.agents.adk_agents.data_agent.prompts.data_engineer import (
+from ..prompts.data_engineer import (
     system_instruction as data_engineer_instruction,
     prompt as data_engineer_prompt,
 )
-from services.backend.agents.adk_agents.data_agent.prompts.sql_correction import (
+from ..prompts.sql_correction import (
     instruction as sql_correction_instruction,
     prompt as sql_correction_prompt,
 )

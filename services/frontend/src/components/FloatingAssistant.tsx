@@ -22,7 +22,7 @@ export default function FloatingAssistant() {
 function AssistantWidget() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
-  const { messages, isLoading, error, sendMessage, createNewSession } = useChat(AGENT_ID);
+  const { messages, isLoading, error, feedback, rateMessage, sendMessage, createNewSession } = useChat(AGENT_ID);
   const scrollRef = useRef<HTMLDivElement>(null);
   const initRef = useRef(false);
 
@@ -119,7 +119,13 @@ function AssistantWidget() {
           </div>
         ) : (
           messages.map((m) => (
-            <ChatMessage key={m.id} message={m} variant="floating" />
+            <ChatMessage
+              key={m.id}
+              message={m}
+              variant="floating"
+              rating={feedback[m.id] ?? null}
+              onRate={(rating) => rateMessage(m.id, rating)}
+            />
           ))
         )}
         {error && <p className="text-[11px] text-red-400 px-1">{error}</p>}

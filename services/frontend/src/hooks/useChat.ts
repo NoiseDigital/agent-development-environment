@@ -7,6 +7,8 @@ import { ChartData } from '../types/chart';
 import type { AgentJsonResponse } from '../types/agent-response';
 import { getAgentConfiguration } from '../config/agent-config';
 import { normalizeTimestamp } from '../utils/timestamps';
+import { feedbackApi, type Rating } from '../lib/feedback-api';
+import { sessionNamesApi } from '../lib/session-names-api';
 
 export interface ChatMessage {
   id: string;
@@ -16,22 +18,6 @@ export interface ChatMessage {
   isStreaming?: boolean;
   charts?: ChartData[];
 }
-
-// ── Session name persistence (localStorage) ──────────────────────────────────
-
-const NAMES_KEY = 'agent-platform-session-names';
-
-const loadStoredNames = (): Record<string, string> => {
-  try { return JSON.parse(localStorage.getItem(NAMES_KEY) ?? '{}'); } catch { return {}; }
-};
-
-const persistName = (sessionId: string, name: string) => {
-  try {
-    const names = loadStoredNames();
-    names[sessionId] = name;
-    localStorage.setItem(NAMES_KEY, JSON.stringify(names));
-  } catch { /* ignore */ }
-};
 
 // ── Agent JSON response parser ───────────────────────────────────────────────
 
@@ -122,6 +108,8 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
   const [isLoadingApps, setIsLoadingApps] = useState(true);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [sessionNames, setSessionNames] = useState<Record<string, string>>({});
+  // Per-message thumb ratings for the active session, keyed by ADK event id.
+  const [feedback, setFeedback] = useState<Record<string, Rating>>({});
   // Prevent the currentSession useEffect from overwriting messages that were
   // just parsed correctly by sendMessage (the session sync happens right after).
   const skipNextSessionSync = useRef(false);
@@ -129,14 +117,26 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
     ? (getAgentConfiguration(selectedApp)?.supportsVisualization ?? false)
     : false;
 
-  // Load stored session names from localStorage on mount
+  // Load saved session display names whenever the active app changes.
   useEffect(() => {
-    setSessionNames(loadStoredNames());
-  }, []);
+    if (!selectedApp) {
+      setSessionNames({});
+      return;
+    }
+    let cancelled = false;
+    sessionNamesApi
+      .list(selectedApp, userId)
+      .then(names => { if (!cancelled) setSessionNames(names); })
+      .catch(() => { if (!cancelled) setSessionNames({}); });
+    return () => { cancelled = true; };
+  }, [selectedApp, userId]);
 
+  // Persist a session display name — optimistic; the server write is fire-and-forget.
   const saveSessionName = (sessionId: string, name: string) => {
-    persistName(sessionId, name);
     setSessionNames(prev => ({ ...prev, [sessionId]: name }));
+    if (selectedApp) {
+      sessionNamesApi.set(selectedApp, sessionId, name, userId).catch(() => {});
+    }
   };
 
   // Load available apps on mount
@@ -188,6 +188,43 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
       setMessages(chatMessages);
     }
   }, [currentSession]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load per-message feedback whenever the active session changes.
+  useEffect(() => {
+    if (!selectedApp || !currentSession) {
+      setFeedback({});
+      return;
+    }
+    let cancelled = false;
+    feedbackApi
+      .listForSession(selectedApp, currentSession.id, userId)
+      .then(map => { if (!cancelled) setFeedback(map); })
+      .catch(() => { if (!cancelled) setFeedback({}); });
+    return () => { cancelled = true; };
+  }, [selectedApp, currentSession?.id, userId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Set or clear (rating = null) the thumb rating for one message. Optimistic —
+  // reverts if the request fails.
+  const rateMessage = async (eventId: string, rating: Rating | null) => {
+    if (!selectedApp || !currentSession) return;
+    const previous = feedback[eventId] ?? null;
+    setFeedback(prev => {
+      const next = { ...prev };
+      if (rating) next[eventId] = rating;
+      else delete next[eventId];
+      return next;
+    });
+    try {
+      await feedbackApi.setRating(selectedApp, currentSession.id, eventId, rating, userId);
+    } catch {
+      setFeedback(prev => {
+        const next = { ...prev };
+        if (previous) next[eventId] = previous;
+        else delete next[eventId];
+        return next;
+      });
+    }
+  };
 
   const loadAvailableApps = async () => {
     try {
@@ -293,6 +330,8 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
 
       let accumulated = '';
       let agentAuthor = 'agent';
+      // The id of the persisted ADK event for this reply — feedback keys off it.
+      let finalEventId: string | null = null;
 
       for await (const event of adkApi.sendMessageSSE(request)) {
         if (event.author && event.author !== 'user') agentAuthor = event.author;
@@ -304,6 +343,7 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
             accumulated += textPart.text;
           } else {
             accumulated = textPart.text;
+            finalEventId = event.id;
           }
           setMessages(prev =>
             prev.map(m =>
@@ -318,10 +358,11 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
       const parsed = supportsVisualization
         ? parseAgentResponse(accumulated)
         : { content: accumulated, charts: undefined };
+      // Adopt the real ADK event id so feedback (keyed by event id) survives a reload.
       setMessages(prev =>
         prev.map(m =>
           m.id === streamingId
-            ? { ...m, content: parsed.content, charts: parsed.charts, isStreaming: false }
+            ? { ...m, id: finalEventId ?? streamingId, content: parsed.content, charts: parsed.charts, isStreaming: false }
             : m
         )
       );
@@ -416,6 +457,9 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
 
     try {
       await adkApi.deleteSession(selectedApp, userId, sessionId);
+      // Drop this session's feedback + saved name — ADK's cascade won't reach our tables.
+      feedbackApi.clearSession(selectedApp, sessionId, userId).catch(() => {});
+      sessionNamesApi.remove(selectedApp, sessionId, userId).catch(() => {});
 
       // Remove the session from the local list
       setSessions(prev => prev.filter(session => session.id !== sessionId));
@@ -424,6 +468,7 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
       if (currentSession?.id === sessionId) {
         setCurrentSession(null);
         setMessages([]);
+        setFeedback({});
       }
 
       setError(null);
@@ -444,6 +489,8 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
     isLoadingSessions,
     error,
     sessionNames,
+    feedback,
+    rateMessage,
     supportsVisualization,
     sendMessage,
     createNewSession,
