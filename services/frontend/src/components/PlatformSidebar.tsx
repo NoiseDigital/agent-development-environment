@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, type ReactNode } from 'react';
 import Image from 'next/image';
-import { agentConfigurations } from '../config/agentConfig';
+import { agentConfigurations } from '../config/agent-config';
 import { adkApi } from '../lib/adk-api';
 import { useResizable } from '../hooks/useResizable';
 import { useSidebarCollapsed } from '../contexts/SidebarContext';
@@ -35,7 +35,7 @@ const AnalyzeIcon = () => (
 const AgentsIcon = () => (
   <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-      d="M13 10V3L4 14h7v7l9-11h-7z" />
+      d="M12 7V5M12 5a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5zM7.5 7h9A2.5 2.5 0 0119 9.5v6A2.5 2.5 0 0116.5 18h-9A2.5 2.5 0 015 15.5v-6A2.5 2.5 0 017.5 7zM4 11v3m16-3v3M9.5 12v1m5-1v1M10 15.5h4" />
   </svg>
 );
 

@@ -2,9 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import ReactMarkdown from 'react-markdown';
 import { useChat } from '../hooks/useChat';
-import ChartVisualization from './ChartVisualization';
+import ChatMessage from './ChatMessage';
 
 // Defacto Plan & Dashboard assistant. For now every request is routed to the
 // Media Analyst agent; a dedicated plan/dashboard agent can replace this later.
@@ -73,7 +72,7 @@ function AssistantWidget() {
         <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-white shrink-0">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </div>
         <div className="min-w-0 flex-1">
@@ -119,54 +118,9 @@ function AssistantWidget() {
             </p>
           </div>
         ) : (
-          messages.map((m) => {
-            const isAgent = m.author !== 'user';
-            return (
-              <div key={m.id} className={`flex animate-message-in ${isAgent ? 'justify-start' : 'justify-end'}`}>
-                <div className={isAgent ? 'w-full' : 'max-w-[85%]'}>
-                  {isAgent ? (
-                    <div>
-                      {m.isStreaming && m.content === '' ? (
-                        <div className="inline-flex items-center gap-2 py-1">
-                          <span className="w-3.5 h-3.5 border-2 border-zinc-700 border-t-zinc-300 rounded-full animate-spin" />
-                          <span className="text-xs text-zinc-400">Thinking…</span>
-                        </div>
-                      ) : (
-                        <div className="px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-[13px]">
-                          <div className="prose prose-invert prose-sm max-w-none
-                            prose-p:my-1 prose-p:leading-relaxed
-                            prose-headings:text-white prose-headings:font-semibold
-                            prose-strong:text-white
-                            prose-ul:my-1 prose-li:my-0.5
-                            prose-code:text-xs prose-code:bg-zinc-800 prose-code:px-1 prose-code:rounded">
-                            <ReactMarkdown>{m.content}</ReactMarkdown>
-                            {m.isStreaming && (
-                              <span className="inline-block w-1.5 h-3.5 ml-0.5 bg-zinc-400 rounded-sm animate-pulse align-middle" />
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      {m.charts && m.charts.length > 0 && (
-                        <div className="mt-2 space-y-2">
-                          {m.charts.map((chart, i) => (
-                            <ChartVisualization
-                              key={`${m.id}-chart-${i}`}
-                              chart={chart}
-                              saveable
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="px-3 py-2 rounded-xl bg-zinc-800 border border-zinc-700 text-white text-[13px] whitespace-pre-wrap">
-                      {m.content}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })
+          messages.map((m) => (
+            <ChatMessage key={m.id} message={m} variant="floating" />
+          ))
         )}
         {error && <p className="text-[11px] text-red-400 px-1">{error}</p>}
       </div>

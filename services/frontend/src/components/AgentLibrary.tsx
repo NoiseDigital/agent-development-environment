@@ -1,6 +1,6 @@
 'use client';
 
-import { getAgentConfiguration } from '../config/agentConfig';
+import { getAgentConfiguration } from '../config/agent-config';
 
 interface AgentLibraryProps {
   availableApps: string[];

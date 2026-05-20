@@ -1,5 +1,5 @@
 // API client for ADK server
-import { getAgentEndpoints } from '../config/agentConfig';
+import { getAgentEndpoints } from '../config/agent-config';
 
 // Agent endpoint configuration (imported from centralized config)
 export interface AgentEndpoint {

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Session } from '../lib/adk-api';
-import { getAgentConfiguration } from '../config/agentConfig';
+import { getAgentConfiguration } from '../config/agent-config';
 
 interface ChatHeaderProps {
   selectedApp: string | null;

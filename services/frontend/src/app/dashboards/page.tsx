@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { mockDashboards, Dashboard, DashboardOwnership, DashboardTile } from '../../data/mockDashboardData';
+import { mockDashboards, Dashboard, DashboardOwnership, DashboardTile } from '../../data/mock-dashboard-data';
 import type { Layout } from 'react-grid-layout';
 import DashboardCanvas from '../../components/DashboardCanvas';
 import { loadDashboardTiles, saveDashboardTiles } from '../../lib/dashboard-store';

@@ -48,7 +48,7 @@ const sections = [
     icon: (
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-          d="M13 10V3L4 14h7v7l9-11h-7z" />
+          d="M12 7V5M12 5a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5zM7.5 7h9A2.5 2.5 0 0119 9.5v6A2.5 2.5 0 0116.5 18h-9A2.5 2.5 0 015 15.5v-6A2.5 2.5 0 017.5 7zM4 11v3m16-3v3M9.5 12v1m5-1v1M10 15.5h4" />
       </svg>
     ),
   },
@@ -86,9 +86,9 @@ export default function Home() {
               key={s.key}
               type="button"
               onClick={() => router.push(s.href)}
-              className="group flex flex-col items-center text-center rounded-2xl border border-zinc-800 bg-zinc-950 hover:bg-zinc-900 hover:border-zinc-700 p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(0,0,0,0.4)] cursor-pointer"
+              className="group flex flex-col items-center text-center rounded-3xl border border-zinc-800 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.08),_rgba(24,24,27,0.96)_45%,_rgba(9,9,11,1)_100%)] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.35)] transition-all duration-300 hover:-translate-y-1 hover:border-zinc-600 hover:shadow-[0_32px_80px_rgba(0,0,0,0.45)] cursor-pointer"
             >
-              <div className="mb-4 w-14 h-14 rounded-xl border border-zinc-800 bg-zinc-900 group-hover:border-zinc-700 group-hover:bg-zinc-800 flex items-center justify-center text-zinc-300 group-hover:text-white transition-colors duration-200">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-zinc-700 bg-zinc-900/90 text-zinc-300 transition-colors duration-200 group-hover:border-zinc-500 group-hover:bg-zinc-800 group-hover:text-white">
                 {s.icon}
               </div>
               <p className="text-white text-sm font-semibold mb-2">{s.label}</p>

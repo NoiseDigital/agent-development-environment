@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { mockClients, Client, Campaign, Ad, AdStatus, Platform } from '../../data/mockPlanData';
+import { mockClients, Client, Campaign, Ad, AdStatus, Platform } from '../../data/mock-plan-data';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

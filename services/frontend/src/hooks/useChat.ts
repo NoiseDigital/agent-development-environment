@@ -5,9 +5,10 @@ import { adkApi } from '../lib/adk-api';
 import type { Session, AgentRunRequest, Event as AdkEvent } from '../lib/adk-api';
 import { ChartData } from '../types/chart';
 import type { AgentJsonResponse } from '../types/agent-response';
-import { getAgentConfiguration } from '../config/agentConfig';
+import { getAgentConfiguration } from '../config/agent-config';
+import { normalizeTimestamp } from '../utils/timestamps';
 
-interface ChatMessage {
+export interface ChatMessage {
   id: string;
   content: string;
   author: string;
@@ -15,15 +16,6 @@ interface ChatMessage {
   isStreaming?: boolean;
   charts?: ChartData[];
 }
-
-// ── Timestamp normalisation ──────────────────────────────────────────────────
-
-const normalizeTimestamp = (timestamp: number | string): number => {
-  let ts = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
-  if (ts < 1_000_000_000_000) ts *= 1000; // seconds → ms
-  if (!ts || isNaN(ts) || ts <= 0) ts = Date.now();
-  return ts;
-};
 
 // ── Session name persistence (localStorage) ──────────────────────────────────
 

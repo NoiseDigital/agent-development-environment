@@ -8,7 +8,7 @@ import ChatHeader from '../../../../components/ChatHeader';
 import MessageList from '../../../../components/MessageList';
 import MessageInput from '../../../../components/MessageInput';
 import SourcesSidebar from '../../../../components/SourcesSidebar';
-import { getAgentConfiguration } from '../../../../config/agentConfig';
+import { getAgentConfiguration } from '../../../../config/agent-config';
 import type { SourceRef } from '../../../../types/source';
 import { sourceUri, sourceLabel } from '../../../../types/source';
 

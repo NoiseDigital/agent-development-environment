@@ -1,5 +1,5 @@
 import { ChartData } from '../types/chart';
-import { Dashboard, DashboardTile, ChartTile } from '../data/mockDashboardData';
+import { Dashboard, DashboardTile, ChartTile } from '../data/mock-dashboard-data';
 
 // Mock persistence layer for dashboards. Layouts and saved visuals live in
 // localStorage, keyed by dashboard id. Swapping these functions for a backend

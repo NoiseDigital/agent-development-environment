@@ -4,7 +4,7 @@ import { GridLayout, useContainerWidth, type Layout } from 'react-grid-layout';
 import { GridBackground } from 'react-grid-layout/extras';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
-import { DashboardTile } from '../data/mockDashboardData';
+import { DashboardTile } from '../data/mock-dashboard-data';
 import ChartVisualization from './ChartVisualization';
 import TextTile from './TextTile';
 

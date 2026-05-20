@@ -2,17 +2,11 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Session } from '../lib/adk-api';
-import { getAgentConfiguration } from '../config/agentConfig';
+import { getAgentConfiguration } from '../config/agent-config';
 import { useResizable } from '../hooks/useResizable';
 import { useSidebarCollapsed } from '../contexts/SidebarContext';
 import ResizeHandle from './ResizeHandle';
-
-const normalizeTimestamp = (timestamp: number | string): number => {
-  let ts = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
-  if (ts < 1_000_000_000_000) ts *= 1000;
-  if (!ts || isNaN(ts) || ts <= 0) ts = Date.now();
-  return ts;
-};
+import { normalizeTimestamp } from '../utils/timestamps';
 
 const toDateKey = (ts: number) => new Date(ts).toLocaleDateString('en-CA');
 

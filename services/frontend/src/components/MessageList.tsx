@@ -1,24 +1,15 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import { getAgentConfiguration } from '../config/agentConfig';
-import ChartVisualization from './ChartVisualization';
-import { ChartData } from '../types/chart';
+import { getAgentConfiguration } from '../config/agent-config';
+import ChatMessage from './ChatMessage';
+import type { ChatMessage as ChatMessageData } from '../hooks/useChat';
 
-// MessageList component for displaying chat messages
-
-interface ChatMessage {
-  id: string;
-  content: string;
-  author: string;
-  timestamp: number;
-  isStreaming?: boolean;
-  charts?: ChartData[];
-}
+// MessageList — the full-height chat transcript. Owns scroll behaviour and the
+// cycling "thinking" verb; each row is rendered by the shared ChatMessage.
 
 interface MessageListProps {
-  messages: ChatMessage[];
+  messages: ChatMessageData[];
   selectedApp?: string | null;
   supportsVisualization?: boolean;
 }
@@ -35,7 +26,6 @@ export default function MessageList({ messages, selectedApp, supportsVisualizati
   const streamingMsgRef = useRef<HTMLDivElement>(null);
   const lastStreamingId = useRef<string | null>(null);
   const prevLengthRef = useRef(messages.length);
-  const [ratings, setRatings] = useState<Record<string, 'up' | 'down' | null>>({});
   const [verbIndex, setVerbIndex] = useState(0);
 
   // Cycle verbs while any message is loading
@@ -48,10 +38,6 @@ export default function MessageList({ messages, selectedApp, supportsVisualizati
     }, 1800);
     return () => clearInterval(id);
   }, [isLoading]);
-
-  const rate = (msgId: string, value: 'up' | 'down') => {
-    setRatings(prev => ({ ...prev, [msgId]: prev[msgId] === value ? null : value }));
-  };
 
   // When a new streaming message starts, scroll its top into view so the user
   // can read from the beginning as tokens arrive. Don't force-scroll to bottom
@@ -82,13 +68,6 @@ export default function MessageList({ messages, selectedApp, supportsVisualizati
     }
   }, [messages]);
 
-  const formatTimestamp = (timestamp: number) => {
-    return new Date(timestamp).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
   // Get agent configuration for display
   const agentConfig = selectedApp ? getAgentConfiguration(selectedApp) : null;
 
@@ -113,105 +92,16 @@ export default function MessageList({ messages, selectedApp, supportsVisualizati
           </div>
         </div>
       ) : (
-        messages.map((message) => {
-          const hasCharts = supportsVisualization && message.charts && message.charts.length > 0;
-          const isAgent = message.author !== 'user';
-          const rating = ratings[message.id] ?? null;
-
-          return (
-          <div
+        messages.map((message) => (
+          <ChatMessage
             key={message.id}
-            ref={message.isStreaming ? streamingMsgRef : undefined}
-            className={`flex animate-message-in ${isAgent ? 'justify-start' : 'justify-end'}`}
-          >
-            <div className={`${isAgent ? 'max-w-2xl w-full' : 'max-w-lg'}`}>
-              {isAgent ? (
-                <div className="group">
-                  {message.isStreaming && message.content === '' ? (
-                    /* Loading indicator — no bubble, bare text + square snake spinner */
-                    <div className="inline-flex items-center gap-3 py-1">
-                      {/* Square snake spinner */}
-                      <span className="w-4 h-4 border-2 border-zinc-700 border-t-zinc-300 animate-spin flex-shrink-0" />
-                      <span
-                        key={verbIndex}
-                        className="text-sm text-zinc-300 font-medium animate-verb"
-                      >
-                        {THINKING_VERBS[verbIndex]}…
-                      </span>
-                    </div>
-                  ) : (
-                  <div className="px-4 py-3.5 rounded-2xl bg-zinc-900 border border-zinc-800 text-white">
-                      <div className="prose prose-invert prose-sm max-w-none
-                        prose-p:my-1.5 prose-p:leading-relaxed
-                        prose-headings:font-semibold prose-headings:text-white
-                        prose-h1:text-base prose-h2:text-sm prose-h3:text-sm
-                        prose-ul:my-1.5 prose-li:my-0.5
-                        prose-code:text-xs prose-code:bg-zinc-800 prose-code:px-1 prose-code:rounded
-                        prose-strong:text-white">
-                        <ReactMarkdown>{message.content}</ReactMarkdown>
-                        {message.isStreaming && (
-                          <span className="inline-block w-1.5 h-3.5 ml-0.5 bg-zinc-400 rounded-sm animate-pulse align-middle" />
-                        )}
-                      </div>
-                  </div>
-                  )}
-
-                  {/* Timestamp + thumbs row — always visible when rated, hover-only otherwise */}
-                  {!message.isStreaming && (
-                    <div className={`flex items-center gap-3 mt-1.5 px-1 transition-opacity duration-150 ${
-                      rating !== null ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                    }`}>
-                      <span className="text-[11px] text-zinc-600">{formatTimestamp(message.timestamp)}</span>
-                      <div className="flex items-center gap-1 ml-auto">
-                        <button
-                          onClick={() => rate(message.id, 'up')}
-                          title="Good response"
-                          className={`p-1 rounded transition-colors ${
-                            rating === 'up' ? 'text-green-400' : 'text-zinc-600 hover:text-zinc-300'
-                          }`}
-                        >
-                          <svg className="w-3.5 h-3.5" fill={rating === 'up' ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => rate(message.id, 'down')}
-                          title="Poor response"
-                          className={`p-1 rounded transition-colors ${
-                            rating === 'down' ? 'text-red-400' : 'text-zinc-600 hover:text-zinc-300'
-                          }`}
-                        >
-                          <svg className="w-3.5 h-3.5" fill={rating === 'down' ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Charts */}
-                  {hasCharts && (
-                    <div className="mt-3 space-y-3">
-                      {message.charts!.map((chart, index) => (
-                        <ChartVisualization
-                          key={`${message.id}-chart-${index}`}
-                          chart={chart}
-                          saveable
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="px-4 py-3 rounded-2xl bg-zinc-800 border border-zinc-700 text-white text-sm leading-relaxed">
-                  <p className="whitespace-pre-wrap">{message.content}</p>
-                  <p className="text-[11px] mt-2 text-zinc-500">{formatTimestamp(message.timestamp)}</p>
-                </div>
-              )}
-            </div>
-          </div>
-          );
-        })
+            message={message}
+            variant="panel"
+            showCharts={supportsVisualization}
+            loadingLabel={THINKING_VERBS[verbIndex]}
+            rowRef={message.isStreaming ? streamingMsgRef : undefined}
+          />
+        ))
       )}
 
       <div ref={messagesEndRef} />

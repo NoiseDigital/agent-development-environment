@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { toPng } from 'html-to-image';
-import { mockDashboards } from '../data/mockDashboardData';
+import { mockDashboards } from '../data/mock-dashboard-data';
 import { addChartToDashboard } from '../lib/dashboard-store';
 import { ChartData } from '../types/chart';
 
