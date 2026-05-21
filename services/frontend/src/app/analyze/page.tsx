@@ -30,7 +30,7 @@ function Slider({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-blue-500"
+        className="w-full accent-accent-500"
       />
     </div>
   );
@@ -82,7 +82,7 @@ function ColumnSelect({
                   disabled={!numeric}
                   checked={sel}
                   onChange={() => numeric && toggle(c.name)}
-                  className="accent-blue-500 disabled:opacity-40"
+                  className="accent-accent-500 disabled:opacity-40"
                 />
                 <span className="truncate flex-1">{c.name}</span>
                 {numeric ? (
@@ -107,7 +107,7 @@ function ColumnSelect({
 
 const Toggle = ({ label, checked, onChange, hint }: { label: string; checked: boolean; onChange: (v: boolean) => void; hint?: string }) => (
   <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
-    <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="accent-blue-500" />
+    <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="accent-accent-500" />
     <span className="flex items-center gap-1">{label}{hint && <InfoHint text={hint} />}</span>
   </label>
 );

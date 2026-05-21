@@ -185,10 +185,10 @@ export default function SourcesSidebar({ selected, onChange }: SourcesSidebarPro
                   <li
                     key={u.id}
                     className={`group flex items-start gap-2 rounded-lg border px-2.5 py-2 transition-colors ${
-                      active ? 'border-blue-500/40 bg-blue-500/10' : 'border-zinc-800 bg-zinc-950 hover:border-zinc-700'
+                      active ? 'border-accent-500/40 bg-accent-500/10' : 'border-zinc-800 bg-zinc-950 hover:border-zinc-700'
                     }`}
                   >
-                    <input type="checkbox" checked={active} onChange={() => toggle(ref)} className="mt-0.5 accent-blue-500 shrink-0" />
+                    <input type="checkbox" checked={active} onChange={() => toggle(ref)} className="mt-0.5 accent-accent-500 shrink-0" />
                     <div className="min-w-0 flex-1">
                       <p className="text-xs text-white truncate" title={u.name}>{u.name}</p>
                       <p className="text-[10px] text-zinc-500">
@@ -251,10 +251,10 @@ export default function SourcesSidebar({ selected, onChange }: SourcesSidebarPro
                       <li
                         key={t.table}
                         className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 transition-colors ${
-                          active ? 'border-blue-500/40 bg-blue-500/10' : 'border-zinc-800 bg-zinc-950 hover:border-zinc-700'
+                          active ? 'border-accent-500/40 bg-accent-500/10' : 'border-zinc-800 bg-zinc-950 hover:border-zinc-700'
                         }`}
                       >
-                        <input type="checkbox" checked={active} onChange={() => toggle(ref)} className="accent-blue-500 shrink-0" />
+                        <input type="checkbox" checked={active} onChange={() => toggle(ref)} className="accent-accent-500 shrink-0" />
                         <span className="text-xs text-white truncate" title={`${t.dataset}.${t.table}`}>{t.table}</span>
                       </li>
                     );

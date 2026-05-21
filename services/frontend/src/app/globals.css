@@ -13,6 +13,28 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* ── Design tokens ──────────────────────────────────────────────────────────
+   Semantic colors the UI references instead of raw Tailwind shades, so the
+   theme has one source of truth. Surfaces/borders map onto the zinc neutral
+   ramp; `accent` is the single brand color — always blue, never sky / indigo /
+   violet. Text keeps the plain `zinc-*` ramp (already a consistent scale). */
+@theme {
+  --color-surface: #18181b;         /* cards, bubbles, panels        (zinc-900) */
+  --color-surface-raised: #27272a;  /* hover, chips, user bubble     (zinc-800) */
+  --color-surface-sunken: #09090b;  /* code blocks, inset fields     (zinc-950) */
+
+  --color-line: #27272a;            /* default hairline border       (zinc-800) */
+  --color-line-strong: #3f3f46;     /* emphasized / hover border     (zinc-700) */
+
+  --color-accent-100: #dbeafe;
+  --color-accent-300: #93c5fd;
+  --color-accent-400: #60a5fa;
+  --color-accent-500: #3b82f6;      /* the brand accent */
+  --color-accent-600: #2563eb;
+  --color-accent-900: #1e3a8a;
+  --color-accent-950: #172554;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
@@ -27,6 +49,25 @@
 
 .animate-verb {
   animation: verb-fade-up 0.35s ease-out forwards;
+}
+
+/* Loading status text — a light band sweeps across the muted label so it stays
+   visibly alive even while a single phase runs for many seconds. */
+@keyframes loading-shimmer {
+  0%   { background-position: 150% 0; }
+  100% { background-position: -150% 0; }
+}
+
+.animate-loading-text {
+  background: linear-gradient(
+    90deg,
+    #71717a 0%, #71717a 40%, #f4f4f5 50%, #71717a 60%, #71717a 100%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: loading-shimmer 2.2s linear infinite;
 }
 
 /* Chat messages rise into place from the input area as they appear. */

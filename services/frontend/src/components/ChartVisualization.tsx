@@ -270,7 +270,7 @@ export default function ChartVisualization({ chart, fill = false, saveable = fal
       {insight && (
         <div className="bg-zinc-800 border border-zinc-600 rounded-lg p-3">
           <p className="text-sm text-zinc-300 leading-relaxed">
-            <span className="text-blue-400 font-medium">💡 Insight:</span> {insight}
+            <span className="text-accent-400 font-medium">💡 Insight:</span> {insight}
           </p>
         </div>
       )}

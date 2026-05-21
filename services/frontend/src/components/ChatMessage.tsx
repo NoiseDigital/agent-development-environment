@@ -3,7 +3,9 @@
 import type { Ref } from 'react';
 import ReactMarkdown from 'react-markdown';
 import GenUIRenderer from './genui/GenUIRenderer';
+import ToolQueries from './ToolQueries';
 import { formatMessageTime } from '../utils/timestamps';
+import { isAdmin } from '../lib/feature-flags';
 import type { ChatMessage as ChatMessageData } from '../hooks/useChat';
 import type { Rating } from '../lib/feedback-api';
 
@@ -44,9 +46,9 @@ const VARIANT: Record<Variant, {
   panel: {
     agentInner: 'max-w-2xl w-full',
     userInner: 'max-w-lg',
-    agentBubble: 'px-4 py-3.5 rounded-2xl bg-zinc-900 border border-zinc-800 text-white',
-    userBubble: 'px-4 py-3 rounded-2xl bg-zinc-800 border border-zinc-700 text-white text-sm leading-relaxed',
-    prose: 'prose-p:my-1.5 prose-p:leading-relaxed prose-headings:font-semibold prose-headings:text-white prose-h1:text-base prose-h2:text-sm prose-h3:text-sm prose-ul:my-1.5 prose-li:my-0.5 prose-code:text-xs prose-code:bg-zinc-800 prose-code:px-1 prose-code:rounded prose-strong:text-white',
+    agentBubble: 'px-4 py-3.5 rounded-2xl bg-surface border border-line text-white',
+    userBubble: 'px-4 py-3 rounded-2xl bg-surface-raised border border-line-strong text-white text-sm leading-relaxed',
+    prose: 'prose-p:my-1.5 prose-p:leading-relaxed prose-headings:font-semibold prose-headings:text-white prose-h1:text-base prose-h2:text-sm prose-h3:text-sm prose-ul:my-1.5 prose-li:my-0.5 prose-code:text-xs prose-code:bg-surface-raised prose-code:px-1 prose-code:rounded prose-strong:text-white',
     spinner: 'w-4 h-4',
     loadingGap: 'gap-3',
     loadingText: 'text-sm text-zinc-300 font-medium',
@@ -55,9 +57,9 @@ const VARIANT: Record<Variant, {
   floating: {
     agentInner: 'w-full',
     userInner: 'max-w-[85%]',
-    agentBubble: 'px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-[13px]',
-    userBubble: 'px-3 py-2 rounded-xl bg-zinc-800 border border-zinc-700 text-white text-[13px]',
-    prose: 'prose-p:my-1 prose-p:leading-relaxed prose-headings:text-white prose-headings:font-semibold prose-strong:text-white prose-ul:my-1 prose-li:my-0.5 prose-code:text-xs prose-code:bg-zinc-800 prose-code:px-1 prose-code:rounded',
+    agentBubble: 'px-3 py-2 rounded-xl bg-surface border border-line text-white text-[13px]',
+    userBubble: 'px-3 py-2 rounded-xl bg-surface-raised border border-line-strong text-white text-[13px]',
+    prose: 'prose-p:my-1 prose-p:leading-relaxed prose-headings:text-white prose-headings:font-semibold prose-strong:text-white prose-ul:my-1 prose-li:my-0.5 prose-code:text-xs prose-code:bg-surface-raised prose-code:px-1 prose-code:rounded',
     spinner: 'w-3.5 h-3.5 rounded-full',
     loadingGap: 'gap-2',
     loadingText: 'text-xs text-zinc-400',
@@ -79,6 +81,12 @@ export default function ChatMessage({
   const isAgent = message.author !== 'user';
   const isThinking = message.isStreaming && message.content === '';
   const blocks = showUi ? message.ui ?? [] : [];
+  // Text has arrived but a chart / choices block is still being produced —
+  // only now show the specific "what's being built" label, where it will land.
+  const showUiLoader =
+    !!message.isStreaming && message.content !== '' && !!message.uiKind && blocks.length === 0;
+  const uiLoaderLabel =
+    message.uiKind === 'choices' ? 'Creating selections' : 'Generating visualization';
 
   return (
     <div
@@ -89,12 +97,7 @@ export default function ChatMessage({
         {isAgent ? (
           <div className="group">
             {isThinking ? (
-              <div className={`inline-flex items-center py-1 ${v.loadingGap}`}>
-                <span className={`${v.spinner} border-2 border-zinc-700 border-t-zinc-300 animate-spin flex-shrink-0`} />
-                <span key={loadingLabel} className={`${v.loadingText} animate-verb`}>
-                  {loadingLabel}…
-                </span>
-              </div>
+              <LoadingRow label={message.status || loadingLabel} v={v} />
             ) : (
               <div className={v.agentBubble}>
                 <div className={`prose prose-invert prose-sm max-w-none ${v.prose}`}>
@@ -106,14 +109,27 @@ export default function ChatMessage({
               </div>
             )}
 
-            {!message.isStreaming && (
-              <MessageFooter timestamp={message.timestamp} rating={rating} onRate={onRate} />
+            {showUiLoader && (
+              <div className={v.uiGap}>
+                <LoadingRow label={uiLoaderLabel} v={v} />
+              </div>
             )}
 
             {blocks.length > 0 && (
               <div className={v.uiGap}>
                 <GenUIRenderer blocks={blocks} onAction={onAction} />
               </div>
+            )}
+
+            {/* Admin-only: the SQL behind this turn's MCP-toolbox tool calls. */}
+            {isAdmin && !message.isStreaming && message.toolCalls && message.toolCalls.length > 0 && (
+              <ToolQueries calls={message.toolCalls} />
+            )}
+
+            {/* One feedback footer for the whole reply, at the very bottom — so
+                there is no empty gap between the text and its chart. */}
+            {!message.isStreaming && (
+              <MessageFooter timestamp={message.timestamp} rating={rating} onRate={onRate} />
             )}
           </div>
         ) : (
@@ -125,6 +141,20 @@ export default function ChatMessage({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// Spinner + a shimmering activity label — shown while the agent is thinking,
+// and again beneath the text while a chart / choices block is still rendering.
+// `label` re-keys the span so a phase change restarts the shimmer cleanly.
+function LoadingRow({ label, v }: { label: string; v: (typeof VARIANT)[Variant] }) {
+  return (
+    <div className={`inline-flex items-center py-1 ${v.loadingGap}`}>
+      <span className={`${v.spinner} border-2 border-line-strong border-t-zinc-300 animate-spin flex-shrink-0`} />
+      <span key={label} className={`${v.loadingText} animate-loading-text`}>
+        {label}…
+      </span>
     </div>
   );
 }
@@ -156,7 +186,7 @@ function MessageFooter({
           onClick={() => toggle('up')}
           title="Good response"
           className={`p-1 rounded transition-colors ${
-            rating === 'up' ? 'text-green-400' : 'text-zinc-600 hover:text-zinc-300'
+            rating === 'up' ? 'text-emerald-400' : 'text-zinc-600 hover:text-zinc-300'
           }`}
         >
           <svg className="w-3.5 h-3.5" fill={rating === 'up' ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">

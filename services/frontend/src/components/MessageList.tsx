@@ -37,8 +37,8 @@ export default function MessageList({
   onAction,
 }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const streamingMsgRef = useRef<HTMLDivElement>(null);
-  const lastStreamingId = useRef<string | null>(null);
+  const lastMsgRef = useRef<HTMLDivElement>(null);
+  const wasStreamingRef = useRef(false);
   const prevLengthRef = useRef(messages.length);
   const lastLoadedFirstId = useRef<string | null>(null);
   const [verbIndex, setVerbIndex] = useState(0);
@@ -65,24 +65,20 @@ export default function MessageList({
     }
   }, [messages]);
 
-  // When a new streaming message starts, scroll its top into view so the user
-  // can read from the beginning as tokens arrive. Don't force-scroll to bottom
-  // during streaming — let the user read at their own pace.
+  // When a reply finishes, bring the TOP of that message to the top of the
+  // viewport so the user reads it from the start. `block: 'start'` is clamped
+  // by the browser — a message too short to fill the viewport just lands fully
+  // visible at the bottom. The delay lets a chart finish sizing first, so the
+  // scroll target is the message's final height.
   useEffect(() => {
-    const streamingMsg = messages.find(m => m.isStreaming);
-
-    if (streamingMsg) {
-      if (streamingMsg.id !== lastStreamingId.current) {
-        // New streaming message just appeared — scroll to its top
-        lastStreamingId.current = streamingMsg.id;
-        setTimeout(() => {
-          streamingMsgRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 50);
-      }
-      // While streaming, don't scroll further
-    } else {
-      lastStreamingId.current = null;
-    }
+    const streaming = messages.some(m => m.isStreaming);
+    const justFinished = wasStreamingRef.current && !streaming;
+    wasStreamingRef.current = streaming;
+    if (!justFinished) return;
+    const id = setTimeout(() => {
+      lastMsgRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 300);
+    return () => clearTimeout(id);
   }, [messages]);
 
   // Scroll to bottom only when the user sends a message (last message is from user)
@@ -118,14 +114,14 @@ export default function MessageList({
           </div>
         </div>
       ) : (
-        messages.map((message) => (
+        messages.map((message, index) => (
           <ChatMessage
             key={message.id}
             message={message}
             variant="panel"
             showUi={supportsVisualization}
             loadingLabel={THINKING_VERBS[verbIndex]}
-            rowRef={message.isStreaming ? streamingMsgRef : undefined}
+            rowRef={index === messages.length - 1 ? lastMsgRef : undefined}
             rating={feedback?.[message.id] ?? null}
             onRate={onRate ? (rating) => onRate(message.id, rating) : undefined}
             onAction={onAction}

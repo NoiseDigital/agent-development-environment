@@ -149,7 +149,7 @@ export default function Choices({
   // Once submitted the block locks to a compact read-only summary.
   if (submitted) {
     return (
-      <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4 mt-3">
+      <div className="bg-surface border border-line-strong rounded-xl p-4 mt-3">
         <p className="text-xs font-medium text-zinc-500 mb-2">Answered</p>
         <ul className="space-y-1.5">
           {questions.map((qq, i) => (
@@ -164,7 +164,7 @@ export default function Choices({
   }
 
   return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4 mt-3">
+    <div className="bg-surface border border-line-strong rounded-xl p-4 mt-3">
       {intro && <p className="text-sm text-zinc-300 mb-3">{intro}</p>}
 
       {/* Tab bar — one tab per question, with an answered dot. Multiple tabs
@@ -181,8 +181,8 @@ export default function Choices({
                 onClick={() => setActive(i)}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                   isActive
-                    ? 'bg-blue-500/15 border border-blue-500 text-white'
-                    : 'bg-zinc-950 border border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                    ? 'bg-accent-500/15 border border-accent-500 text-white'
+                    : 'bg-surface-sunken border border-line text-zinc-400 hover:border-line-strong'
                 }`}
               >
                 <span
@@ -211,8 +211,8 @@ export default function Choices({
               onClick={() => toggle(val)}
               className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
                 isActive
-                  ? 'border-blue-500 bg-blue-500/15 text-white'
-                  : 'border-zinc-700 bg-zinc-950 text-zinc-300 hover:border-zinc-600'
+                  ? 'border-accent-500 bg-accent-500/15 text-white'
+                  : 'border-line-strong bg-surface-sunken text-zinc-300 hover:border-zinc-600'
               }`}
             >
               {o.label}
@@ -227,7 +227,7 @@ export default function Choices({
           value={draft.custom}
           onChange={(e) => patch(active, { custom: e.target.value })}
           placeholder="Or type your own answer…"
-          className="mt-3 w-full px-3 py-2 text-xs bg-zinc-950 border border-zinc-800 rounded-lg text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+          className="mt-3 w-full px-3 py-2 text-xs bg-surface-sunken border border-line rounded-lg text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
         />
       )}
 
@@ -238,7 +238,7 @@ export default function Choices({
             type="button"
             onClick={() => setActive((i) => Math.max(0, i - 1))}
             disabled={active === 0}
-            className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-zinc-700 bg-zinc-950 text-zinc-300 hover:border-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-line-strong bg-surface-sunken text-zinc-300 hover:border-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             Back
           </button>
@@ -246,7 +246,7 @@ export default function Choices({
             type="button"
             onClick={() => setActive((i) => Math.min(questions.length - 1, i + 1))}
             disabled={active === questions.length - 1}
-            className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-zinc-700 bg-zinc-950 text-zinc-300 hover:border-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-line-strong bg-surface-sunken text-zinc-300 hover:border-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             Next
           </button>

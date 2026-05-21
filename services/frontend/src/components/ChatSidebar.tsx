@@ -258,8 +258,8 @@ export default function ChatSidebar({
                                 disabled={!!aiRenamingId && !isAiRenaming}
                                 className={`p-1 flex-shrink-0 rounded transition-colors ${
                                   isAiRenaming
-                                    ? 'text-violet-400 bg-violet-950'
-                                    : 'text-zinc-500 hover:text-violet-400 hover:bg-zinc-700 disabled:opacity-30'
+                                    ? 'text-accent-400 bg-accent-950'
+                                    : 'text-zinc-500 hover:text-accent-400 hover:bg-zinc-700 disabled:opacity-30'
                                 }`}
                               >
                                 {isAiRenaming ? (
@@ -278,7 +278,7 @@ export default function ChatSidebar({
                             <button
                               onClick={commitEdit}
                               title="Save"
-                              className="p-1 text-green-400 hover:text-green-300 flex-shrink-0"
+                              className="p-1 text-emerald-400 hover:text-emerald-300 flex-shrink-0"
                             >
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />

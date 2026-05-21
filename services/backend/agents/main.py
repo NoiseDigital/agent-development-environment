@@ -9,6 +9,7 @@ from google.adk.cli.fast_api import get_fast_api_app
 from api.sources.routes import router as sources_router
 from api.feedback.routes import router as feedback_router
 from api.sessions.routes import router as sessions_router
+from api.tools.routes import router as tools_router
 from api.naming import router as naming_router
 
 AGENTS_DIR = str(Path(__file__).resolve().parent / "adk_agents")
@@ -25,6 +26,7 @@ app = get_fast_api_app(
 app.include_router(sources_router)  # uploads + BigQuery catalog
 app.include_router(feedback_router)  # per-message thumb ratings
 app.include_router(sessions_router)  # session display names
+app.include_router(tools_router)  # MCP toolbox query catalog (admin)
 app.include_router(naming_router)  # session-name generation
 
 

@@ -23,17 +23,17 @@ const statusColors: Record<AdStatus, string> = {
   Active: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30',
   Paused: 'bg-amber-500/15 text-amber-400 border border-amber-500/30',
   Completed: 'bg-zinc-700/50 text-zinc-400 border border-zinc-700',
-  Draft: 'bg-blue-500/15 text-blue-400 border border-blue-500/30',
+  Draft: 'bg-accent-500/15 text-accent-400 border border-accent-500/30',
 };
 
 const platformColors: Record<Platform, string> = {
-  'DV360': 'text-blue-400',
-  'Meta': 'text-indigo-400',
+  'DV360': 'text-accent-400',
+  'Meta': 'text-accent-400',
   'Google Ads': 'text-amber-400',
   'The Trade Desk': 'text-emerald-400',
   'Amazon DSP': 'text-orange-400',
   'TikTok': 'text-pink-400',
-  'LinkedIn': 'text-sky-400',
+  'LinkedIn': 'text-accent-400',
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -71,13 +71,13 @@ function AdRow({ ad }: { ad: Ad }) {
 
       {/* ── Performance separator ── */}
       <td className="px-2 py-3">
-        <div className="w-px h-5 bg-blue-500/40 mx-auto" />
+        <div className="w-px h-5 bg-accent-500/40 mx-auto" />
       </td>
 
       {/* Impressions */}
       <td className="px-4 py-3 text-xs whitespace-nowrap text-right">
         {hasPerf ? (
-          <span className="text-blue-300 font-medium">{fmt(ad.impressions)}</span>
+          <span className="text-accent-300 font-medium">{fmt(ad.impressions)}</span>
         ) : (
           <span className="text-zinc-600">—</span>
         )}
@@ -105,7 +105,7 @@ function AdRow({ ad }: { ad: Ad }) {
             href={ad.creativeUrl}
             target="_blank"
             rel="noreferrer"
-            className="text-blue-400 hover:text-blue-300 underline underline-offset-2 text-[11px]"
+            className="text-accent-400 hover:text-accent-300 underline underline-offset-2 text-[11px]"
           >
             Preview
           </a>
@@ -167,7 +167,7 @@ function CampaignSection({ campaign }: { campaign: Campaign }) {
         </div>
 
         <div className="hidden md:flex flex-col items-end gap-0.5 shrink-0 min-w-[80px]">
-          <span className="text-xs text-blue-300 font-medium">{fmt(totalImpressions)}</span>
+          <span className="text-xs text-accent-300 font-medium">{fmt(totalImpressions)}</span>
           <span className="text-[10px] text-zinc-600">impressions</span>
         </div>
       </button>
@@ -185,7 +185,7 @@ function CampaignSection({ campaign }: { campaign: Campaign }) {
                 <th className="px-2 pt-3 pb-1" />
                 {/* Performance columns */}
                 <th colSpan={4} className="px-4 pt-3 pb-1">
-                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-blue-500">Live Performance</span>
+                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-accent-500">Live Performance</span>
                 </th>
               </tr>
               <tr className="border-b border-zinc-800/60 bg-zinc-950/60">
@@ -198,10 +198,10 @@ function CampaignSection({ campaign }: { campaign: Campaign }) {
                 <th className="px-4 py-2 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap text-right">Budget</th>
                 <th className="px-4 py-2 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider whitespace-nowrap text-right">CPM</th>
                 <th className="px-2 py-2" />
-                <th className="px-4 py-2 text-[10px] font-semibold text-blue-500/70 uppercase tracking-wider whitespace-nowrap text-right">Impr.</th>
-                <th className="px-4 py-2 text-[10px] font-semibold text-blue-500/70 uppercase tracking-wider whitespace-nowrap text-right">CTR</th>
-                <th className="px-4 py-2 text-[10px] font-semibold text-blue-500/70 uppercase tracking-wider whitespace-nowrap text-right">Spend</th>
-                <th className="px-4 py-2 text-[10px] font-semibold text-blue-500/70 uppercase tracking-wider whitespace-nowrap">Creative</th>
+                <th className="px-4 py-2 text-[10px] font-semibold text-accent-500/70 uppercase tracking-wider whitespace-nowrap text-right">Impr.</th>
+                <th className="px-4 py-2 text-[10px] font-semibold text-accent-500/70 uppercase tracking-wider whitespace-nowrap text-right">CTR</th>
+                <th className="px-4 py-2 text-[10px] font-semibold text-accent-500/70 uppercase tracking-wider whitespace-nowrap text-right">Spend</th>
+                <th className="px-4 py-2 text-[10px] font-semibold text-accent-500/70 uppercase tracking-wider whitespace-nowrap">Creative</th>
               </tr>
             </thead>
             <tbody>

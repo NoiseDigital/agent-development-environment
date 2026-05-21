@@ -15,7 +15,7 @@ export default function ResizeHandle({ side, onPointerDown }: ResizeHandleProps)
       aria-orientation="vertical"
       className={`absolute top-0 ${
         side === 'right' ? 'right-0' : 'left-0'
-      } z-20 h-full w-1.5 cursor-col-resize hover:bg-blue-500/40 transition-colors`}
+      } z-20 h-full w-1.5 cursor-col-resize hover:bg-accent-500/40 transition-colors`}
     />
   );
 }

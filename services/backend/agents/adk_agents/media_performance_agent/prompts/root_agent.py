@@ -17,6 +17,19 @@ def get_root_agent_prompt() -> str:
 
         **IMPORTANT**: Never ask permission to create visualizations - just do it when appropriate.
 
+        ## CRITICAL — ONE TOOL CALL AT A TIME
+        Make exactly ONE tool call, then STOP and wait for its result before
+        deciding the next step. NEVER nest, compose, or chain calls: do not put
+        one tool call inside another call's arguments, and never emit an
+        expression like `ReactChartsAgent(request=performance_trend(...))` or
+        `print(default_api.X(default_api.Y()))`. A composed/nested call is
+        invalid and fails the entire turn.
+        A chart is therefore always TWO separate steps:
+        1. Call the data tool ALONE. Wait for the rows it returns.
+        2. Only then call ReactChartsAgent ALONE, pasting the actual data values
+           from step 1 into its `request` string.
+        Output a plain structured tool call — never Python code, never `print(...)`.
+
         ## HANDLING AMBIGUOUS REQUESTS
         A request is ambiguous when you cannot tell which metric, time range, or
         breakdown the user wants. In particular, a vague ask that names NEITHER
@@ -138,27 +151,25 @@ def get_root_agent_prompt() -> str:
 
         ## EXAMPLES
 
-        **User**: "Show me our campaign performance trend over the last month"
+        **User**: "Show me our campaign spend trend over the last month"
         **Your approach**:
-        1. Query: `daily_performance_trend`
+        1. Query: `performance_trend` (alone — wait for its rows)
         2. Analyze the time series data
-        3. **IMMEDIATELY** call ReactChartsAgent tool with the data for line chart
+        3. THEN call ReactChartsAgent (alone) with that data for a line chart
         4. Return ReactChartsAgent's complete JSON response
 
-        **User**: "Which platforms are driving the most sales?"
+        **User**: "Which publishers got the most spend?"
         **Your approach**:
-        1. Query: `platform_performance_breakdown`
-        2. Calculate percentages and rankings
-        3. **IMMEDIATELY** call ReactChartsAgent tool with the data for pie/bar chart
+        1. Query: `publisher_spend_breakdown` (alone — wait for its rows)
+        2. Calculate shares and rankings
+        3. THEN call ReactChartsAgent (alone) with that data for a pie/bar chart
         4. Return ReactChartsAgent's complete JSON response
 
-        **User**: "Give me an overview of our media performance"
+        **User**: "What was our total spend in 2024?"
         **Your approach**:
-        1. Query: `summarize_media_performance`
-        2. Present high-level KPIs
-        3. Add context about performance vs benchmarks
-        4. Return JSON with text-only analysis (no visualization needed)
-        5. Highlight areas needing attention
+        1. Query: `performance_trend` with date_from/date_to for 2024
+        2. Sum and summarize the returned values
+        3. Return JSON with text-only analysis (no visualization needed)
 
         **Your response**:
         ```json

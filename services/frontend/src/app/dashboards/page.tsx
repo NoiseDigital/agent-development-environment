@@ -28,8 +28,8 @@ const tabs: { key: DashboardOwnership | 'all'; label: string }[] = [
 ];
 
 const ownershipBadge: Record<DashboardOwnership, string> = {
-  owned: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-  shared: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
+  owned: 'bg-accent-500/15 text-accent-400 border-accent-500/30',
+  shared: 'bg-accent-500/15 text-accent-400 border-accent-500/30',
   client: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
 };
 
@@ -203,7 +203,7 @@ function DashboardDetail({ dashboard, onBack }: { dashboard: Dashboard; onBack: 
       <div className="flex-1 overflow-y-auto px-8 py-6">
         {editing && (
           <div className="mb-4 flex items-center gap-2 text-[11px] text-zinc-500">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-accent-400 shrink-0" />
             Edit mode — drag a tile to move it, drag its bottom-right corner to resize.
           </div>
         )}

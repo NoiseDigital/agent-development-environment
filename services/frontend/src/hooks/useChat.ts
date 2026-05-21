@@ -10,6 +10,13 @@ import { normalizeTimestamp } from '../utils/timestamps';
 import { feedbackApi, type Rating } from '../lib/feedback-api';
 import { sessionNamesApi } from '../lib/session-names-api';
 
+/** One tool the agent invoked during a turn — name + arguments only; the SQL
+ *  is reconstructed later from the toolbox catalog. */
+export interface ToolCall {
+  name: string;
+  args: Record<string, unknown>;
+}
+
 export interface ChatMessage {
   id: string;
   content: string;
@@ -17,6 +24,12 @@ export interface ChatMessage {
   timestamp: number;
   isStreaming?: boolean;
   ui?: UIBlock[];
+  /** While streaming, before any text: a label for the process step underway. */
+  status?: string;
+  /** While streaming: the kind of UI block still being produced, if any. */
+  uiKind?: 'chart' | 'choices';
+  /** Tool calls made while producing this reply (admin "what ran" view). */
+  toolCalls?: ToolCall[];
 }
 
 // Shown when the agent errors out or returns nothing — never leave a turn blank.
@@ -166,24 +179,105 @@ const streamingDisplayText = (raw: string): string => {
   return out;
 };
 
-// Helper function to convert ADK events to chat messages
+// What the agent is doing right now, derived from an event. `working` is the
+// process label shown by the spinner BEFORE any text streams. `uiKind` means a
+// chart / choices block is on the way — it drives the more specific label shown
+// AFTER text has appeared, never before it.
+const phaseFromEvent = (
+  event: AdkEvent,
+): { working?: string; uiKind?: 'chart' | 'choices' } | null => {
+  if (event.author === 'ReactChartsAgent') return { uiKind: 'chart' };
+  if (event.author === 'ChoicesAgent') return { uiKind: 'choices' };
+  if (event.author === 'ResponseFormatter') return { working: 'Finalizing the response' };
+
+  const call = event.content?.parts?.find(p => p.functionCall)?.functionCall as
+    | { name?: string }
+    | undefined;
+  const fnName = call?.name;
+  if (fnName) {
+    if (/charts?/i.test(fnName)) return { uiKind: 'chart' };
+    if (/choices/i.test(fnName)) return { uiKind: 'choices' };
+    return { working: 'Querying the data' };
+  }
+  return null;
+};
+
+// The tool calls an event records (its function_call parts). The SQL is not
+// here — the agent never sees it; ToolQueries reconstructs it from the catalog.
+const extractToolCalls = (event: AdkEvent): ToolCall[] =>
+  (event.content?.parts ?? [])
+    .map(p => p.functionCall)
+    .filter((fc): fc is Record<string, unknown> => !!fc)
+    .map(fc => ({
+      name: typeof fc.name === 'string' ? fc.name : '',
+      args: (fc.args && typeof fc.args === 'object' ? fc.args : {}) as Record<string, unknown>,
+    }))
+    .filter(c => c.name);
+
+// The stream emits each call more than once (partial + complete events) — keep
+// one entry per distinct name+args so the "N queries" count is accurate.
+const dedupeToolCalls = (calls: ToolCall[]): ToolCall[] => {
+  const seen = new Set<string>();
+  return calls.filter(c => {
+    const key = `${c.name}|${JSON.stringify(c.args)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+// Convert persisted ADK events into chat messages.
 const eventsToMessages = (events: AdkEvent[], supportsVisualization: boolean): ChatMessage[] => {
-  return events
-    .filter(event => event.content?.parts?.some(part => part.text))
-    .map(event => {
-      const part = event.content?.parts?.find(part => part.text);
-      const rawText = part?.text || '';
-      const parsedResponse = supportsVisualization
-        ? parseAgentResponse(rawText)
-        : { content: rawText, ui: undefined };
-      return {
+  const messages: ChatMessage[] = [];
+  // Tool calls precede the turn's reply — gather them, attach to that reply.
+  let pendingCalls: ToolCall[] = [];
+
+  for (const event of events) {
+    const calls = extractToolCalls(event);
+    if (calls.length) pendingCalls.push(...calls);
+
+    const part = event.content?.parts?.find(part => part.text);
+    if (!part?.text) continue;
+
+    if (event.author === 'user') {
+      messages.push({
         id: event.id,
-        content: parsedResponse.content,
-        author: event.author,
+        content: part.text,
+        author: 'user',
         timestamp: normalizeTimestamp(event.timestamp),
-        ui: parsedResponse.ui,
+      });
+      pendingCalls = [];
+      continue;
+    }
+
+    // An agent text event. A multi-agent turn (worker → formatter) persists
+    // several; collapse each run of consecutive agent events down to the last
+    // one (the final reply) so reload shows no raw draft or duplicate bubble.
+    const parsed = supportsVisualization
+      ? parseAgentResponse(part.text)
+      : { content: part.text, ui: undefined };
+    const message: ChatMessage = {
+      id: event.id,
+      content: parsed.content,
+      author: event.author,
+      timestamp: normalizeTimestamp(event.timestamp),
+      ui: parsed.ui,
+      toolCalls: pendingCalls.length ? dedupeToolCalls(pendingCalls) : undefined,
+    };
+    const prev = messages[messages.length - 1];
+    if (prev && prev.author !== 'user') {
+      // Replacing the draft with the later output — keep the turn's tool calls.
+      messages[messages.length - 1] = {
+        ...message,
+        toolCalls: message.toolCalls ?? prev.toolCalls,
       };
-    });
+    } else {
+      messages.push(message);
+    }
+    pendingCalls = [];
+  }
+
+  return messages;
 };
 
 // Replace with auth to get userId
@@ -421,9 +515,23 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
       // In a multi-agent pipeline (worker → formatter) the response is the LAST
       // agent's output — reset accumulation when a new agent starts emitting text.
       let lastTextAuthor: string | null = null;
+      // The agent's current process step + which UI block (if any) is coming.
+      let working = '';
+      let uiKind: 'chart' | 'choices' | undefined;
+      // Tool calls made this turn — surfaced under the reply for admins.
+      const toolCalls: ToolCall[] = [];
 
       for await (const event of adkApi.sendMessageSSE(request)) {
         if (event.author && event.author !== 'user') agentAuthor = event.author;
+
+        // Keep the loading label in step with the agent's actual activity.
+        const next = phaseFromEvent(event);
+        if (next) {
+          if (next.working) working = next.working;
+          if (next.uiKind) uiKind = next.uiKind;
+        }
+        toolCalls.push(...extractToolCalls(event));
+
         const textPart = event.content?.parts?.find(p => p.text);
         if (textPart?.text) {
           if (event.author && event.author !== lastTextAuthor) {
@@ -438,14 +546,18 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
             accumulated = textPart.text;
             finalEventId = event.id;
           }
-          // Show partial `text` only — never the raw JSON envelope mid-stream.
-          const display = supportsVisualization ? streamingDisplayText(accumulated) : accumulated;
-          setMessages(prev =>
-            prev.map(m =>
-              m.id === streamingId ? { ...m, content: display, author: agentAuthor } : m
-            )
-          );
         }
+
+        // Show partial `text` only — never the raw JSON envelope mid-stream.
+        const display = supportsVisualization ? streamingDisplayText(accumulated) : accumulated;
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === streamingId
+              ? { ...m, content: display, author: agentAuthor, status: working || undefined, uiKind }
+              : m
+          )
+        );
+
         if (event.turnComplete) break;
       }
 
@@ -459,7 +571,16 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
       setMessages(prev =>
         prev.map(m =>
           m.id === streamingId
-            ? { ...m, id: finalEventId ?? streamingId, content: finalText, ui: parsed.ui, isStreaming: false }
+            ? {
+                ...m,
+                id: finalEventId ?? streamingId,
+                content: finalText,
+                ui: parsed.ui,
+                isStreaming: false,
+                status: undefined,
+                uiKind: undefined,
+                toolCalls: toolCalls.length ? dedupeToolCalls(toolCalls) : undefined,
+              }
             : m
         )
       );
@@ -491,7 +612,9 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
       // fallback reply rather than dropping the exchange entirely.
       setMessages(prev =>
         prev.map(m =>
-          m.id === streamingId ? { ...m, content: FALLBACK_REPLY, isStreaming: false } : m
+          m.id === streamingId
+            ? { ...m, content: FALLBACK_REPLY, isStreaming: false, status: undefined, uiKind: undefined }
+            : m
         )
       );
     } finally {

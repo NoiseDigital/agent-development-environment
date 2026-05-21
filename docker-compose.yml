@@ -10,6 +10,8 @@ services:
       - ./services/backend/agents:/workspace
       - gcloud_config:/root/.config/gcloud:ro
       - uploads:/data/uploads
+      # Read-only: lets the platform API reconstruct the SQL behind tool calls.
+      - ./services/backend/mcp/images/toolbox:/toolbox-config:ro
     ports:
       - "${AGENT_PORT:-8000}:${AGENT_PORT:-8000}"
     environment:
