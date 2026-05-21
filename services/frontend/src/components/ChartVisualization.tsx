@@ -47,12 +47,29 @@ const LEGEND_PROPS = {
   formatter: (value: string) => <span style={{ color: '#F9FAFB' }}>{value}</span>,
 };
 
+/** Compact number formatting for axes and tooltips — 49940 → "49.9K". */
+const formatNumber = (n: unknown): string => {
+  if (typeof n !== 'number' || !isFinite(n)) return String(n ?? '');
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return `${(n / 1e9).toFixed(1).replace(/\.0$/, '')}B`;
+  if (abs >= 1e6) return `${(n / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
+  if (abs >= 1e3) return `${(n / 1e3).toFixed(1).replace(/\.0$/, '')}K`;
+  if (abs > 0 && abs < 1) return n.toFixed(2);
+  return n.toLocaleString('en-US');
+};
+
+/** Recharts tooltip formatter — formats the value, keeps the series name. */
+const tooltipFormatter = (value: unknown, name: unknown): [string, string] => [
+  formatNumber(value),
+  String(name ?? ''),
+];
+
 /** Grid + axes + tooltip shared by the cartesian chart types (line, bar, area). */
 const cartesianBase = () => [
   <CartesianGrid key="grid" strokeDasharray="3 3" stroke="#374151" />,
   <XAxis key="x" dataKey="name" tick={AXIS_TICK} axisLine={AXIS_LINE} />,
-  <YAxis key="y" tick={AXIS_TICK} axisLine={AXIS_LINE} />,
-  <Tooltip key="tip" contentStyle={TOOLTIP_STYLE} />,
+  <YAxis key="y" tick={AXIS_TICK} axisLine={AXIS_LINE} tickFormatter={formatNumber} />,
+  <Tooltip key="tip" contentStyle={TOOLTIP_STYLE} formatter={tooltipFormatter} />,
 ];
 
 // ── Data shape helpers ────────────────────────────────────────────────────────
@@ -71,6 +88,11 @@ export default function ChartVisualization({ chart, fill = false, saveable = fal
   const chartHeight: number | string = fill ? '100%' : 300;
   const rootRef = useRef<HTMLDivElement>(null);
 
+  // Palette — agent-overridable via chart.colors, otherwise the defaults.
+  const palette = chart.colors?.length ? chart.colors : SERIES_COLORS;
+  const funnelPalette = chart.colors?.length ? chart.colors : FUNNEL_COLORS;
+  const accent = chart.colors?.[0];
+
   const renderChart = () => {
     switch (type) {
       case 'line':
@@ -86,9 +108,9 @@ export default function ChartVisualization({ chart, fill = false, saveable = fal
                       key={metric}
                       type="monotone"
                       dataKey={metric}
-                      stroke={SERIES_COLORS[index % SERIES_COLORS.length]}
+                      stroke={palette[index % palette.length]}
                       strokeWidth={2}
-                      dot={{ fill: SERIES_COLORS[index % SERIES_COLORS.length], strokeWidth: 2, r: 4 }}
+                      dot={{ fill: palette[index % palette.length], strokeWidth: 2, r: 4 }}
                     />
                   ))}
                 </>
@@ -96,9 +118,9 @@ export default function ChartVisualization({ chart, fill = false, saveable = fal
                 <Line
                   type="monotone"
                   dataKey="value"
-                  stroke="#3B82F6"
+                  stroke={accent ?? '#3B82F6'}
                   strokeWidth={2}
-                  dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
+                  dot={{ fill: accent ?? '#3B82F6', strokeWidth: 2, r: 4 }}
                 />
               )}
             </LineChart>
@@ -118,13 +140,13 @@ export default function ChartVisualization({ chart, fill = false, saveable = fal
                       key={metric}
                       dataKey={metric}
                       stackId="a"
-                      fill={SERIES_COLORS[index % SERIES_COLORS.length]}
+                      fill={palette[index % palette.length]}
                       radius={[4, 4, 0, 0]}
                     />
                   ))}
                 </>
               ) : (
-                <Bar dataKey="value" fill="#10B981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="value" fill={accent ?? '#10B981'} radius={[4, 4, 0, 0]} />
               )}
             </BarChart>
           </ResponsiveContainer>
@@ -144,10 +166,10 @@ export default function ChartVisualization({ chart, fill = false, saveable = fal
                 label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
               >
                 {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={SERIES_COLORS[index % SERIES_COLORS.length]} />
+                  <Cell key={`cell-${index}`} fill={palette[index % palette.length]} />
                 ))}
               </Pie>
-              <Tooltip contentStyle={TOOLTIP_STYLE} />
+              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={tooltipFormatter} />
             </PieChart>
           </ResponsiveContainer>
         );
@@ -160,8 +182,8 @@ export default function ChartVisualization({ chart, fill = false, saveable = fal
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke="#3B82F6"
-                fill="#3B82F6"
+                stroke={accent ?? '#3B82F6'}
+                fill={accent ?? '#3B82F6'}
                 fillOpacity={0.3}
               />
             </AreaChart>
@@ -172,7 +194,7 @@ export default function ChartVisualization({ chart, fill = false, saveable = fal
         return (
           <ResponsiveContainer width="100%" height={chartHeight}>
             <FunnelChart layout="horizontal">
-              <Tooltip contentStyle={TOOLTIP_STYLE} />
+              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={tooltipFormatter} />
               <Funnel
                 data={data}
                 dataKey="value"
@@ -191,7 +213,7 @@ export default function ChartVisualization({ chart, fill = false, saveable = fal
                 {data.map((entry, index) => (
                   <Cell
                     key={`cell-${index}`}
-                    fill={entry.fill || FUNNEL_COLORS[index % FUNNEL_COLORS.length]}
+                    fill={entry.fill || funnelPalette[index % funnelPalette.length]}
                   />
                 ))}
               </Funnel>

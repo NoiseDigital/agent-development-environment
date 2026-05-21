@@ -24,7 +24,7 @@ from ..prompts.chart_evaluator import (
 )
 
 
-CHART_EVALUATOR_MODEL_ID = "gemini-2.5-flash-001"
+CHART_EVALUATOR_MODEL_ID = ""
 
 
 class EvaluationResult(BaseModel):

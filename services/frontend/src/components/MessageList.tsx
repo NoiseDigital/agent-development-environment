@@ -17,6 +17,8 @@ interface MessageListProps {
   feedback?: Record<string, Rating>;
   /** Set or clear (null) a message's rating. */
   onRate?: (eventId: string, rating: Rating | null) => void;
+  /** Send a message back to the agent — used by interactive UI blocks. */
+  onAction?: (text: string) => void;
 }
 
 const THINKING_VERBS = [
@@ -32,11 +34,13 @@ export default function MessageList({
   supportsVisualization = false,
   feedback,
   onRate,
+  onAction,
 }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const streamingMsgRef = useRef<HTMLDivElement>(null);
   const lastStreamingId = useRef<string | null>(null);
   const prevLengthRef = useRef(messages.length);
+  const lastLoadedFirstId = useRef<string | null>(null);
   const [verbIndex, setVerbIndex] = useState(0);
 
   // Cycle verbs while any message is loading
@@ -49,6 +53,17 @@ export default function MessageList({
     }, 1800);
     return () => clearInterval(id);
   }, [isLoading]);
+
+  // When a conversation loads (a refresh, or switching sessions) jump to the
+  // newest message. Keyed on the first message's id so it fires once per
+  // conversation — not on every streaming token within one.
+  useEffect(() => {
+    const firstId = messages[0]?.id ?? null;
+    if (firstId && firstId !== lastLoadedFirstId.current) {
+      lastLoadedFirstId.current = firstId;
+      messagesEndRef.current?.scrollIntoView({ block: 'end' });
+    }
+  }, [messages]);
 
   // When a new streaming message starts, scroll its top into view so the user
   // can read from the beginning as tokens arrive. Don't force-scroll to bottom
@@ -108,11 +123,12 @@ export default function MessageList({
             key={message.id}
             message={message}
             variant="panel"
-            showCharts={supportsVisualization}
+            showUi={supportsVisualization}
             loadingLabel={THINKING_VERBS[verbIndex]}
             rowRef={message.isStreaming ? streamingMsgRef : undefined}
             rating={feedback?.[message.id] ?? null}
             onRate={onRate ? (rating) => onRate(message.id, rating) : undefined}
+            onAction={onAction}
           />
         ))
       )}

@@ -1,0 +1,36 @@
+# Per-agent behaviour expectations. The suite (test_agents.py) runs each
+# `message` through the harness and checks the `expect` block — add a case by
+# adding an entry here, no Python needed.
+#
+# expect keys:
+#   ok:    reply is non-empty and error-free (default: true)
+#   ui:    the { text, ui } envelope must contain a block of this component
+#   tools: the agent must have made at least one tool call
+# A case may also set `xfail: "reason"` to mark a known-failing behaviour.
+#
+# These are REAL agent runs (live Gemini + MCP) — see README.md.
+
+media_performance_agent:
+  - name: capability question returns text
+    message: "In one sentence, what can you help me with?"
+    expect:
+      ok: true
+
+  - name: ambiguous request surfaces a clarification block
+    message: "How did we do?"
+    expect:
+      ui: choices
+    xfail: "orchestrator relays subagent output unreliably — the choices block is produced but often not surfaced; needs the worker->formatter fix"
+
+  - name: explicit chart request returns a chart block
+    message: "Plot total spend by publisher as a bar chart."
+    expect:
+      ui: chart
+      tools: true
+    xfail: "orchestrator returns empty text when delegating to a subagent (ReactChartsAgent / ClarificationAgent) — needs the worker->formatter fix"
+
+timesheet_agent:
+  - name: capability question returns text
+    message: "What can you help me with?"
+    expect:
+      ok: true

@@ -45,8 +45,8 @@ from .chart_evaluator import (
 
 
 MAX_RESULT_ROWS_DISPLAY = 50
-BI_ENGINEER_AGENT_MODEL_ID = "gemini-2.5-pro"  # "gemini-2.5-pro-preview-05-06"
-BI_ENGINEER_FIX_AGENT_MODEL_ID = "gemini-2.5-pro"  # "gemini-2.5-pro-preview-05-06"
+BI_ENGINEER_AGENT_MODEL_ID = "gemini-2.5-flash"  # "gemini-2.5-pro-preview-05-06"
+BI_ENGINEER_FIX_AGENT_MODEL_ID = "gemini-2.5-flash"  # "gemini-2.5-pro-preview-05-06"
 
 
 @cache

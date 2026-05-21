@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { adkApi } from '../lib/adk-api';
 import type { Session, AgentRunRequest, Event as AdkEvent } from '../lib/adk-api';
-import { ChartData } from '../types/chart';
-import type { AgentJsonResponse } from '../types/agent-response';
+import type { ChartData } from '../types/chart';
+import type { UIBlock } from '../types/genui';
 import { getAgentConfiguration } from '../config/agent-config';
 import { normalizeTimestamp } from '../utils/timestamps';
 import { feedbackApi, type Rating } from '../lib/feedback-api';
@@ -16,8 +16,13 @@ export interface ChatMessage {
   author: string;
   timestamp: number;
   isStreaming?: boolean;
-  charts?: ChartData[];
+  ui?: UIBlock[];
 }
+
+// Shown when the agent errors out or returns nothing — never leave a turn blank.
+const FALLBACK_REPLY =
+  "I wasn't able to complete that — something went wrong on my end. " +
+  'Please try again, or rephrase your question.';
 
 // ── Agent JSON response parser ───────────────────────────────────────────────
 
@@ -46,18 +51,22 @@ const extractFirstJsonObject = (text: string): string | null => {
   return null;
 };
 
-/** Try to parse a string as a valid AgentJsonResponse with a `text` field. */
-const tryParseAgentJson = (raw: string): { content: string; charts?: ChartData[] } | null => {
+/** Parse an agent's JSON response — the GenUI `{ text, ui }` contract, also
+ *  accepting the legacy `{ text, visualization }` shape (mapped to chart blocks). */
+const tryParseAgentJson = (raw: string): { content: string; ui?: UIBlock[] } | null => {
   try {
-    const parsed: AgentJsonResponse = JSON.parse(raw.trim());
+    const parsed = JSON.parse(raw.trim());
     if (!parsed || typeof parsed !== 'object' || parsed.text === undefined) return null;
 
-    const result: { content: string; charts?: ChartData[] } = { content: parsed.text };
+    const result: { content: string; ui?: UIBlock[] } = { content: parsed.text };
 
-    if (parsed.visualization) {
-      // Series charts carry `data`; heatmaps carry a correlation `matrix`.
+    if (Array.isArray(parsed.ui)) {
+      result.ui = parsed.ui as UIBlock[];
+    } else if (parsed.visualization) {
+      // Legacy shape: one or more charts under `visualization` → chart blocks.
       const viz = parsed.visualization;
-      result.charts = Array.isArray(viz) ? viz : [viz];
+      const charts: ChartData[] = Array.isArray(viz) ? viz : [viz];
+      result.ui = charts.map((props) => ({ component: 'chart', props }));
     }
     return result;
   } catch {
@@ -65,7 +74,7 @@ const tryParseAgentJson = (raw: string): { content: string; charts?: ChartData[]
   }
 };
 
-const parseAgentResponse = (text: string): { content: string; charts?: ChartData[] } => {
+const parseAgentResponse = (text: string): { content: string; ui?: UIBlock[] } => {
   // Try the first balanced JSON object found anywhere in the response
   const jsonStr = extractFirstJsonObject(text);
   if (jsonStr) {
@@ -74,6 +83,45 @@ const parseAgentResponse = (text: string): { content: string; charts?: ChartData
   }
   // Fallback: treat as plain text
   return { content: text };
+};
+
+// While a structured ({ text, ui }) response streams in, show only the partial
+// `text` value so the user never sees raw JSON. Best-effort extraction of the
+// first "text" string from a possibly-incomplete JSON object.
+const streamingDisplayText = (raw: string): string => {
+  // The reply is the { text, ui } JSON envelope — possibly fenced, or with the
+  // ui block first. Show only the partial `text`; until it appears show nothing
+  // so the JSON envelope and ui blocks never leak into the bubble.
+  const key = raw.indexOf('"text"');
+  if (key === -1) return '';
+  let i = key + 6;
+  while (i < raw.length && raw[i] !== ':') i++;
+  i++;
+  while (i < raw.length && raw[i] !== '"') i++;
+  i++; // past the opening quote
+  const ESCAPES: Record<string, string> = { n: '\n', t: '\t', r: '\r', '"': '"', '\\': '\\', '/': '/' };
+  let out = '';
+  while (i < raw.length) {
+    const ch = raw[i];
+    if (ch === '\\') {
+      const next = raw[i + 1];
+      if (next === undefined) break; // escape split across stream chunks
+      if (next === 'u') {
+        const hex = raw.slice(i + 2, i + 6);
+        if (hex.length < 4) break;
+        out += String.fromCharCode(parseInt(hex, 16));
+        i += 6;
+        continue;
+      }
+      out += ESCAPES[next] ?? next;
+      i += 2;
+      continue;
+    }
+    if (ch === '"') break; // closing quote — text field complete
+    out += ch;
+    i++;
+  }
+  return out;
 };
 
 // Helper function to convert ADK events to chat messages
@@ -85,13 +133,13 @@ const eventsToMessages = (events: AdkEvent[], supportsVisualization: boolean): C
       const rawText = part?.text || '';
       const parsedResponse = supportsVisualization
         ? parseAgentResponse(rawText)
-        : { content: rawText, charts: undefined };
+        : { content: rawText, ui: undefined };
       return {
         id: event.id,
         content: parsedResponse.content,
         author: event.author,
         timestamp: normalizeTimestamp(event.timestamp),
-        charts: parsedResponse.charts,
+        ui: parsedResponse.ui,
       };
     });
 };
@@ -229,9 +277,7 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
   const loadAvailableApps = async () => {
     try {
       setIsLoadingApps(true);
-      console.log('Fetching available apps from ADK server...');
       const apps = await adkApi.listApps();
-      console.log('Available apps:', apps);
       setAvailableApps(apps);
 
       // Auto-select the first app if available
@@ -250,9 +296,7 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
     if (!selectedApp) return;
 
     try {
-      console.log(`Loading sessions for app: ${selectedApp}`);
       const sessionList = await adkApi.listSessions(selectedApp, userId);
-      console.log('Sessions loaded:', sessionList);
       setSessions(sessionList);
 
       // If no current session, select the first one or create a new one
@@ -345,24 +389,28 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
             accumulated = textPart.text;
             finalEventId = event.id;
           }
+          // Show partial `text` only — never the raw JSON envelope mid-stream.
+          const display = supportsVisualization ? streamingDisplayText(accumulated) : accumulated;
           setMessages(prev =>
             prev.map(m =>
-              m.id === streamingId ? { ...m, content: accumulated, author: agentAuthor } : m
+              m.id === streamingId ? { ...m, content: display, author: agentAuthor } : m
             )
           );
         }
         if (event.turnComplete) break;
       }
 
-      // Parse the completed response for charts / JSON wrapper
+      // Parse the completed response for UI blocks / JSON wrapper
       const parsed = supportsVisualization
         ? parseAgentResponse(accumulated)
-        : { content: accumulated, charts: undefined };
+        : { content: accumulated, ui: undefined };
+      // A blank reply with nothing to render → a graceful fallback message.
+      const finalText = parsed.content.trim() || (parsed.ui?.length ? '' : FALLBACK_REPLY);
       // Adopt the real ADK event id so feedback (keyed by event id) survives a reload.
       setMessages(prev =>
         prev.map(m =>
           m.id === streamingId
-            ? { ...m, id: finalEventId ?? streamingId, content: parsed.content, charts: parsed.charts, isStreaming: false }
+            ? { ...m, id: finalEventId ?? streamingId, content: finalText, ui: parsed.ui, isStreaming: false }
             : m
         )
       );
@@ -389,8 +437,14 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
       }
 
     } catch (err) {
-      setError(`Failed to send message: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      setMessages(prev => prev.filter(m => m.id !== streamingId && m.id !== userMessage.id));
+      console.error('Failed to send message:', err);
+      // Keep the user's message; turn the streaming placeholder into a graceful
+      // fallback reply rather than dropping the exchange entirely.
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === streamingId ? { ...m, content: FALLBACK_REPLY, isStreaming: false } : m
+        )
+      );
     } finally {
       setIsLoading(false);
     }

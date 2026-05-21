@@ -83,15 +83,11 @@ export class ADKApiClient {
     const allApps = new Set<string>();
     const endpoints = Object.values(this.endpoints);
 
-    console.log('Checking endpoints for available apps:', endpoints.map(e => e.url));
-
     for (const endpoint of endpoints) {
       try {
-        console.log(`Checking ${endpoint.url}/list-apps`);
         const response = await fetch(`${endpoint.url}/list-apps`);
         if (response.ok) {
           const apps = await response.json();
-          console.log(`Apps from ${endpoint.url}:`, apps);
           apps.forEach((app: string) => allApps.add(app));
         } else {
           console.warn(`Failed to get apps from ${endpoint.url}: ${response.status}`);
@@ -101,9 +97,7 @@ export class ADKApiClient {
       }
     }
 
-    const result = Array.from(allApps);
-    console.log('Final combined app list:', result);
-    return result;
+    return Array.from(allApps);
   }
 
   async createSession(appName: string, userId: string, sessionId?: string): Promise<Session> {

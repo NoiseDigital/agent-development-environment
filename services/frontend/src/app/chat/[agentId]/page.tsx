@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useChat } from '../../../hooks/useChat';
+import { useChatContext } from '../../../contexts/ChatContext';
 import type { Session } from '../../../lib/adk-api';
 
 /**
@@ -26,7 +26,7 @@ export default function AgentIndexPage() {
   const didInit = useRef(false);
 
   const { selectedApp, sessions, isLoadingApps, isLoadingSessions, availableApps, createNewSession } =
-    useChat(agentId);
+    useChatContext();
 
   useEffect(() => {
     // Wait for both apps and sessions to finish loading.

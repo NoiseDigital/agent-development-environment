@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useChat } from '../../../../hooks/useChat';
+import { useChatContext } from '../../../../contexts/ChatContext';
 import ChatSidebar from '../../../../components/ChatSidebar';
 import ChatHeader from '../../../../components/ChatHeader';
 import MessageList from '../../../../components/MessageList';
@@ -18,7 +18,6 @@ export default function ChatSessionPage() {
   const agentId = typeof params.agentId === 'string' ? params.agentId : '';
   const sessionId = typeof params.sessionId === 'string' ? params.sessionId : '';
   const [selectedSources, setSelectedSources] = useState<SourceRef[]>([]);
-  const didInit = useRef(false);
 
   const {
     availableApps,
@@ -28,7 +27,6 @@ export default function ChatSessionPage() {
     messages,
     isLoading,
     isLoadingApps,
-    isLoadingSessions,
     error,
     sessionNames,
     feedback,
@@ -40,7 +38,7 @@ export default function ChatSessionPage() {
     deleteSession,
     renameSession,
     saveSessionName,
-  } = useChat(agentId);
+  } = useChatContext();
 
   // Redirect to library if agentId unknown
   useEffect(() => {
@@ -49,27 +47,22 @@ export default function ChatSessionPage() {
     }
   }, [isLoadingApps, availableApps, agentId, router]);
 
-  // On mount: select the session from the URL.
+  // The URL is the single source of truth for which session is open: load
+  // whatever session the route names. Selecting a conversation or creating one
+  // just navigates — this effect does the loading, so there is one load path.
   useEffect(() => {
-    if (!selectedApp || isLoadingApps || isLoadingSessions || didInit.current) return;
-    didInit.current = true;
-    if (sessionId) selectSession(sessionId);
-  }, [selectedApp, isLoadingApps, isLoadingSessions]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Keep URL in sync when currentSession changes (e.g. after create)
-  useEffect(() => {
-    if (currentSession && currentSession.id !== sessionId) {
-      router.replace(`/chat/${agentId}/${currentSession.id}`);
+    if (selectedApp && sessionId && currentSession?.id !== sessionId) {
+      selectSession(sessionId);
     }
-  }, [currentSession?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedApp, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleNewSession = async () => {
     const s = await createNewSession();
     if (s) router.push(`/chat/${agentId}/${s.id}`);
   };
 
+  // Selecting a conversation just navigates — the URL-driven effect loads it.
   const handleSelectSession = (id: string) => {
-    selectSession(id);
     router.push(`/chat/${agentId}/${id}`);
   };
 
@@ -110,6 +103,7 @@ export default function ChatSessionPage() {
           supportsVisualization={supportsVisualization}
           feedback={feedback}
           onRate={rateMessage}
+          onAction={(text) => sendMessage(text, sourceManifest)}
         />
         <MessageInput
           selectedApp={selectedApp}

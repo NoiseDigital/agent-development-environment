@@ -7,19 +7,20 @@ import type { Upload, SourceRef, BigQueryTableRef } from '../../types/source';
 import { sourceUri, sourceLabel } from '../../types/source';
 import type { ChartData } from '../../types/chart';
 import ChartVisualization from '../../components/ChartVisualization';
+import InfoHint from '../../components/InfoHint';
 
 // ── Control helpers ───────────────────────────────────────────────────────────
 
 function Slider({
-  label, value, min, max, step, onChange,
+  label, value, min, max, step, onChange, hint,
 }: {
   label: string; value: number; min: number; max: number; step: number;
-  onChange: (v: number) => void;
+  onChange: (v: number) => void; hint?: string;
 }) {
   return (
     <div>
       <div className="flex justify-between text-[11px] mb-1">
-        <span className="text-zinc-400">{label}</span>
+        <span className="text-zinc-400 flex items-center gap-1">{label}{hint && <InfoHint text={hint} />}</span>
         <span className="text-zinc-200 font-mono">{value}</span>
       </div>
       <input
@@ -39,9 +40,9 @@ function Slider({
 // disabled with a type tag, and sparse numeric columns are flagged — so users
 // are guided toward columns worth analyzing rather than picking dead ends.
 function ColumnSelect({
-  label, hint, columns, selected, onChange, loading,
+  label, hint, tip, columns, selected, onChange, loading,
 }: {
-  label: string; hint?: string; columns: ColumnProfile[];
+  label: string; hint?: string; tip?: string; columns: ColumnProfile[];
   selected: string[]; onChange: (cols: string[]) => void; loading?: boolean;
 }) {
   const toggle = (c: string) =>
@@ -50,8 +51,9 @@ function ColumnSelect({
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-xs font-medium text-zinc-300">
+        <span className="text-xs font-medium text-zinc-300 flex items-center gap-1">
           {label} {hint && <span className="text-zinc-600 font-normal">{hint}</span>}
+          {tip && <InfoHint text={tip} />}
         </span>
         <span className="flex gap-2 text-[10px]">
           <button type="button" onClick={() => onChange(numericNames)} className="text-zinc-500 hover:text-white">All</button>
@@ -103,10 +105,10 @@ function ColumnSelect({
   );
 }
 
-const Toggle = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) => (
+const Toggle = ({ label, checked, onChange, hint }: { label: string; checked: boolean; onChange: (v: boolean) => void; hint?: string }) => (
   <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
     <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="accent-blue-500" />
-    {label}
+    <span className="flex items-center gap-1">{label}{hint && <InfoHint text={hint} />}</span>
   </label>
 );
 
@@ -376,13 +378,16 @@ export default function AnalyzePage() {
           {/* Column sets */}
           <div className="space-y-3">
             <h2 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Columns</h2>
-            <ColumnSelect label="Set A" hint="drivers" columns={columnProfiles} selected={setA} onChange={setSetA} loading={describing} />
-            <ColumnSelect label="Set B" hint="KPIs · optional" columns={columnProfiles} selected={setB} onChange={setSetB} loading={describing} />
+            <ColumnSelect label="Set A" hint="drivers" tip="Variables you think influence the outcome — e.g. spend, impressions. Only numeric columns can be correlated." columns={columnProfiles} selected={setA} onChange={setSetA} loading={describing} />
+            <ColumnSelect label="Set B" hint="KPIs · optional" tip="Outcomes to test Set A against. Leave empty to correlate Set A against itself." columns={columnProfiles} selected={setB} onChange={setSetB} loading={describing} />
           </div>
 
           {/* Method */}
           <div className="space-y-2">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Method</h2>
+            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+              Method
+              <InfoHint text="Pearson measures linear correlation; Spearman measures rank (monotonic) correlation — more robust to outliers and non-linear-but-ordered trends." />
+            </h2>
             <div className="flex gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-lg">
               {(['pearson', 'spearman'] as const).map((m) => (
                 <button
@@ -403,19 +408,19 @@ export default function AnalyzePage() {
           <div className="space-y-2">
             <h2 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Preprocessing</h2>
             <div className="grid grid-cols-2 gap-2">
-              <Toggle label="Winsorize" checked={winsorize} onChange={setWinsorize} />
-              <Toggle label="Log1p" checked={log1p} onChange={setLog1p} />
-              <Toggle label="Z-Score" checked={zscore} onChange={setZscore} />
-              <Toggle label="Difference" checked={difference} onChange={setDifference} />
+              <Toggle label="Winsorize" checked={winsorize} onChange={setWinsorize} hint="Clip extreme outliers to a percentile range before correlating." />
+              <Toggle label="Log1p" checked={log1p} onChange={setLog1p} hint="Apply log(1 + x) — compresses skewed, heavy-tailed values." />
+              <Toggle label="Z-Score" checked={zscore} onChange={setZscore} hint="Standardize each column to mean 0, standard deviation 1." />
+              <Toggle label="Difference" checked={difference} onChange={setDifference} hint="Correlate period-over-period change instead of absolute values — removes shared trends." />
             </div>
           </div>
 
           {/* Sliders */}
           <div className="space-y-3">
             <h2 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Settings</h2>
-            <Slider label="Alpha" value={alpha} min={0.001} max={0.2} step={0.001} onChange={setAlpha} />
-            <Slider label="Lag B" value={lag} min={-12} max={12} step={1} onChange={setLag} />
-            <Slider label="Top N" value={topN} min={5} max={200} step={5} onChange={setTopN} />
+            <Slider label="Alpha" value={alpha} min={0.001} max={0.2} step={0.001} onChange={setAlpha} hint="Significance threshold. Correlations with a p-value above alpha are dimmed as not significant." />
+            <Slider label="Lag B" value={lag} min={-12} max={12} step={1} onChange={setLag} hint="Shift Set B by N periods to test lead/lag — e.g. does spend predict next-week clicks." />
+            <Slider label="Top N" value={topN} min={5} max={200} step={5} onChange={setTopN} hint="How many of the strongest correlations to list under Top signals." />
           </div>
 
           <button
@@ -436,26 +441,36 @@ export default function AnalyzePage() {
             </div>
           )}
 
-          {qa && (
-            <div
-              className={`mb-4 px-3 py-2 text-xs rounded-lg border ${
-                qa.ok
-                  ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
-                  : 'text-amber-400 bg-amber-500/10 border-amber-500/30'
-              }`}
-            >
-              <span className="font-medium">
-                Data QA — {qa.row_count.toLocaleString()} rows, {qa.column_count} columns.
-              </span>
-              {qa.ok ? ' No issues found.' : (
-                <ul className="mt-1 list-disc list-inside space-y-0.5">
-                  {qa.warnings.map((w, i) => (
-                    <li key={i}>{w}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
+          {qa && (() => {
+            // Per-column missingness already shows inline in the column picker —
+            // collapse those into a count and only enumerate other QA warnings.
+            const missing = qa.warnings.filter((w) => /missing/i.test(w));
+            const other = qa.warnings.filter((w) => !/missing/i.test(w));
+            return (
+              <div
+                className={`mb-4 px-3 py-2 text-xs rounded-lg border ${
+                  qa.ok
+                    ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
+                    : 'text-amber-400 bg-amber-500/10 border-amber-500/30'
+                }`}
+              >
+                <span className="font-medium">
+                  Data QA — {qa.row_count.toLocaleString()} rows, {qa.column_count} columns.
+                </span>
+                {qa.ok && ' No issues found.'}
+                {missing.length > 0 && (
+                  <span>{' '}{missing.length} column{missing.length === 1 ? '' : 's'} with high missingness — see the % null tags in the column list.</span>
+                )}
+                {other.length > 0 && (
+                  <ul className="mt-1 list-disc list-inside space-y-0.5">
+                    {other.map((w, i) => (
+                      <li key={i}>{w}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })()}
 
           {!result ? (
             <div className="flex flex-col items-center justify-center h-72 text-center">

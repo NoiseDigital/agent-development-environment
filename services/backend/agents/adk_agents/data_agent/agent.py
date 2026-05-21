@@ -44,7 +44,7 @@ from .tools.data_engineer import (
 )
 
 
-ROOT_AGENT_MODEL_ID = "gemini-2.5-pro-preview-06-05"
+ROOT_AGENT_MODEL_ID = "gemini-2.5-flash"
 
 
 async def before_model_callback(
@@ -73,7 +73,7 @@ async def after_model_callback(
 prepare_environment()
 
 root_agent = Agent(
-    model="gemini-2.5-pro",
+    model="gemini-2.5-flash",
     name="data_agent",
     output_key="output",
     description="Data Analytics Consultant",

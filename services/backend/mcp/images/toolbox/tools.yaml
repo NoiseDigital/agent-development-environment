@@ -411,6 +411,21 @@ statement: |
 description: |
   Returns conversion funnel data in Recharts format with 'name' (funnel stage) and 'value' (count) for funnel visualization.
 ---
+kind: tool
+name: available_date_range
+type: bigquery-sql
+source: my-bq-source
+statement: |
+  SELECT
+    FORMAT_DATE('%Y-%m-%d', DATE(MIN(date_time))) AS earliest_date,
+    FORMAT_DATE('%Y-%m-%d', DATE(MAX(date_time))) AS latest_date,
+    COUNT(DISTINCT DATE(date_time)) AS distinct_days
+  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
+description: |
+  Returns the date range available in the media performance data: earliest_date,
+  latest_date and distinct_days. Call this before asking the user to clarify a
+  time period, so the options offered are grounded in the real available dates.
+---
 kind: toolset
 name: public_bq_toolset
 tools:
@@ -436,3 +451,4 @@ tools:
   - weekly_performance_trend
   - top_performing_campaigns
   - conversion_funnel_data
+  - available_date_range

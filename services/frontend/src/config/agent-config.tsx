@@ -133,17 +133,8 @@ export const defaultIcons = [
 
 // Helper function to get agent configuration
 export const getAgentConfiguration = (agentName: string): AgentConfig => {
-  console.log('Looking for agent:', agentName);
-  console.log('Available configurations:', Object.keys(agentConfigurations));
-
   const config = agentConfigurations[agentName];
-
-  if (config) {
-    console.log('Found config for:', agentName, config);
-    return config;
-  }
-
-  console.log('No config found for:', agentName, 'using fallback');
+  if (config) return config;
 
   // Fallback for agents not in config
   const defaultDisplayName = agentName

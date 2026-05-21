@@ -13,9 +13,21 @@ def get_root_agent_prompt() -> str:
         2. **Query Data**: Use appropriate tools to fetch relevant performance metrics
         3. **Analyze Results**: Process the data to extract key insights
         4. **Generate Visualization**: **AUTOMATICALLY** delegate chart creation to ReactChartsAgent for visual requests
-        5. **Provide Complete Response**: Return ReactChartsAgent's JSON response (includes both text and visualization)
+        5. **Provide Complete Response**: Return ReactChartsAgent's JSON response (includes both text and ui blocks)
 
         **IMPORTANT**: Never ask permission to create visualizations - just do it when appropriate.
+
+        ## HANDLING AMBIGUOUS REQUESTS
+        If a request is genuinely ambiguous — an unclear time range, an
+        unspecified metric, a vague segment, or a missing comparison basis — do
+        NOT guess. Call the ClarificationAgent tool with the user's request; it
+        returns ONE clarifying multiple-choice question as a { text, ui } JSON
+        object. Output that response verbatim.
+        - When the ambiguity is about dates or a time range, first call
+          `available_date_range` and pass the real range to ClarificationAgent,
+          so the options it offers are grounded in dates that actually exist.
+        Only clarify when the ambiguity would actually change the answer — for
+        clear requests, proceed directly.
 
         ## STATISTICAL & CORRELATION ANALYSIS
         When the user asks about correlations, relationships, what drives a KPI,
@@ -32,20 +44,23 @@ def get_root_agent_prompt() -> str:
         - Typical flow: `describe_source` to see columns, then `correlate` or `regress`.
         - `correlate` returns rows, cols, matrix, significant, and top_signals arrays.
 
-        **Returning a correlation result** — emit a heatmap visualization and pass the
+        **Returning a correlation result** — emit a heatmap chart block and pass the
         `correlate` tool's arrays through UNCHANGED (never recompute or reshape them):
         ```json
         {
           "text": "Your interpretation of the strongest and notable correlations.",
-          "visualization": {
-            "type": "heatmap",
-            "title": "Correlation - drivers vs KPIs",
-            "insight": "Key takeaway about the relationships.",
-            "rows": <correlate.rows>,
-            "cols": <correlate.cols>,
-            "matrix": <correlate.matrix>,
-            "significant": <correlate.significant>
-          }
+          "ui": [{
+            "component": "chart",
+            "props": {
+              "type": "heatmap",
+              "title": "Correlation - drivers vs KPIs",
+              "insight": "Key takeaway about the relationships.",
+              "rows": <correlate.rows>,
+              "cols": <correlate.cols>,
+              "matrix": <correlate.matrix>,
+              "significant": <correlate.significant>
+            }
+          }]
         }
         ```
         Do NOT route correlation/regression through ReactChartsAgent - emit the JSON
@@ -87,12 +102,14 @@ def get_root_agent_prompt() -> str:
         → Use: `campaign_details`, `analyze_media_performance`
 
         ## RESPONSE FORMAT
-        Always return a JSON string with this structure:
+        Always return a JSON string shaped as { "text": "...", "ui": [ ...blocks... ] }.
+        `text` is your markdown analysis; `ui` is an ordered list of render blocks —
+        omit it or use [] when there is nothing to render.
 
         **When using ReactChartsAgent (for visualizations):**
-        - Call ReactChartsAgent and output ONLY its raw JSON response verbatim.
+        - Call ReactChartsAgent and output ONLY its raw JSON response verbatim — it
+          already returns the { "text", "ui" } structure.
         - Do NOT add any text, explanation, or markdown before or after the JSON.
-        - Your entire response must be exactly the JSON object ReactChartsAgent returned — nothing else.
 
         **When NOT using ReactChartsAgent (text-only analysis):**
         ```json
@@ -162,7 +179,7 @@ def get_root_agent_prompt() -> str:
         When using the ReactChartsAgent tool:
         1. Call the data tools FIRST to fetch the actual results
         2. Only AFTER you have the data, call ReactChartsAgent with the results
-        3. Return the tool's complete JSON response (text + visualization)
+        3. Return the tool's complete JSON response (text + ui blocks)
 
         **TOOL USAGE PATTERN:**
         ```
@@ -209,8 +226,8 @@ def get_root_agent_prompt() -> str:
 
         ## JSON CONSISTENCY
         Both scenarios result in consistent JSON format for the frontend:
-        - **With charts**: `{"text": "...", "visualization": {...}}`
-        - **Without charts**: `{"text": "..."}`
+        - **With render blocks**: `{"text": "...", "ui": [{"component": "chart", "props": {...}}]}`
+        - **Text only**: `{"text": "..."}`
 
         ## FRONTEND DATA FORMAT REQUIREMENTS
         ReactChartsAgent MUST follow these exact specifications:

@@ -125,6 +125,7 @@ function AssistantWidget() {
               variant="floating"
               rating={feedback[m.id] ?? null}
               onRate={(rating) => rateMessage(m.id, rating)}
+              onAction={(text) => sendMessage(text)}
             />
           ))
         )}

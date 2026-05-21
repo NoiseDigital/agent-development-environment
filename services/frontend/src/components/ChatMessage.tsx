@@ -2,7 +2,7 @@
 
 import type { Ref } from 'react';
 import ReactMarkdown from 'react-markdown';
-import ChartVisualization from './ChartVisualization';
+import GenUIRenderer from './genui/GenUIRenderer';
 import { formatMessageTime } from '../utils/timestamps';
 import type { ChatMessage as ChatMessageData } from '../hooks/useChat';
 import type { Rating } from '../lib/feedback-api';
@@ -18,14 +18,16 @@ interface ChatMessageProps {
   variant?: Variant;
   /** Verb shown beside the spinner while the agent is thinking; the panel cycles it. */
   loadingLabel?: string;
-  /** Render attached visualizations — gated on the agent supporting them. */
-  showCharts?: boolean;
+  /** Render the agent's UI blocks — gated on the agent supporting them. */
+  showUi?: boolean;
   /** Attached to the row element so the panel can scroll a streaming reply into view. */
   rowRef?: Ref<HTMLDivElement>;
   /** Current thumb rating for this agent message. */
   rating?: Rating | null;
   /** Set or clear (null) this message's rating. */
   onRate?: (rating: Rating | null) => void;
+  /** Send a message back to the agent — used by interactive UI blocks. */
+  onAction?: (text: string) => void;
 }
 
 const VARIANT: Record<Variant, {
@@ -37,7 +39,7 @@ const VARIANT: Record<Variant, {
   spinner: string;
   loadingGap: string;
   loadingText: string;
-  chartGap: string;
+  uiGap: string;
 }> = {
   panel: {
     agentInner: 'max-w-2xl w-full',
@@ -48,7 +50,7 @@ const VARIANT: Record<Variant, {
     spinner: 'w-4 h-4',
     loadingGap: 'gap-3',
     loadingText: 'text-sm text-zinc-300 font-medium',
-    chartGap: 'mt-3 space-y-3',
+    uiGap: 'mt-3 space-y-3',
   },
   floating: {
     agentInner: 'w-full',
@@ -59,7 +61,7 @@ const VARIANT: Record<Variant, {
     spinner: 'w-3.5 h-3.5 rounded-full',
     loadingGap: 'gap-2',
     loadingText: 'text-xs text-zinc-400',
-    chartGap: 'mt-2 space-y-2',
+    uiGap: 'mt-2 space-y-2',
   },
 };
 
@@ -67,15 +69,16 @@ export default function ChatMessage({
   message,
   variant = 'panel',
   loadingLabel = 'Thinking',
-  showCharts = true,
+  showUi = true,
   rowRef,
   rating,
   onRate,
+  onAction,
 }: ChatMessageProps) {
   const v = VARIANT[variant];
   const isAgent = message.author !== 'user';
   const isThinking = message.isStreaming && message.content === '';
-  const charts = showCharts ? message.charts ?? [] : [];
+  const blocks = showUi ? message.ui ?? [] : [];
 
   return (
     <div
@@ -107,11 +110,9 @@ export default function ChatMessage({
               <MessageFooter timestamp={message.timestamp} rating={rating} onRate={onRate} />
             )}
 
-            {charts.length > 0 && (
-              <div className={v.chartGap}>
-                {charts.map((chart, i) => (
-                  <ChartVisualization key={`${message.id}-chart-${i}`} chart={chart} saveable />
-                ))}
+            {blocks.length > 0 && (
+              <div className={v.uiGap}>
+                <GenUIRenderer blocks={blocks} onAction={onAction} />
               </div>
             )}
           </div>

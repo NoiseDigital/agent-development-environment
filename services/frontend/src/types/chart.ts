@@ -17,6 +17,8 @@ export interface ChartData {
   insight?: string;
   // Series data for line/bar/pie/funnel/area charts.
   data?: ChartDataPoint[];
+  // Optional palette override — agents may theme a chart; falls back to defaults.
+  colors?: string[];
   // Correlation-matrix fields for heatmap charts.
   rows?: string[];
   cols?: string[];

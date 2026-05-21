@@ -12,7 +12,7 @@ from a2a.types import (
 
 logger = logging.getLogger(__name__)
 
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = ""
 
 # Retrieve the A2A agent registry base URL from environment variables with a default fallback.
 # NOTE: Update to math agent, media performance agent was taken off A2A
