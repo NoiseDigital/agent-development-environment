@@ -27,20 +27,24 @@ source: my-bq-source
 parameters:
   - name: date_from
     type: string
-    description: Start date for analysis. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2000-01-01"
   - name: date_to
     type: string
-    description: End date for analysis. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2999-12-31"
   - name: campaign_phase_filter
     type: string
-    description: Filter by campaign phase (optional)
+    description: Filter by campaign phase. Omit (empty) for no filter.
     required: false
+    default: ""
   - name: publisher_filter
     type: string
-    description: Filter by publisher (optional)
+    description: Filter by publisher. Omit (empty) for no filter.
     required: false
+    default: ""
 statement: |
   SELECT
     date_time as date,
@@ -57,8 +61,8 @@ statement: |
   WHERE
     (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
     AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
-    AND (@campaign_phase_filter IS NULL OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', @campaign_phase_filter, '%')))
-    AND (@publisher_filter IS NULL OR LOWER(publisher) LIKE LOWER(CONCAT('%', @publisher_filter, '%')))
+    AND (@campaign_phase_filter = '' OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', @campaign_phase_filter, '%')))
+    AND (@publisher_filter = '' OR LOWER(publisher) LIKE LOWER(CONCAT('%', @publisher_filter, '%')))
   GROUP BY date_time, campaign_phase, publisher, platform
   ORDER BY date_time DESC, total_spend DESC
 description: |
@@ -71,12 +75,14 @@ source: my-bq-source
 parameters:
   - name: date_from
     type: string
-    description: Start date for summary. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2000-01-01"
   - name: date_to
     type: string
-    description: End date for summary. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2999-12-31"
 statement: |
   SELECT
     SUM(impressions) AS total_impressions,
@@ -151,8 +157,9 @@ source: my-bq-source
 parameters:
   - name: campaign_filter
     type: string
-    description: Filter by campaign phase (optional)
+    description: Filter by campaign phase. Omit (empty) for no filter.
     required: false
+    default: ""
 statement: |
   SELECT
     date_time as date,
@@ -168,7 +175,7 @@ statement: |
     completed_views
   FROM `nd-agentspace-sbx.media_performance.performance`
   WHERE
-    (@campaign_filter IS NULL OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', @campaign_filter, '%')))
+    (@campaign_filter = '' OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', @campaign_filter, '%')))
   ORDER BY date_time DESC, campaign_phase
   LIMIT 100
 description: |
@@ -176,30 +183,73 @@ description: |
 ---
 # Recharts-friendly visualization tools
 kind: tool
-name: daily_spend_trend
+name: performance_trend
 type: bigquery-sql
 source: my-bq-source
 parameters:
-  - name: days_back
-    type: integer
-    description: Number of days to look back (default 30)
+  - name: metric
+    type: string
+    description: Metric to trend (spend, impressions, clicks, landing_page_views). Defaults to spend.
     required: false
+    default: spend
+  - name: date_from
+    type: string
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
+    required: false
+    default: "2000-01-01"
+  - name: date_to
+    type: string
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
+    required: false
+    default: "2999-12-31"
   - name: campaign_phase_filter
     type: string
-    description: Filter by campaign phase (optional)
+    description: Filter by campaign phase. Omit (empty) for no filter.
     required: false
+    default: ""
 statement: |
+  -- A time-series trend that always spans the FULL requested range. The window
+  -- is split into at most 48 equal-width buckets, so the result never exceeds
+  -- the data layer's 50-row cap and even "all time" charts show every period.
+  WITH filtered AS (
+    SELECT
+      DATE(date_time) AS d,
+      spend, impressions, clicks, landing_page_views
+    FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
+    WHERE date_time >= PARSE_DATE('%Y-%m-%d', @date_from)
+      AND date_time <= PARSE_DATE('%Y-%m-%d', @date_to)
+      AND (@campaign_phase_filter = ''
+           OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', @campaign_phase_filter, '%')))
+  ),
+  bounds AS (
+    SELECT
+      MIN(d) AS d0,
+      GREATEST(1, CAST(CEIL((DATE_DIFF(MAX(d), MIN(d), DAY) + 1) / 48) AS INT64)) AS bucket_days
+    FROM filtered
+  )
   SELECT
-    date_time as name,
-    SUM(spend) as value
-  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
-  WHERE
-    date_time >= DATE_SUB(CURRENT_DATE(), INTERVAL COALESCE(@days_back, 30) DAY)
-    AND (@campaign_phase_filter IS NULL OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', @campaign_phase_filter, '%')))
-  GROUP BY date_time
-  ORDER BY date_time
+    FORMAT_DATE('%Y-%m-%d',
+      DATE_ADD(b.d0,
+        INTERVAL DIV(DATE_DIFF(f.d, b.d0, DAY), b.bucket_days) * b.bucket_days DAY)) AS name,
+    CASE @metric
+      WHEN 'spend' THEN CAST(SUM(f.spend) AS FLOAT64)
+      WHEN 'impressions' THEN CAST(SUM(f.impressions) AS FLOAT64)
+      WHEN 'clicks' THEN CAST(SUM(f.clicks) AS FLOAT64)
+      WHEN 'landing_page_views' THEN CAST(SUM(f.landing_page_views) AS FLOAT64)
+      ELSE CAST(SUM(f.spend) AS FLOAT64)
+    END AS value
+  FROM filtered f
+  CROSS JOIN bounds b
+  GROUP BY name
+  ORDER BY name
 description: |
-  Returns daily spend trend in Recharts format with 'name' (date) and 'value' (spend) columns for line charts.
+  Returns a time-series trend for the chosen metric in Recharts format with
+  'name' (the period's start date, YYYY-MM-DD) and 'value'. The requested date
+  range is divided into at most 48 equal-width buckets, so the result always
+  covers the WHOLE range. Call it once with the user's date range (or omit the
+  dates for all-time) and chart every point — never drop or trim points. Use
+  this for any "trend", "over time", "daily/weekly/monthly", or
+  "spend since <year>" request.
 ---
 kind: tool
 name: publisher_spend_breakdown
@@ -208,16 +258,18 @@ source: my-bq-source
 parameters:
   - name: date_from
     type: string
-    description: Start date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2000-01-01"
   - name: date_to
     type: string
-    description: End date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2999-12-31"
 statement: |
   SELECT
     publisher as name,
-    SUM(spend) as value
+    CAST(SUM(spend) AS FLOAT64) as value
   FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
   WHERE
     (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
@@ -235,25 +287,28 @@ source: my-bq-source
 parameters:
   - name: metric
     type: string
-    description: Metric to compare (spend, impressions, clicks, landing_page_views)
+    description: Metric to compare (spend, impressions, clicks, landing_page_views). Defaults to spend.
     required: false
+    default: spend
   - name: date_from
     type: string
-    description: Start date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2000-01-01"
   - name: date_to
     type: string
-    description: End date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2999-12-31"
 statement: |
   SELECT
     campaign_phase as name,
     CASE @metric
-      WHEN 'spend' THEN SUM(spend)
-      WHEN 'impressions' THEN SUM(impressions)
-      WHEN 'clicks' THEN SUM(clicks)
-      WHEN 'landing_page_views' THEN SUM(landing_page_views)
-      ELSE SUM(spend)
+      WHEN 'spend' THEN CAST(SUM(spend) AS FLOAT64)
+      WHEN 'impressions' THEN CAST(SUM(impressions) AS FLOAT64)
+      WHEN 'clicks' THEN CAST(SUM(clicks) AS FLOAT64)
+      WHEN 'landing_page_views' THEN CAST(SUM(landing_page_views) AS FLOAT64)
+      ELSE CAST(SUM(spend) AS FLOAT64)
     END as value
   FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
   WHERE
@@ -273,12 +328,14 @@ source: my-bq-source
 parameters:
   - name: date_from
     type: string
-    description: Start date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2000-01-01"
   - name: date_to
     type: string
-    description: End date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2999-12-31"
 statement: |
   SELECT
     platform as name,
@@ -296,66 +353,39 @@ description: |
   Returns platform click-through rates in Recharts format with 'name' (platform) and 'value' (CTR %) for comparison charts.
 ---
 kind: tool
-name: weekly_performance_trend
-type: bigquery-sql
-source: my-bq-source
-parameters:
-  - name: weeks_back
-    type: integer
-    description: Number of weeks to look back (default 12)
-    required: false
-  - name: metric
-    type: string
-    description: Metric to trend (spend, impressions, clicks, landing_page_views)
-    required: false
-statement: |
-  SELECT
-    FORMAT_DATE('%Y-W%U', date_time) as name,
-    CASE @metric
-      WHEN 'spend' THEN SUM(spend)
-      WHEN 'impressions' THEN SUM(impressions)
-      WHEN 'clicks' THEN SUM(clicks)
-      WHEN 'landing_page_views' THEN SUM(landing_page_views)
-      ELSE SUM(spend)
-    END as value
-  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
-  WHERE
-    date_time >= DATE_SUB(CURRENT_DATE(), INTERVAL COALESCE(@weeks_back, 12) * 7 DAY)
-  GROUP BY FORMAT_DATE('%Y-W%U', date_time)
-  ORDER BY name
-description: |
-  Returns weekly performance trend in Recharts format with 'name' (week) and 'value' (selected metric) for line charts.
----
-kind: tool
 name: top_performing_campaigns
 type: bigquery-sql
 source: my-bq-source
 parameters:
   - name: metric
     type: string
-    description: Metric to rank by (spend, impressions, clicks, landing_page_views)
+    description: Metric to rank by (spend, impressions, clicks, landing_page_views). Defaults to spend.
     required: false
+    default: spend
   - name: limit_rows
     type: integer
     description: Number of top campaigns to return (default 10)
     required: false
+    default: 10
   - name: date_from
     type: string
-    description: Start date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2000-01-01"
   - name: date_to
     type: string
-    description: End date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2999-12-31"
 statement: |
   SELECT
     CONCAT(campaign_phase, ' (', publisher, ')') as name,
     CASE @metric
-      WHEN 'spend' THEN SUM(spend)
-      WHEN 'impressions' THEN SUM(impressions)
-      WHEN 'clicks' THEN SUM(clicks)
-      WHEN 'landing_page_views' THEN SUM(landing_page_views)
-      ELSE SUM(spend)
+      WHEN 'spend' THEN CAST(SUM(spend) AS FLOAT64)
+      WHEN 'impressions' THEN CAST(SUM(impressions) AS FLOAT64)
+      WHEN 'clicks' THEN CAST(SUM(clicks) AS FLOAT64)
+      WHEN 'landing_page_views' THEN CAST(SUM(landing_page_views) AS FLOAT64)
+      ELSE CAST(SUM(spend) AS FLOAT64)
     END as value
   FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
   WHERE
@@ -365,7 +395,7 @@ statement: |
     AND publisher IS NOT NULL
   GROUP BY campaign_phase, publisher
   ORDER BY value DESC
-  LIMIT COALESCE(@limit_rows, 10)
+  LIMIT @limit_rows
 description: |
   Returns top performing campaigns in Recharts format with 'name' (campaign + publisher) and 'value' (selected metric).
 ---
@@ -376,16 +406,19 @@ source: my-bq-source
 parameters:
   - name: campaign_phase_filter
     type: string
-    description: Filter by campaign phase (optional)
+    description: Filter by campaign phase. Omit (empty) for no filter.
     required: false
+    default: ""
   - name: date_from
     type: string
-    description: Start date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2000-01-01"
   - name: date_to
     type: string
-    description: End date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2999-12-31"
 statement: |
   WITH funnel_data AS (
     SELECT
@@ -399,7 +432,7 @@ statement: |
     WHERE
       (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
       AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
-      AND (@campaign_phase_filter IS NULL OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', @campaign_phase_filter, '%')))
+      AND (@campaign_phase_filter = '' OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', @campaign_phase_filter, '%')))
   )
   SELECT 'Impressions' as name, impressions as value FROM funnel_data
   UNION ALL SELECT 'Clicks' as name, clicks as value FROM funnel_data
@@ -444,11 +477,10 @@ tools:
 kind: toolset
 name: media_performance_recharts_friendly
 tools:
-  - daily_spend_trend
+  - performance_trend
   - publisher_spend_breakdown
   - campaign_performance_comparison
   - platform_engagement_metrics
-  - weekly_performance_trend
   - top_performing_campaigns
   - conversion_funnel_data
   - available_date_range

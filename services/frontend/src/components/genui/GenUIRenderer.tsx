@@ -5,6 +5,7 @@
 import type { ReactNode } from 'react';
 import type { UIBlock } from '../../types/genui';
 import { registry, type RenderContext } from './registry';
+import BlockBoundary from './BlockBoundary';
 
 export default function GenUIRenderer({
   blocks,
@@ -24,7 +25,7 @@ export default function GenUIRenderer({
         if (!render) return null;
         return (
           <div key={block.id ?? `${block.component}-${i}`}>
-            {render(block.props, ctx)}
+            <BlockBoundary>{render(block.props, ctx)}</BlockBoundary>
           </div>
         );
       })}

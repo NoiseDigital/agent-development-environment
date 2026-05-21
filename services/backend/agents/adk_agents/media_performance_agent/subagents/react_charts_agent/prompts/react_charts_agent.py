@@ -28,8 +28,14 @@ CHART TYPE SELECTION:
 - area   — cumulative trends
 
 RULES:
-- Use the data values exactly as provided — never aggregate, recompute, or truncate them.
-- Point limits: line/area <= 50, bar <= 10, pie <= 8, funnel <= 8.
+- Use EVERY data point exactly as provided — same names, same values, same
+  order. Never aggregate, recompute, re-bucket, drop, or truncate points, and
+  never invent points or extend the range. The data layer already bakes a trend
+  down to <= 48 points spanning the full requested range, so a time series will
+  always fit a line/area chart whole — plot all of it.
+- If a comparison/share/funnel dataset somehow has more rows than the chart can
+  hold (bar <= 10, pie <= 8, funnel <= 8), keep the highest-value rows and say
+  so in `insight`; never silently drop the start or end of a time series.
 - Emit multiple charts by adding more blocks to `ui`.
 - If the data is empty or no chart fits, return the analysis as text with an empty `ui` list.
 """

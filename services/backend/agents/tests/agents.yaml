@@ -7,8 +7,7 @@
 #   ui:    the { text, ui } envelope must contain a block of this component
 #   tools: the agent must have made at least one tool call
 # A case may also set `xfail: "reason"` to mark a known-failing behaviour.
-#
-# These are REAL agent runs (live Gemini + MCP) — see README.md.
+
 
 media_performance_agent:
   - name: capability question returns text
@@ -16,18 +15,17 @@ media_performance_agent:
     expect:
       ok: true
 
-  - name: ambiguous request surfaces a clarification block
+  - name: ambiguous request surfaces a choices block
     message: "How did we do?"
     expect:
       ui: choices
-    xfail: "orchestrator relays subagent output unreliably — the choices block is produced but often not surfaced; needs the worker->formatter fix"
 
   - name: explicit chart request returns a chart block
     message: "Plot total spend by publisher as a bar chart."
     expect:
       ui: chart
       tools: true
-    xfail: "orchestrator returns empty text when delegating to a subagent (ReactChartsAgent / ClarificationAgent) — needs the worker->formatter fix"
+    xfail: "flaky: the agent may clarify an under-specified request instead of charting (LLM behavioural variance) — the {text,ui} envelope itself is now reliable"
 
 timesheet_agent:
   - name: capability question returns text

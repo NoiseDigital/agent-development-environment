@@ -51,27 +51,69 @@ const extractFirstJsonObject = (text: string): string | null => {
   return null;
 };
 
-/** Parse an agent's JSON response — the GenUI `{ text, ui }` contract, also
- *  accepting the legacy `{ text, visualization }` shape (mapped to chart blocks). */
-const tryParseAgentJson = (raw: string): { content: string; ui?: UIBlock[] } | null => {
-  try {
-    const parsed = JSON.parse(raw.trim());
-    if (!parsed || typeof parsed !== 'object' || parsed.text === undefined) return null;
-
-    const result: { content: string; ui?: UIBlock[] } = { content: parsed.text };
-
-    if (Array.isArray(parsed.ui)) {
-      result.ui = parsed.ui as UIBlock[];
-    } else if (parsed.visualization) {
-      // Legacy shape: one or more charts under `visualization` → chart blocks.
-      const viz = parsed.visualization;
-      const charts: ChartData[] = Array.isArray(viz) ? viz : [viz];
-      result.ui = charts.map((props) => ({ component: 'chart', props }));
+// LLM-generated JSON occasionally blends in Python literals (True/False/None).
+// Translate them to JSON — but only outside string content, so message text is
+// left untouched.
+const normalizePythonJson = (s: string): string => {
+  const LITERALS: Record<string, string> = { True: 'true', False: 'false', None: 'null' };
+  let out = '';
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inString) {
+      out += ch;
+      if (escape) escape = false;
+      else if (ch === '\\') escape = true;
+      else if (ch === '"') inString = false;
+      continue;
     }
-    return result;
+    if (ch === '"') { inString = true; out += ch; continue; }
+    let matched = false;
+    for (const [py, json] of Object.entries(LITERALS)) {
+      if (s.startsWith(py, i) && !/[A-Za-z0-9_]/.test(s[i + py.length] ?? '')) {
+        out += json;
+        i += py.length - 1;
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) out += ch;
+  }
+  return out;
+};
+
+/** JSON.parse, retried once with Python literals normalised to JSON. */
+const parseJsonLoose = (s: string) => {
+  try {
+    return JSON.parse(s);
+  } catch {
+    /* malformed — retry leniently below */
+  }
+  try {
+    return JSON.parse(normalizePythonJson(s));
   } catch {
     return null;
   }
+};
+
+/** Parse an agent's JSON response — the GenUI `{ text, ui }` contract, also
+ *  accepting the legacy `{ text, visualization }` shape (mapped to chart blocks). */
+const tryParseAgentJson = (raw: string): { content: string; ui?: UIBlock[] } | null => {
+  const parsed = parseJsonLoose(raw.trim());
+  if (!parsed || typeof parsed !== 'object' || parsed.text === undefined) return null;
+
+  const result: { content: string; ui?: UIBlock[] } = { content: parsed.text };
+
+  if (Array.isArray(parsed.ui)) {
+    result.ui = parsed.ui as UIBlock[];
+  } else if (parsed.visualization) {
+    // Legacy shape: one or more charts under `visualization` → chart blocks.
+    const viz = parsed.visualization;
+    const charts: ChartData[] = Array.isArray(viz) ? viz : [viz];
+    result.ui = charts.map((props) => ({ component: 'chart', props }));
+  }
+  return result;
 };
 
 const parseAgentResponse = (text: string): { content: string; ui?: UIBlock[] } => {
@@ -376,11 +418,18 @@ export function useChat(initialApp?: string, userId: string = 'user-1') {
       let agentAuthor = 'agent';
       // The id of the persisted ADK event for this reply — feedback keys off it.
       let finalEventId: string | null = null;
+      // In a multi-agent pipeline (worker → formatter) the response is the LAST
+      // agent's output — reset accumulation when a new agent starts emitting text.
+      let lastTextAuthor: string | null = null;
 
       for await (const event of adkApi.sendMessageSSE(request)) {
         if (event.author && event.author !== 'user') agentAuthor = event.author;
         const textPart = event.content?.parts?.find(p => p.text);
         if (textPart?.text) {
+          if (event.author && event.author !== lastTextAuthor) {
+            accumulated = '';
+            lastTextAuthor = event.author;
+          }
           // partial === true → streaming delta, append.
           // partial === false / undefined (complete event) → full text, replace to avoid duplication.
           if (event.partial === true) {

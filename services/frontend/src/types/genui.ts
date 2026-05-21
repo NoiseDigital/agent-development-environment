@@ -7,7 +7,7 @@
 
 import type { ChartData } from './chart';
 
-/** One selectable option in a `choices` block. */
+/** One selectable option in a clarifying question. */
 export interface ChoiceOption {
   /** What the user sees. */
   label: string;
@@ -15,14 +15,27 @@ export interface ChoiceOption {
   value?: string;
 }
 
-/** A clarifying question the agent surfaces to gather missing context. */
-export interface ChoicesProps {
+/** An option as it may arrive from an agent: a {label,value} object, or a
+ *  bare string used as both label and value. */
+export type ChoiceOptionInput = ChoiceOption | string;
+
+/** A single clarifying question within a `choices` block. */
+export interface ChoiceQuestion {
   question: string;
-  options: ChoiceOption[];
+  options: ChoiceOptionInput[];
   /** Allow picking several options. */
   multiSelect?: boolean;
   /** Allow a free-text answer alongside the options. */
   allowCustom?: boolean;
+}
+
+/** A clarifying-questions block — every ambiguity the agent needs resolved,
+ *  grouped into one tabbed block the user answers in a single pass. */
+export interface ChoicesProps {
+  /** Optional one-line framing shown above the questions. */
+  intro?: string;
+  /** 1–4 clarifying questions. */
+  questions: ChoiceQuestion[];
 }
 
 /** One renderable block. Discriminated on `component`; `props` is that

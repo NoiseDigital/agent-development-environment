@@ -7,6 +7,7 @@ container:
     docker compose exec agent uv run pytest tests -v
 """
 
+import ast
 import json
 from pathlib import Path
 
@@ -36,14 +37,22 @@ def _load_cases():
 
 
 def _ui_components(text: str) -> list[str]:
-    """Parse the { text, ui } envelope from a reply and list its component names."""
+    """Parse the { text, ui } envelope from a reply and list its component names.
+
+    Tolerates LLM JSON that blends in Python literals (True/False/None) — the
+    frontend does the same, so the harness should not be stricter than it.
+    """
     start, end = text.find("{"), text.rfind("}")
     if start == -1 or end <= start:
         return []
+    blob = text[start : end + 1]
     try:
-        payload = json.loads(text[start : end + 1])
+        payload = json.loads(blob)
     except json.JSONDecodeError:
-        return []
+        try:
+            payload = ast.literal_eval(blob)
+        except (ValueError, SyntaxError):
+            return []
     ui = payload.get("ui") if isinstance(payload, dict) else None
     return [b.get("component") for b in ui or [] if isinstance(b, dict)]
 

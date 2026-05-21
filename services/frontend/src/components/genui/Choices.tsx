@@ -1,11 +1,86 @@
 'use client';
 
-import { useState } from 'react';
-import type { ChoicesProps } from '../../types/genui';
+import { useMemo, useState } from 'react';
+import type { ChoicesProps, ChoiceQuestion, ChoiceOption } from '../../types/genui';
 
-// An agent-surfaced clarifying question. The user picks option(s) and/or types
-// a custom answer; submitting sends it back to the agent as the next message —
-// the GenUI feedback loop in its simplest interactive form.
+/** A clarifying question after normalization — options are always objects. */
+interface CleanQuestion {
+  question: string;
+  options: ChoiceOption[];
+  multiSelect?: boolean;
+  allowCustom?: boolean;
+}
+
+// An agent-surfaced set of clarifying questions, grouped into one tabbed block.
+// The user moves between questions (tabs / Back-Next), picks option(s) or types
+// a custom answer for each, and submits once — the combined answers go back to
+// the agent as the next message. This is the GenUI feedback loop's richest
+// interactive form: many ambiguities resolved in a single pass.
+
+const valueOf = (o: ChoiceOption) => o.value ?? o.label;
+
+/** Per-question working state: chosen option values plus any free-text. */
+interface Draft {
+  selected: string[];
+  custom: string;
+}
+
+/** Coerce one option into a {label,value} object. Agents may send a bare
+ *  string ("Revenue") or an object — both are valid; junk is dropped. As a
+ *  safety net, a string that is itself a JSON {label,value} object (an agent
+ *  serialization slip) is unwrapped rather than shown raw. */
+function toOption(o: unknown): ChoiceOption | null {
+  if (typeof o === 'string') {
+    const label = o.trim();
+    if (!label) return null;
+    if (label.startsWith('{') && label.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(label);
+        if (parsed && typeof parsed.label === 'string') {
+          return { label: parsed.label, value: parsed.value ?? parsed.label };
+        }
+      } catch {
+        /* not JSON — fall through and use the raw string */
+      }
+    }
+    return { label, value: label };
+  }
+  if (o && typeof (o as ChoiceOption).label === 'string') {
+    const opt = o as ChoiceOption;
+    return { label: opt.label, value: opt.value ?? opt.label };
+  }
+  return null;
+}
+
+/** A `choices` block may arrive in shapes the UI must survive — a legacy
+ *  single-question payload ({ question, options }), string options, a missing
+ *  `options` array, junk entries. Coerce whatever we get into a clean question
+ *  list so a bad payload (e.g. an old saved message) degrades instead of
+ *  crashing the whole chat. */
+type LooseChoicesProps = ChoicesProps &
+  Partial<Pick<ChoiceQuestion, 'question' | 'options' | 'multiSelect' | 'allowCustom'>>;
+
+function normalizeQuestions(props: LooseChoicesProps): CleanQuestion[] {
+  const raw: unknown[] = Array.isArray(props.questions)
+    ? props.questions
+    : props.question
+      ? [props]
+      : [];
+  return raw
+    .filter(
+      (q): q is ChoiceQuestion =>
+        !!q && typeof (q as ChoiceQuestion).question === 'string',
+    )
+    .map((q) => ({
+      question: q.question,
+      multiSelect: q.multiSelect,
+      allowCustom: q.allowCustom,
+      options: (Array.isArray(q.options) ? q.options : [])
+        .map(toOption)
+        .filter((o): o is ChoiceOption => o !== null),
+    }));
+}
+
 export default function Choices({
   props,
   onAction,
@@ -13,50 +88,132 @@ export default function Choices({
   props: ChoicesProps;
   onAction?: (text: string) => void;
 }) {
-  const { question, options, multiSelect = false, allowCustom = false } = props;
-  const [selected, setSelected] = useState<string[]>([]);
-  const [custom, setCustom] = useState('');
+  const questions = useMemo(
+    () => normalizeQuestions(props as LooseChoicesProps),
+    [props],
+  );
+
+  const [drafts, setDrafts] = useState<Draft[]>(() =>
+    questions.map(() => ({ selected: [], custom: '' })),
+  );
+  const [activeRaw, setActive] = useState(0);
   const [submitted, setSubmitted] = useState<string | null>(null);
 
-  const valueOf = (o: { label: string; value?: string }) => o.value ?? o.label;
+  if (questions.length === 0) return null;
+
+  const intro = (props as LooseChoicesProps).intro;
+  const active = Math.max(0, Math.min(activeRaw, questions.length - 1));
+
+  /** The resolved answer for question `i` — selections and custom text joined. */
+  const answerFor = (i: number) => {
+    const d = drafts[i] ?? { selected: [], custom: '' };
+    return [...d.selected, d.custom.trim()].filter(Boolean).join(', ');
+  };
+  const isAnswered = (i: number) => answerFor(i).length > 0;
+  const answeredCount = questions.filter((_, i) => isAnswered(i)).length;
+  const allAnswered = answeredCount === questions.length;
+
+  const q = questions[active];
+  const draft = drafts[active] ?? { selected: [], custom: '' };
+
+  const patch = (i: number, next: Partial<Draft>) => {
+    if (submitted) return;
+    setDrafts((cur) => {
+      // Backfill in case state predates the normalized question list.
+      const base =
+        cur.length === questions.length
+          ? cur
+          : questions.map((_, idx) => cur[idx] ?? { selected: [], custom: '' });
+      return base.map((d, idx) => (idx === i ? { ...d, ...next } : d));
+    });
+  };
 
   const toggle = (val: string) => {
     if (submitted) return;
-    setSelected((cur) =>
-      multiSelect
-        ? cur.includes(val) ? cur.filter((v) => v !== val) : [...cur, val]
-        : cur.includes(val) ? [] : [val],
-    );
+    const cur = draft.selected;
+    const next = q.multiSelect
+      ? cur.includes(val) ? cur.filter((v) => v !== val) : [...cur, val]
+      : cur.includes(val) ? [] : [val];
+    patch(active, { selected: next });
   };
-
-  const answer = [...selected, custom.trim()].filter(Boolean).join(', ');
-  const canSubmit = !submitted && answer.length > 0;
 
   const submit = () => {
-    if (!canSubmit) return;
-    setSubmitted(answer);
-    onAction?.(answer);
+    if (submitted || !allAnswered) return;
+    const combined = questions
+      .map((qq, i) => `${qq.question} → ${answerFor(i)}`)
+      .join('\n');
+    setSubmitted(combined);
+    onAction?.(combined);
   };
+
+  // Once submitted the block locks to a compact read-only summary.
+  if (submitted) {
+    return (
+      <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4 mt-3">
+        <p className="text-xs font-medium text-zinc-500 mb-2">Answered</p>
+        <ul className="space-y-1.5">
+          {questions.map((qq, i) => (
+            <li key={i} className="text-xs text-zinc-400">
+              {qq.question}{' '}
+              <span className="text-zinc-200">{answerFor(i)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4 mt-3">
-      <p className="text-sm font-medium text-white mb-3">{question}</p>
+      {intro && <p className="text-sm text-zinc-300 mb-3">{intro}</p>}
+
+      {/* Tab bar — one tab per question, with an answered dot. Multiple tabs
+          let the user jump around and revise before the single submit. */}
+      {questions.length > 1 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {questions.map((_, i) => {
+            const isActive = i === active;
+            const done = isAnswered(i);
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setActive(i)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  isActive
+                    ? 'bg-blue-500/15 border border-blue-500 text-white'
+                    : 'bg-zinc-950 border border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    done ? 'bg-emerald-400' : 'bg-zinc-600'
+                  }`}
+                />
+                Q{i + 1}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Active question */}
+      <p className="text-sm font-medium text-white mb-3">{q.question}</p>
 
       <div className="flex flex-wrap gap-2">
-        {options.map((o) => {
+        {q.options.map((o) => {
           const val = valueOf(o);
-          const active = selected.includes(val);
+          const isActive = draft.selected.includes(val);
           return (
             <button
               key={val}
               type="button"
-              disabled={!!submitted}
               onClick={() => toggle(val)}
-              className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-                active
+              className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
+                isActive
                   ? 'border-blue-500 bg-blue-500/15 text-white'
                   : 'border-zinc-700 bg-zinc-950 text-zinc-300 hover:border-zinc-600'
-              } ${submitted ? 'cursor-default opacity-70' : 'cursor-pointer'}`}
+              }`}
             >
               {o.label}
             </button>
@@ -64,31 +221,51 @@ export default function Choices({
         })}
       </div>
 
-      {allowCustom && !submitted && (
+      {q.allowCustom && (
         <input
           type="text"
-          value={custom}
-          onChange={(e) => setCustom(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
+          value={draft.custom}
+          onChange={(e) => patch(active, { custom: e.target.value })}
           placeholder="Or type your own answer…"
           className="mt-3 w-full px-3 py-2 text-xs bg-zinc-950 border border-zinc-800 rounded-lg text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
         />
       )}
 
-      {submitted ? (
-        <p className="mt-3 text-xs text-zinc-500">
-          Answered: <span className="text-zinc-300">{submitted}</span>
-        </p>
-      ) : (
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!canSubmit}
-          className="mt-3 px-4 py-1.5 text-xs font-semibold rounded-lg bg-white text-black hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          Send
-        </button>
-      )}
+      {/* Footer — Back/Next nav, progress counter, and the gated Submit. */}
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={() => setActive((i) => Math.max(0, i - 1))}
+            disabled={active === 0}
+            className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-zinc-700 bg-zinc-950 text-zinc-300 hover:border-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            onClick={() => setActive((i) => Math.min(questions.length - 1, i + 1))}
+            disabled={active === questions.length - 1}
+            className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-zinc-700 bg-zinc-950 text-zinc-300 hover:border-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            Next
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-zinc-500">
+            {answeredCount}/{questions.length} answered
+          </span>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!allAnswered}
+            className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-white text-black hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Submit
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
