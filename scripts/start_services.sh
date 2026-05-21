@@ -167,11 +167,13 @@ docker volume create agent-platform_gcloud_config >/dev/null 2>&1 || true
 # COMPOSE_IGNORE_ORPHANS suppresses the workspace container orphan warning — the
 # workspace service is intentionally absent from this up invocation.
 docker compose \
+    --project-name agent-platform \
     --project-directory "$PROJECT_ROOT" \
     -f "$PROJECT_ROOT/docker-compose.yml" \
     build agent frontend
 
 COMPOSE_IGNORE_ORPHANS=1 docker compose \
+    --project-name agent-platform \
     --project-directory "$HOST_PROJECT_ROOT" \
     -f "$PROJECT_ROOT/docker-compose.yml" \
     up -d --no-build --wait --wait-timeout 120 \
