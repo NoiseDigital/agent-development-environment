@@ -17,7 +17,9 @@ import csv
 import io
 import os
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+
+from api.auth import CurrentUser, current_user
 
 from . import repo
 from .storage import get_storage
@@ -58,8 +60,8 @@ def _inspect(data: bytes, ext: str) -> dict:
 
 
 @router.get("/sources")
-async def list_uploads(user_id: str = "user-1"):
-    return {"sources": await repo.list_uploads(user_id)}
+async def list_uploads(user: CurrentUser = Depends(current_user)):
+    return {"sources": await repo.list_uploads(user.uid)}
 
 
 @router.get("/sources/{source_id}")
@@ -71,7 +73,10 @@ async def get_upload(source_id: str):
 
 
 @router.post("/sources/upload")
-async def upload_source(file: UploadFile = File(...), user_id: str = Form("user-1")):
+async def upload_source(
+    file: UploadFile = File(...),
+    user: CurrentUser = Depends(current_user),
+):
     filename = file.filename or "upload"
     ext = os.path.splitext(filename)[1].lower()
     if ext not in ALLOWED_EXTS:
@@ -90,7 +95,7 @@ async def upload_source(file: UploadFile = File(...), user_id: str = Form("user-
     key = storage.save(data, filename)
     metadata = _inspect(data, ext)
     return await repo.create_upload(
-        user_id=user_id,
+        user_id=user.uid,
         name=filename,
         storage_key=key,
         file_ext=ext,

@@ -9,6 +9,7 @@ import { getAgentConfiguration } from '../config/agent-config';
 import { normalizeTimestamp } from '../utils/timestamps';
 import { feedbackApi, type Rating } from '../lib/feedback-api';
 import { sessionNamesApi } from '../lib/session-names-api';
+import { getCurrentUser } from '../lib/auth';
 
 /** One tool the agent invoked during a turn — name + arguments only; the SQL
  *  is reconstructed later from the toolbox catalog. */
@@ -280,8 +281,9 @@ const eventsToMessages = (events: AdkEvent[], supportsVisualization: boolean): C
   return messages;
 };
 
-// Replace with auth to get userId
-export function useChat(initialApp?: string, userId: string = 'user-1') {
+// Identity comes from the auth seam (lib/auth) — a fixed dev user today, the
+// Firebase user once auth is live. Callers may still override `userId` for tests.
+export function useChat(initialApp?: string, userId: string = getCurrentUser().uid) {
   const [availableApps, setAvailableApps] = useState<string[]>([]);
   const [selectedApp, setSelectedApp] = useState<string | null>(initialApp ?? null);
   const [sessions, setSessions] = useState<Session[]>([]);

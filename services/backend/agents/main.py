@@ -7,7 +7,7 @@ import uvicorn
 from google.adk.cli.fast_api import get_fast_api_app
 
 from api.sources.routes import router as sources_router
-from api.feedback.routes import router as feedback_router
+from api.events.routes import router as events_router
 from api.sessions.routes import router as sessions_router
 from api.tools.routes import router as tools_router
 from api.naming import router as naming_router
@@ -24,7 +24,7 @@ app = get_fast_api_app(
 
 # Platform API — everything ADK's FastAPI app doesn't already provide.
 app.include_router(sources_router)  # uploads + BigQuery catalog
-app.include_router(feedback_router)  # per-message thumb ratings
+app.include_router(events_router)  # per-message event metadata (feedback)
 app.include_router(sessions_router)  # session display names
 app.include_router(tools_router)  # MCP toolbox query catalog (admin)
 app.include_router(naming_router)  # session-name generation

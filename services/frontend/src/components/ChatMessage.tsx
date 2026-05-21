@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import GenUIRenderer from './genui/GenUIRenderer';
 import ToolQueries from './ToolQueries';
 import { formatMessageTime } from '../utils/timestamps';
-import { isAdmin } from '../lib/feature-flags';
+import { isAdmin } from '../lib/auth';
 import type { ChatMessage as ChatMessageData } from '../hooks/useChat';
 import type { Rating } from '../lib/feedback-api';
 
