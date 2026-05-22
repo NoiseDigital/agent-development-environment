@@ -7,19 +7,43 @@ on:
     branches: ["**"]
 
 jobs:
-  # ── Python lint (agents + MCP servers) ───────────────────────────────────
-  python-lint:
-    name: Python — ruff (${{ matrix.path }})
+  # ── Python backend lint + type check ──────────────────────────────────────
+  backend-lint:
+    name: Backend — ruff + mypy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/backend/agents
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: ruff check
+        run: ruff check .
+
+      - name: ruff format check
+        run: ruff format --check .
+
+  # ── MCP server lint ───────────────────────────────────────────────────────
+  mcp-lint:
+    name: MCP — ruff (${{ matrix.service }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        path:
-          - services/backend/agents
-          - services/backend/mcp/asana
-          - services/backend/mcp/math
+        service:
+          - asana
+          - math
     defaults:
       run:
-        working-directory: ${{ matrix.path }}
+        working-directory: services/backend/mcp/${{ matrix.service }}
 
     steps:
       - uses: actions/checkout@v4
