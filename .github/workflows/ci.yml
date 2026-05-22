@@ -7,50 +7,19 @@ on:
     branches: ["**"]
 
 jobs:
-  # ── Python backend lint + type check ──────────────────────────────────────
-  backend-lint:
-    name: Backend — ruff + mypy
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/backend/agents
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-          cache: pip
-
-      - name: Install linting tools
-        run: pip install ruff mypy
-
-      - name: Install project dependencies
-        run: pip install -e ".[dev]" --quiet || pip install -e . --quiet || true
-
-      - name: ruff check
-        run: ruff check .
-
-      - name: ruff format check
-        run: ruff format --check .
-
-      # Uncomment when mypy stubs and type coverage improve:
-      # - name: mypy
-      #   run: mypy . --ignore-missing-imports --no-error-summary
-
-  # ── MCP server lint ───────────────────────────────────────────────────────
-  mcp-lint:
-    name: MCP — ruff (${{ matrix.service }})
+  # ── Python lint (agents + MCP servers) ───────────────────────────────────
+  python-lint:
+    name: Python — ruff (${{ matrix.path }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service:
-          - asana
-          - math
+        path:
+          - services/backend/agents
+          - services/backend/mcp/asana
+          - services/backend/mcp/math
     defaults:
       run:
-        working-directory: services/backend/mcp/${{ matrix.service }}
+        working-directory: ${{ matrix.path }}
 
     steps:
       - uses: actions/checkout@v4
