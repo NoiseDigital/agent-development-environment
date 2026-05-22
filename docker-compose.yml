@@ -21,6 +21,7 @@ services:
       - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
       - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-northamerica-northeast1}
       - TOOLBOX_ENDPOINT=${TOOLBOX_ENDPOINT:-http://mcp-toolbox:5000}
+      - ASANA_MCP_URL=${ASANA_MCP_URL:-http://mcp-asana:8080}
       - UV_LINK_MODE=copy
     depends_on:
       postgres:

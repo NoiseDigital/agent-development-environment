@@ -13,6 +13,8 @@ from mcp import types as mcp_types
 from mcp.server.lowlevel import Server
 from mcp.server.sse import SseServerTransport
 from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
 from google.adk.tools.function_tool import FunctionTool
@@ -109,17 +111,24 @@ async def call_tool(name: str, arguments: dict) -> list[mcp_types.TextContent]:
 
 # --- MCP Remote Server ---
 async def handle_sse(request):
-    """Runs the MCP server over SSE."""
     async with sse.connect_sse(
         request.scope, request.receive, request._send
     ) as streams:
         await app.run(streams[0], streams[1], app.create_initialization_options())
 
 
+async def handle_get_tasks(request: Request) -> JSONResponse:
+    project_id = request.query_params.get("project_id", "")
+    completed_since = request.query_params.get("completed_since", "now")
+    result = get_asana_tasks(project_id=project_id, completed_since=completed_since)
+    return JSONResponse(result)
+
+
 starlette_app = Starlette(
     debug=True,
     routes=[
         Route("/sse", endpoint=handle_sse),
+        Route("/get_tasks", endpoint=handle_get_tasks),
         Mount("/messages/", app=sse.handle_post_message),
     ],
 )

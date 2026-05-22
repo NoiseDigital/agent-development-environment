@@ -140,11 +140,13 @@ if [ "$PROFILE" = "google-ads" ]; then
   chmod 600 "$GOOGLE_ADS_ENV_PATH"
 
   docker compose \
+      --project-name agent-platform \
       --project-directory "$PROJECT_ROOT" \
       -f "$PROJECT_ROOT/docker-compose.yml" \
       --profile google-ads build mcp-google-ads
 
   COMPOSE_IGNORE_ORPHANS=1 docker compose \
+      --project-name agent-platform \
       --project-directory "$HOST_PROJECT_ROOT" \
       -f "$PROJECT_ROOT/docker-compose.yml" \
       --profile google-ads up -d --no-build mcp-google-ads
@@ -155,11 +157,13 @@ fi
 
 if [ "$PROFILE" = "math" ]; then
   docker compose \
+      --project-name agent-platform \
       --project-directory "$PROJECT_ROOT" \
       -f "$PROJECT_ROOT/docker-compose.yml" \
       --profile math build mcp-math
 
   COMPOSE_IGNORE_ORPHANS=1 docker compose \
+      --project-name agent-platform \
       --project-directory "$HOST_PROJECT_ROOT" \
       -f "$PROJECT_ROOT/docker-compose.yml" \
       --profile math up -d --no-build mcp-math
@@ -170,11 +174,13 @@ fi
 
 if [ "$PROFILE" = "asana" ]; then
   docker compose \
+      --project-name agent-platform \
       --project-directory "$PROJECT_ROOT" \
       -f "$PROJECT_ROOT/docker-compose.yml" \
       --profile asana build mcp-asana
 
   COMPOSE_IGNORE_ORPHANS=1 docker compose \
+      --project-name agent-platform \
       --project-directory "$HOST_PROJECT_ROOT" \
       -f "$PROJECT_ROOT/docker-compose.yml" \
       --profile asana up -d --no-build mcp-asana

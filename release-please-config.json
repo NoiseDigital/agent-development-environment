@@ -37,6 +37,11 @@
           "path": "services/backend/mcp/math/pyproject.toml",
           "jsonpath": "$.project.version"
         },
+        {
+          "type": "toml",
+          "path": "services/backend/mcp/asana/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
         "services/backend/mcp/images/toolbox/version.txt",
         "services/backend/mcp/images/google-ads/version.txt"
       ]
