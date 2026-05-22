@@ -7,6 +7,9 @@ import 'react-resizable/css/styles.css';
 import { DashboardTile } from '../data/mock-dashboard-data';
 import ChartVisualization from './ChartVisualization';
 import TextTile from './TextTile';
+import KpiTile from './KpiTile';
+import PivotTile from './PivotTile';
+import NarrativeTile from './NarrativeTile';
 
 // Shared grid metrics — must stay in sync between the layout and its background.
 const COLS = 12;
@@ -71,12 +74,18 @@ export default function DashboardCanvas({
             {tiles.map((tile) => (
               <div key={tile.id} className="group/tile">
                 <div
-                  className={`h-full rounded-xl border bg-zinc-900 p-4 overflow-hidden transition-colors ${
+                  className={`h-full rounded-xl border bg-zinc-900 p-3 overflow-hidden transition-colors ${
                     editing ? 'border-zinc-700 cursor-move' : 'border-zinc-800'
                   }`}
                 >
                   {tile.type === 'chart' ? (
                     <ChartVisualization chart={tile.chart} fill />
+                  ) : tile.type === 'kpi' ? (
+                    <KpiTile tile={tile} />
+                  ) : tile.type === 'pivot' ? (
+                    <PivotTile tile={tile} />
+                  ) : tile.type === 'narrative' ? (
+                    <NarrativeTile tile={tile} />
                   ) : (
                     <TextTile
                       text={tile.text}

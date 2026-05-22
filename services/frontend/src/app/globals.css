@@ -80,6 +80,26 @@
   animation: message-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Toasts slide up from the bottom-right as they enter the stack. */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-toast-in {
+  animation: toast-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* A row collapsing/expanding into place — used by drilldown panels. */
+@keyframes drill-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-drill-in {
+  animation: drill-in 0.22s ease-out both;
+}
+
 /* Custom scrollbar styles */
 * {
   scrollbar-width: thin;
@@ -108,4 +128,52 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ── Vega-Lite chart theming ──────────────────────────────────────────────────
+   Vega draws its own SVG, so the platform font and the hover tooltip are themed
+   here in CSS rather than through component props. */
+
+/* Force the platform font onto every Vega chart label (Vega sets its own font
+   on the SVG text — !important wins regardless of how it applies it). */
+.vega-chart text {
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif !important;
+}
+
+/* vega-tooltip renders one shared #vg-tooltip-element on <body>; restyle it to
+   match the app's surfaces. ID specificity beats vega-tooltip's own stylesheet. */
+#vg-tooltip-element.vg-tooltip {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px -8px rgb(0 0 0 / 0.75);
+  padding: 7px 10px;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 11px;
+  color: #e4e4e7;
+}
+
+#vg-tooltip-element.vg-tooltip h2 {
+  margin: 0 0 4px;
+  padding: 0;
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+#vg-tooltip-element.vg-tooltip td {
+  padding: 1px 0;
+}
+
+#vg-tooltip-element.vg-tooltip td.key {
+  color: #8b8b94;
+  padding-right: 14px;
+  font-weight: 400;
+}
+
+#vg-tooltip-element.vg-tooltip td.value {
+  color: #fafafa;
+  font-weight: 600;
+  text-align: right;
 }

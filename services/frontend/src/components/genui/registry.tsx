@@ -6,6 +6,8 @@ import type { ReactNode } from 'react';
 import type { UIBlock, UIComponent } from '../../types/genui';
 import ChartVisualization from '../ChartVisualization';
 import Choices from './Choices';
+import Recommendation from './Recommendation';
+import VegaChart from '../VegaChart';
 
 /** Host-provided capabilities a block renderer may use. */
 export interface RenderContext {
@@ -21,4 +23,6 @@ type Renderer<T extends UIComponent> = (
 export const registry: { [T in UIComponent]: Renderer<T> } = {
   chart: (props) => <ChartVisualization chart={props} saveable />,
   choices: (props, ctx) => <Choices props={props} onAction={ctx.onAction} />,
+  recommendation: (props) => <Recommendation {...props} />,
+  vega: (props) => <VegaChart spec={props} />,
 };

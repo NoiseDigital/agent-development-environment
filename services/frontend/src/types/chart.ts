@@ -19,6 +19,9 @@ export interface ChartData {
   data?: ChartDataPoint[];
   // Optional palette override — agents may theme a chart; falls back to defaults.
   colors?: string[];
+  // Line charts: plot the two metrics on independent left/right Y axes — for
+  // pairing series of different scales (e.g. spend vs. impressions).
+  dualAxis?: boolean;
   // Correlation-matrix fields for heatmap charts.
   rows?: string[];
   cols?: string[];

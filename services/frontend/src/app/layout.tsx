@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import PlatformSidebar from "../components/PlatformSidebar";
 import FloatingAssistant from "../components/FloatingAssistant";
+import Toaster from "../components/Toaster";
 import { SidebarProvider } from "../contexts/SidebarContext";
 
 const geistSans = Geist({
@@ -38,6 +39,7 @@ export default function RootLayout({
             </div>
           </div>
           <FloatingAssistant />
+          <Toaster />
         </SidebarProvider>
       </body>
     </html>

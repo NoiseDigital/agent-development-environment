@@ -1,12 +1,27 @@
 import { ChartData } from '../types/chart';
-
-export type DashboardOwnership = 'owned' | 'shared' | 'client';
+import {
+  selectAdLines,
+  selectPerformance,
+  aggregate,
+  timeSeries,
+  breakdown,
+  breakdownNested,
+  pacing,
+  keywordRows,
+  type PerfFilter,
+  type MetricTotals,
+  type BreakdownRow,
+} from '../lib/media-query';
+import { clients, campaigns } from './media-model';
+import type { UserDashboardSpec } from '../lib/user-dashboards';
+import { newId } from '../lib/id';
 
 // ── Tile model ────────────────────────────────────────────────────────────────
-// A dashboard is a set of tiles laid out on a hidden 12-column grid. Each tile
-// carries its own grid position so layouts can be dragged, resized, and saved.
+// A dashboard tab is a set of tiles on a hidden 12-column grid. Tile DATA is
+// derived from the media model (see the builder below); tile LAYOUT is the
+// code-defined report arrangement, still draggable/resizable in the UI.
 
-export type TileType = 'chart' | 'text';
+export type TileType = 'chart' | 'text' | 'kpi' | 'pivot' | 'narrative';
 
 export interface GridPos {
   x: number;
@@ -32,7 +47,63 @@ export interface TextTile extends BaseTile {
   text: string;
 }
 
-export type DashboardTile = ChartTile | TextTile;
+/** A change indicator on a KPI card — `good` drives the colour, independent of
+ *  sign (a falling CPC is good). */
+export interface KpiDelta {
+  value: string;
+  good: boolean;
+}
+
+export interface KpiTile extends BaseTile {
+  type: 'kpi';
+  label: string;
+  value: string;
+  delta?: KpiDelta;
+  sublabel?: string;
+}
+
+export interface PivotColumn {
+  key: string;
+  label: string;
+}
+
+export interface PivotRow {
+  label: string;
+  values: Record<string, string>;
+  /** Row-level trend (spend, recent vs prior half) — top-level rows only. */
+  delta?: KpiDelta;
+  children?: PivotRow[];
+}
+
+export interface PivotTile extends BaseTile {
+  type: 'pivot';
+  title: string;
+  /** Header label for the first (row-name) column, e.g. "Market" or "Keyword". */
+  rowHeader: string;
+  columns: PivotColumn[];
+  rows: PivotRow[];
+  total: PivotRow;
+}
+
+/** An agent-written summary panel — the "powered by Noise" insight layer. */
+export interface NarrativeTile extends BaseTile {
+  type: 'narrative';
+  title: string;
+  points: string[];
+}
+
+export type DashboardTile = ChartTile | TextTile | KpiTile | PivotTile | NarrativeTile;
+
+// ── Dashboard model ───────────────────────────────────────────────────────────
+
+export type DashboardOwnership = 'owned' | 'shared' | 'client';
+
+/** One tab of a dashboard — a filtered view, its tiles derived from the model. */
+export interface DashboardTab {
+  id: string;
+  label: string;
+  tiles: DashboardTile[];
+}
 
 export interface Dashboard {
   id: string;
@@ -43,256 +114,488 @@ export interface Dashboard {
   ownership: DashboardOwnership;
   lastUpdated: string;
   description: string;
-  tiles: DashboardTile[];
+  accentColor: string;
+  filters: string[];
+  /** The campaign whose ad lines + performance this dashboard reports on. */
+  campaignId: string;
+  tabs: DashboardTab[];
 }
 
-// Default grid placement for a dashboard built from the standard 4-chart set.
-// Index 3 (the funnel) spans the full width.
-const CHART_POSITIONS: GridPos[] = [
-  { x: 0, y: 2, w: 6, h: 9, minW: 3, minH: 5 },
-  { x: 6, y: 2, w: 6, h: 9, minW: 3, minH: 5 },
-  { x: 0, y: 11, w: 6, h: 9, minW: 3, minH: 5 },
-  { x: 0, y: 20, w: 12, h: 9, minW: 4, minH: 5 },
+// ── Metric formatting + metadata ──────────────────────────────────────────────
+
+const usd0 = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
+const usd2 = (n: number) => '$' + n.toFixed(2);
+const num0 = (n: number) => Math.round(n).toLocaleString('en-US');
+const compact = (n: number) =>
+  n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'K' : String(Math.round(n));
+const pct = (n: number) => (n * 100).toFixed(2) + '%';
+
+type MetricKey = keyof MetricTotals;
+
+const METRIC: Record<MetricKey, { label: string; fmt: (n: number) => string; betterLower?: boolean }> = {
+  spend: { label: 'Spend', fmt: usd0 },
+  impressions: { label: 'Impressions', fmt: compact },
+  viewableImpressions: { label: 'Viewable Impr.', fmt: compact },
+  clicks: { label: 'Clicks', fmt: num0 },
+  conversions: { label: 'Conversions', fmt: num0 },
+  videoCompletions: { label: 'Video Completions', fmt: compact },
+  cpm: { label: 'CPM', fmt: usd2, betterLower: true },
+  cpc: { label: 'Avg. CPC', fmt: usd2, betterLower: true },
+  ctr: { label: 'CTR', fmt: pct },
+  cvr: { label: 'Conv. Rate', fmt: pct },
+  cpa: { label: 'CPA', fmt: usd2, betterLower: true },
+  vcr: { label: 'VCR', fmt: pct },
+  viewability: { label: 'Viewability', fmt: pct },
+};
+
+// ── Tab derivation ────────────────────────────────────────────────────────────
+
+export type TabKind = 'overall' | 'awareness' | 'engagement' | 'conversion';
+
+// Each KPI-goal tab leads with the metrics that goal is optimised for.
+const KPI_SET: Record<TabKind, MetricKey[]> = {
+  overall: ['spend', 'impressions', 'clicks', 'ctr', 'cpc', 'conversions'],
+  awareness: ['spend', 'impressions', 'viewableImpressions', 'cpm', 'viewability', 'vcr'],
+  engagement: ['spend', 'clicks', 'ctr', 'videoCompletions', 'cpc', 'impressions'],
+  conversion: ['spend', 'conversions', 'cvr', 'cpa', 'clicks', 'ctr'],
+};
+
+type SeriesMetric = 'spend' | 'impressions' | 'clicks' | 'conversions';
+
+// Each tab's hero trend pairs two metrics on a dual-axis chart (left/right Y).
+const TREND_PAIR: Record<TabKind, [SeriesMetric, SeriesMetric]> = {
+  overall: ['spend', 'impressions'],
+  awareness: ['impressions', 'spend'],
+  engagement: ['clicks', 'spend'],
+  conversion: ['conversions', 'spend'],
+};
+
+const PIVOT_COLUMNS: PivotColumn[] = [
+  { key: 'spend', label: 'Spend' },
+  { key: 'impressions', label: 'Impressions' },
+  { key: 'clicks', label: 'Clicks' },
+  { key: 'ctr', label: 'CTR' },
+  { key: 'cpc', label: 'Avg. CPC' },
 ];
 
-function buildTiles(prefix: string, headline: string, charts: ChartData[]): DashboardTile[] {
-  const textTile: TextTile = {
-    id: `${prefix}-text-0`,
-    type: 'text',
-    text: headline,
-    layout: { x: 0, y: 0, w: 12, h: 2, minW: 2, minH: 1 },
+const fmtWeek = (date: string) =>
+  new Date(`${date}T00:00:00Z`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+
+function kpiDelta(key: MetricKey, prior: MetricTotals, recent: MetricTotals): KpiDelta | undefined {
+  const a = prior[key];
+  const b = recent[key];
+  if (!a || !isFinite(a) || !isFinite(b)) return undefined;
+  const change = (b - a) / a;
+  const betterLower = METRIC[key].betterLower ?? false;
+  return {
+    value: `${change >= 0 ? '+' : ''}${(change * 100).toFixed(1)}%`,
+    good: betterLower ? change < 0 : change >= 0,
   };
-  const chartTiles: ChartTile[] = charts.map((chart, i) => ({
-    id: `${prefix}-chart-${i}`,
-    type: 'chart',
-    chart,
-    layout: CHART_POSITIONS[i] ?? { x: 0, y: 29 + i * 9, w: 6, h: 9, minW: 3, minH: 5 },
-  }));
-  return [textTile, ...chartTiles];
 }
 
-// ── Horizon Auto Group ────────────────────────────────────────────────────────
+function pivotCells(t: MetricTotals): Record<string, string> {
+  return {
+    spend: usd0(t.spend),
+    impressions: compact(t.impressions),
+    clicks: num0(t.clicks),
+    ctr: pct(t.ctr),
+    cpc: usd2(t.cpc),
+  };
+}
 
-const horizonCharts: ChartData[] = [
-  {
+function pivotRow(r: BreakdownRow, deltaByKey?: Map<string, KpiDelta | undefined>): PivotRow {
+  return {
+    label: r.label,
+    values: pivotCells(r.totals),
+    delta: deltaByKey?.get(r.key),
+    children: r.children?.map((c) => pivotRow(c)),
+  };
+}
+
+// A short, data-derived analyst summary — the templated stand-in for a live
+// agent call. Same data the tiles aggregate, turned into plain-language points.
+function buildNarrative(
+  filter: PerfFilter,
+  kind: TabKind,
+  totals: MetricTotals,
+  prior: MetricTotals,
+  recent: MetricTotals,
+): string[] {
+  const points: string[] = [];
+  const pace = pacing(filter);
+  points.push(`Spend is pacing at ${Math.round(pace.pct * 100)}% of the ${usd0(pace.budget)} plan.`);
+
+  if (prior.ctr > 0) {
+    const change = (recent.ctr - prior.ctr) / prior.ctr;
+    points.push(
+      `CTR ${change >= 0 ? 'improved' : 'declined'} ${Math.abs(change * 100).toFixed(0)}% versus the first half of the flight.`,
+    );
+  }
+
+  const topPlatform = breakdown(filter, 'platformId')[0];
+  if (topPlatform && totals.spend > 0) {
+    const share = Math.round((topPlatform.totals.spend / totals.spend) * 100);
+    points.push(`${topPlatform.label} led delivery at ${usd0(topPlatform.totals.spend)} (${share}% of spend).`);
+  }
+
+  if (kind === 'conversion') {
+    points.push(`Conversion lines returned a ${usd2(totals.cpa)} blended CPA on ${num0(totals.conversions)} conversions.`);
+  } else if (kind === 'awareness') {
+    points.push(`Awareness reached ${compact(totals.impressions)} impressions at ${pct(totals.viewability)} viewability.`);
+  } else if (kind === 'engagement') {
+    points.push(`Engagement lines drove ${num0(totals.clicks)} clicks at a ${pct(totals.ctr)} CTR.`);
+  } else {
+    points.push(`Delivered ${compact(totals.impressions)} impressions and ${num0(totals.conversions)} conversions to date.`);
+  }
+  return points;
+}
+
+/** Derive a tab's full tile set — KPI strip, a hero trend + analyst narrative,
+ *  a platform breakdown, and a market pivot — all from the model. */
+export function buildTab(prefix: string, campaignId: string, kind: TabKind): DashboardTile[] {
+  const filter: PerfFilter = { campaignId, kpiGoal: kind === 'overall' ? undefined : kind };
+  const rows = selectPerformance(filter);
+  const totals = aggregate(rows);
+
+  // Split the flight in half for recent-vs-prior deltas.
+  const dates = [...new Set(rows.map((r) => r.date))].sort();
+  const midIdx = Math.floor(dates.length / 2);
+  const recentStart = dates[midIdx] ?? '';
+  const priorEnd = dates[midIdx - 1] ?? '';
+  const prior = aggregate(rows.filter((r) => recentStart && r.date < recentStart));
+  const recent = aggregate(rows.filter((r) => recentStart && r.date >= recentStart));
+
+  // KPI strip
+  const kpiTiles: KpiTile[] = KPI_SET[kind].map((key, i) => ({
+    id: `${prefix}-kpi-${i}`,
+    type: 'kpi',
+    label: METRIC[key].label,
+    value: METRIC[key].fmt(totals[key]),
+    delta: kpiDelta(key, prior, recent),
+    layout: { x: (i % 6) * 2, y: 0, w: 2, h: 2, minW: 2, minH: 2 },
+  }));
+
+  // Hero trend chart (2/3 width, dual-axis) + analyst narrative beside it
+  const [trendA, trendB] = TREND_PAIR[kind];
+  const series = timeSeries(rows, 'week');
+  const trend: ChartData = {
     type: 'line',
-    title: 'Impressions & Spend Over Time',
-    insight: 'Impressions peaked in mid-April aligned with the EV launch push. Spend efficiency improved week-over-week as DV360 optimised toward viewable placements.',
-    data: [
-      { name: 'Apr W1', Impressions: 1_820_000, Spend: 18_200 },
-      { name: 'Apr W2', Impressions: 2_650_000, Spend: 24_500 },
-      { name: 'Apr W3', Impressions: 3_100_000, Spend: 28_900 },
-      { name: 'Apr W4', Impressions: 2_980_000, Spend: 27_400 },
-      { name: 'May W1', Impressions: 2_540_000, Spend: 22_800 },
-      { name: 'May W2', Impressions: 2_710_000, Spend: 21_600 },
-      { name: 'May W3', Impressions: 2_430_000, Spend: 19_900 },
-    ],
-  },
-  {
+    dualAxis: true,
+    title: `${METRIC[trendA].label} vs. ${METRIC[trendB].label}`,
+    insight: `Weekly ${METRIC[trendA].label.toLowerCase()} and ${METRIC[trendB].label.toLowerCase()}.`,
+    data: series.map((p) => ({
+      name: fmtWeek(p.date),
+      [METRIC[trendA].label]: Math.round(p[trendA]),
+      [METRIC[trendB].label]: Math.round(p[trendB]),
+    })),
+  };
+  const trendTile: ChartTile = {
+    id: `${prefix}-chart-0`,
+    type: 'chart',
+    chart: trend,
+    layout: { x: 0, y: 2, w: 8, h: 8, minW: 4, minH: 5 },
+  };
+  const narrativeTile: NarrativeTile = {
+    id: `${prefix}-narrative`,
+    type: 'narrative',
+    title: 'Noise Analyst',
+    points: buildNarrative(filter, kind, totals, prior, recent),
+    layout: { x: 8, y: 2, w: 4, h: 8, minW: 3, minH: 4 },
+  };
+
+  // Full-width platform breakdown
+  const platformChart: ChartData = {
     type: 'bar',
     title: 'Spend by Platform',
-    insight: 'DV360 accounts for 46% of total spend, reflecting the programmatic-first strategy. Meta and Google Ads together drive the majority of click volume.',
-    data: [
-      { name: 'DV360', value: 106_770 },
-      { name: 'Meta', value: 29_925 },
-      { name: 'Google Ads', value: 38_200 },
-      { name: 'The Trade Desk', value: 24_920 },
-    ],
-  },
-  {
-    type: 'line',
-    title: 'CTR by Platform (%)',
-    insight: 'Google Ads Search drives a 5.0% CTR, far outpacing display formats. Meta native CTR of 1.2% is above category benchmarks for auto.',
-    data: [
-      { name: 'Apr W1', 'Google Ads': 4.8, 'Meta': 1.0, 'DV360': 0.3 },
-      { name: 'Apr W2', 'Google Ads': 5.1, 'Meta': 1.2, 'DV360': 0.35 },
-      { name: 'Apr W3', 'Google Ads': 5.3, 'Meta': 1.25, 'DV360': 0.4 },
-      { name: 'Apr W4', 'Google Ads': 5.0, 'Meta': 1.18, 'DV360': 0.38 },
-      { name: 'May W1', 'Google Ads': 4.9, 'Meta': 1.22, 'DV360': 0.42 },
-      { name: 'May W2', 'Google Ads': 5.2, 'Meta': 1.3, 'DV360': 0.4 },
-    ],
-  },
-  {
-    type: 'funnel',
-    title: 'Conversion Funnel — Q2 2025',
-    insight: 'The funnel shows healthy top-of-funnel reach. The Click → Visit drop (35%) suggests landing page friction — an A/B test on the EV page CTA is recommended.',
-    data: [
-      { name: 'Impressions', value: 18_810_000, fill: '#1976D2' },
-      { name: 'Viewable Impr.', value: 12_227_000, fill: '#2196F3' },
-      { name: 'Clicks', value: 111_340, fill: '#42A5F5' },
-      { name: 'Site Visits', value: 72_370, fill: '#64B5F6' },
-      { name: 'Lead Forms', value: 8_680, fill: '#90CAF9' },
-    ],
-  },
+    insight: 'How budget is distributed across platforms for this view.',
+    data: breakdown(filter, 'platformId').map((r) => ({ name: r.label, value: Math.round(r.totals.spend) })),
+  };
+  const platformTile: ChartTile = {
+    id: `${prefix}-chart-1`,
+    type: 'chart',
+    chart: platformChart,
+    layout: { x: 0, y: 10, w: 12, h: 6, minW: 4, minH: 4 },
+  };
+
+  // Pivot — with a recent-vs-prior spend trend on each market group
+  const priorMap = new Map(breakdown({ ...filter, dateTo: priorEnd }, 'marketGroup').map((r) => [r.key, r.totals]));
+  const recentMap = new Map(breakdown({ ...filter, dateFrom: recentStart }, 'marketGroup').map((r) => [r.key, r.totals]));
+  const deltaByKey = new Map<string, KpiDelta | undefined>();
+  for (const r of breakdown(filter, 'marketGroup')) {
+    const p = priorMap.get(r.key);
+    const rc = recentMap.get(r.key);
+    deltaByKey.set(r.key, p && rc ? kpiDelta('spend', p, rc) : undefined);
+  }
+  const pivotTile: PivotTile = {
+    id: `${prefix}-pivot`,
+    type: 'pivot',
+    title: 'Performance by Market',
+    rowHeader: 'Market',
+    columns: PIVOT_COLUMNS,
+    rows: breakdownNested(filter, ['marketGroup', 'market']).map((r) => pivotRow(r, deltaByKey)),
+    total: { label: 'Total', values: pivotCells(totals) },
+    layout: { x: 0, y: 16, w: 12, h: 8, minW: 4, minH: 5 },
+  };
+
+  return [...kpiTiles, trendTile, narrativeTile, platformTile, pivotTile];
+}
+
+// ── Platform deep-dive tabs ───────────────────────────────────────────────────
+
+const SEARCH_KPIS: MetricKey[] = ['spend', 'impressions', 'clicks', 'ctr', 'cpc', 'conversions'];
+
+const KEYWORD_COLUMNS: PivotColumn[] = [
+  { key: 'impressions', label: 'Impressions' },
+  { key: 'clicks', label: 'Clicks' },
+  { key: 'ctr', label: 'CTR' },
+  { key: 'cpc', label: 'Avg. CPC' },
+  { key: 'conversions', label: 'Conversions' },
 ];
 
-// ── Bloom & Co. ───────────────────────────────────────────────────────────────
+/** The Search deep-dive tab — KPI strip, a clicks trend + narrative, and the
+ *  keyword-performance table (the grain only search platforms expose). */
+function buildSearchTab(prefix: string, campaignId: string): DashboardTile[] {
+  const filter: PerfFilter = { campaignId, platformId: 'search' };
+  const rows = selectPerformance(filter);
+  const totals = aggregate(rows);
 
-const bloomCharts: ChartData[] = [
-  {
-    type: 'line',
-    title: 'Impressions & Spend Over Time',
-    insight: 'Strong delivery across the spring launch window with spend pacing tightly to plan. Impressions tapered naturally as the flight closed in mid-May.',
-    data: [
-      { name: 'Mar W2', Impressions: 980_000, Spend: 9_800 },
-      { name: 'Mar W3', Impressions: 1_540_000, Spend: 14_200 },
-      { name: 'Mar W4', Impressions: 1_820_000, Spend: 16_900 },
-      { name: 'Apr W1', Impressions: 1_680_000, Spend: 15_400 },
-      { name: 'Apr W2', Impressions: 1_420_000, Spend: 13_200 },
-      { name: 'Apr W3', Impressions: 1_180_000, Spend: 10_980 },
-      { name: 'May W1', Impressions: 850_000, Spend: 7_400 },
-      { name: 'May W2', Impressions: 384_000, Spend: 3_112 },
-    ],
-  },
-  {
-    type: 'pie',
-    title: 'Spend by Platform',
-    insight: 'Meta (Instagram Stories) captured the largest share at 47%, consistent with the audience-first brief targeting women 25–44 in urban centres.',
-    data: [
-      { name: 'Meta', value: 29_988 },
-      { name: 'The Trade Desk', value: 19_994 },
-      { name: 'Google Ads', value: 14_998 },
-    ],
-  },
-  {
-    type: 'line',
-    title: 'CTR by Platform (%)',
-    insight: 'Meta Stories drove the highest engagement at 1.8% CTR on peak weeks — well above the 0.9% beauty industry benchmark.',
-    data: [
-      { name: 'Mar W2', 'Meta': 1.4, 'The Trade Desk': 0.8, 'Google Ads': 0.9 },
-      { name: 'Mar W3', 'Meta': 1.7, 'The Trade Desk': 0.95, 'Google Ads': 0.95 },
-      { name: 'Mar W4', 'Meta': 1.9, 'The Trade Desk': 1.1, 'Google Ads': 1.1 },
-      { name: 'Apr W1', 'Meta': 1.8, 'The Trade Desk': 1.05, 'Google Ads': 1.05 },
-      { name: 'Apr W2', 'Meta': 1.6, 'The Trade Desk': 0.95, 'Google Ads': 1.0 },
-    ],
-  },
-  {
-    type: 'funnel',
-    title: 'Conversion Funnel — Spring Launch',
-    insight: 'Retargeting display drove a disproportionate share of product page visits, confirming the lower-funnel value of the Google Ads line.',
-    data: [
-      { name: 'Impressions', value: 10_854_000, fill: '#1976D2' },
-      { name: 'Viewable Impr.', value: 7_598_000, fill: '#2196F3' },
-      { name: 'Clicks', value: 132_060, fill: '#42A5F5' },
-      { name: 'Product Views', value: 79_236, fill: '#64B5F6' },
-      { name: 'Purchases', value: 6_339, fill: '#90CAF9' },
-    ],
-  },
-];
+  const dates = [...new Set(rows.map((r) => r.date))].sort();
+  const recentStart = dates[Math.floor(dates.length / 2)] ?? '';
+  const prior = aggregate(rows.filter((r) => recentStart && r.date < recentStart));
+  const recent = aggregate(rows.filter((r) => recentStart && r.date >= recentStart));
 
-// ── NorthEdge Financial ───────────────────────────────────────────────────────
+  const kpiTiles: KpiTile[] = SEARCH_KPIS.map((key, i) => ({
+    id: `${prefix}-kpi-${i}`,
+    type: 'kpi',
+    label: METRIC[key].label,
+    value: METRIC[key].fmt(totals[key]),
+    delta: kpiDelta(key, prior, recent),
+    layout: { x: (i % 6) * 2, y: 0, w: 2, h: 2, minW: 2, minH: 2 },
+  }));
 
-const northEdgeCharts: ChartData[] = [
-  {
+  const series = timeSeries(rows, 'week');
+  const trend: ChartData = {
     type: 'line',
-    title: 'Impressions & Spend Over Time',
-    insight: 'LinkedIn pacing is front-loaded to capture mortgage decision-makers before end-of-quarter. Google Ads spend is stabilising around $8K/week.',
-    data: [
-      { name: 'Apr W1', Impressions: 620_000, Spend: 28_600 },
-      { name: 'Apr W2', Impressions: 710_000, Spend: 32_100 },
-      { name: 'Apr W3', Impressions: 680_000, Spend: 30_800 },
-      { name: 'Apr W4', Impressions: 650_000, Spend: 29_400 },
-      { name: 'May W1', Impressions: 590_000, Spend: 27_200 },
-      { name: 'May W2', Impressions: 610_000, Spend: 27_860 },
-    ],
-  },
-  {
-    type: 'bar',
-    title: 'Spend by Platform',
-    insight: 'LinkedIn dominates spend at 34% due to its premium CPM in the financial services segment, but delivers the highest quality leads by volume.',
-    data: [
-      { name: 'LinkedIn', value: 46_200 },
-      { name: 'Google Ads', value: 53_760 },
-      { name: 'DV360', value: 35_000 },
-    ],
-  },
-  {
-    type: 'line',
-    title: 'CTR by Platform (%)',
-    insight: 'Google Ads Search maintains an 8% CTR on branded terms — best-in-class for financial services. LinkedIn CTR of 1% meets benchmark for B2C mortgage campaigns.',
-    data: [
-      { name: 'Apr W1', 'Google Ads': 7.8, 'LinkedIn': 0.95, 'DV360': 0.65 },
-      { name: 'Apr W2', 'Google Ads': 8.1, 'LinkedIn': 1.0, 'DV360': 0.70 },
-      { name: 'Apr W3', 'Google Ads': 8.3, 'LinkedIn': 1.05, 'DV360': 0.72 },
-      { name: 'Apr W4', 'Google Ads': 8.0, 'LinkedIn': 0.98, 'DV360': 0.68 },
-      { name: 'May W1', 'Google Ads': 7.9, 'LinkedIn': 1.02, 'DV360': 0.71 },
-    ],
-  },
-  {
-    type: 'funnel',
-    title: 'Lead Generation Funnel — Q2 2025',
-    insight: 'Form completion rate of 28% on mortgage leads is strong. Focus on reducing drop-off between Rate Calculator page view and form start.',
-    data: [
-      { name: 'Impressions', value: 7_630_000, fill: '#1976D2' },
-      { name: 'Clicks', value: 77_150, fill: '#2196F3' },
-      { name: 'Landing Page', value: 54_005, fill: '#42A5F5' },
-      { name: 'Form Start', value: 16_200, fill: '#64B5F6' },
-      { name: 'Form Complete', value: 4_536, fill: '#90CAF9' },
-    ],
-  },
-];
+    dualAxis: true,
+    title: 'Clicks vs. Spend',
+    insight: 'Weekly search clicks and spend across the campaign flight.',
+    data: series.map((p) => ({
+      name: fmtWeek(p.date),
+      Clicks: Math.round(p.clicks),
+      Spend: Math.round(p.spend),
+    })),
+  };
+  const trendTile: ChartTile = {
+    id: `${prefix}-chart-0`,
+    type: 'chart',
+    chart: trend,
+    layout: { x: 0, y: 2, w: 8, h: 8, minW: 4, minH: 5 },
+  };
+  const narrativeTile: NarrativeTile = {
+    id: `${prefix}-narrative`,
+    type: 'narrative',
+    title: 'Noise Analyst',
+    points: buildNarrative(filter, 'conversion', totals, prior, recent),
+    layout: { x: 8, y: 2, w: 4, h: 8, minW: 3, minH: 4 },
+  };
+
+  const keywordTile: PivotTile = {
+    id: `${prefix}-keywords`,
+    type: 'pivot',
+    title: 'Keyword Performance',
+    rowHeader: 'Keyword',
+    columns: KEYWORD_COLUMNS,
+    rows: keywordRows(filter).map((k) => ({
+      label: k.keyword,
+      values: {
+        impressions: compact(k.impressions),
+        clicks: num0(k.clicks),
+        ctr: pct(k.ctr),
+        cpc: usd2(k.cpc),
+        conversions: num0(k.conversions),
+      },
+    })),
+    total: {
+      label: 'Total',
+      values: {
+        impressions: compact(totals.impressions),
+        clicks: num0(totals.clicks),
+        ctr: pct(totals.ctr),
+        cpc: usd2(totals.cpc),
+        conversions: num0(totals.conversions),
+      },
+    },
+    layout: { x: 0, y: 10, w: 12, h: 9, minW: 4, minH: 5 },
+  };
+
+  return [...kpiTiles, trendTile, narrativeTile, keywordTile];
+}
 
 // ── Dashboard registry ────────────────────────────────────────────────────────
 
-export const mockDashboards: Dashboard[] = [
+const GOAL_TABS: { id: string; label: string; kind: TabKind }[] = [
+  { id: 'overall', label: 'Overall', kind: 'overall' },
+  { id: 'awareness', label: 'Awareness', kind: 'awareness' },
+  { id: 'engagement', label: 'Engagement', kind: 'engagement' },
+  { id: 'conversion', label: 'Conversion', kind: 'conversion' },
+];
+
+function buildTabs(prefix: string, campaignId: string): DashboardTab[] {
+  const tabs: DashboardTab[] = GOAL_TABS.map((t) => ({
+    id: t.id,
+    label: t.label,
+    tiles: buildTab(`${prefix}-${t.id}`, campaignId, t.kind),
+  }));
+  // Add a Search deep-dive tab when the campaign runs search ad lines.
+  if (selectAdLines({ campaignId, platformId: 'search' }).length > 0) {
+    tabs.push({
+      id: 'search',
+      label: 'Search',
+      tiles: buildSearchTab(`${prefix}-search`, campaignId),
+    });
+  }
+  return tabs;
+}
+
+const clientById = (id: string) => clients.find((c) => c.id === id) ?? clients[0];
+
+interface DashboardSeed {
+  id: string;
+  campaignId: string;
+  clientId: string;
+  owner: string;
+  ownership: DashboardOwnership;
+  name: string;
+  lastUpdated: string;
+  description: string;
+  filters: string[];
+}
+
+const SEEDS: DashboardSeed[] = [
   {
     id: 'dash-1',
-    name: 'Horizon Auto — Q2 2025 Performance',
-    client: 'Horizon Auto Group',
-    clientInitials: 'HA',
+    campaignId: 'horizon-q2',
+    clientId: 'horizon',
     owner: 'You',
     ownership: 'owned',
+    name: 'Horizon Auto — Q2 Working View',
     lastUpdated: '2025-05-12',
-    description: 'Full-funnel view across all paid channels for the Q2 Brand Awareness and Summer Sales campaigns.',
-    tiles: buildTiles(
-      'dash-1',
-      'Q2 2025 Performance Overview — full-funnel results across every paid channel for the Brand Awareness and Summer Sales campaigns. Drag any tile to rearrange; resize from the bottom-right corner.',
-      horizonCharts,
-    ),
+    description: 'Full-funnel working view of the Q2 performance campaign across every paid channel.',
+    filters: ['Campaign', 'Campaign Phase', 'Market', 'Format'],
   },
   {
     id: 'dash-2',
-    name: 'Bloom & Co — Spring Launch Recap',
-    client: 'Bloom & Co.',
-    clientInitials: 'BC',
+    campaignId: 'bloom-spring',
+    clientId: 'bloom',
     owner: 'You',
     ownership: 'owned',
+    name: 'Bloom & Co — Spring Launch',
     lastUpdated: '2025-05-10',
-    description: 'Post-campaign analysis of the Spring Collection launch across Meta, Pinterest, and Google Ads.',
-    tiles: buildTiles(
-      'dash-2',
-      'Spring Launch Recap — post-campaign analysis of the Spring Collection rollout across Meta, Pinterest, and Google Ads.',
-      bloomCharts,
-    ),
+    description: 'Performance of the Spring Collection launch across Meta, Pinterest, and Google.',
+    filters: ['Campaign', 'Channel', 'Audience'],
   },
   {
     id: 'dash-3',
-    name: 'NorthEdge — Mortgage Q2 Live',
-    client: 'NorthEdge Financial',
-    clientInitials: 'NF',
+    campaignId: 'northedge-mortgage',
+    clientId: 'northedge',
     owner: 'Sarah K.',
     ownership: 'shared',
+    name: 'NorthEdge — Mortgage Q2 Live',
     lastUpdated: '2025-05-13',
-    description: 'Live performance view of the Mortgage Rates Q2 campaign across LinkedIn, Google Ads, and DV360.',
-    tiles: buildTiles(
-      'dash-3',
-      'Mortgage Q2 Live — real-time performance of the Mortgage Rates campaign across LinkedIn, Google Ads, and DV360.',
-      northEdgeCharts,
-    ),
+    description: 'Live view of the Mortgage Rates campaign across LinkedIn, Google, and DV360.',
+    filters: ['Campaign', 'Market', 'Product'],
   },
   {
     id: 'dash-4',
-    name: 'Horizon Auto — Client Report May',
-    client: 'Horizon Auto Group',
-    clientInitials: 'HA',
+    campaignId: 'horizon-q2',
+    clientId: 'horizon',
     owner: 'Marcus T.',
     ownership: 'client',
+    name: 'Horizon Auto — Client Report',
     lastUpdated: '2025-05-08',
-    description: 'Client-facing monthly report for Horizon Auto Group. Simplified view with exec summary metrics.',
-    tiles: buildTiles(
-      'dash-4',
-      'Client Report — May — simplified monthly summary for Horizon Auto Group with exec-level headline metrics.',
-      horizonCharts,
-    ),
+    description: 'Client-facing performance report for the Q2 campaign.',
+    filters: ['Campaign', 'Market'],
   },
 ];
+
+export const mockDashboards: Dashboard[] = SEEDS.map((s) => {
+  const client = clientById(s.clientId);
+  return {
+    id: s.id,
+    name: s.name,
+    client: client.name,
+    clientInitials: client.initials,
+    owner: s.owner,
+    ownership: s.ownership,
+    lastUpdated: s.lastUpdated,
+    description: s.description,
+    accentColor: client.accentColor,
+    filters: s.filters,
+    campaignId: s.campaignId,
+    tabs: buildTabs(s.id, s.campaignId),
+  };
+});
+
+// ── Generative / user-created dashboards ──────────────────────────────────────
+
+/** Hydrate a user-created dashboard spec into a full Dashboard — tiles rebuilt
+ *  fresh from the model. A `defaultTabId` is surfaced by moving it first. */
+export function dashboardFromSpec(spec: UserDashboardSpec): Dashboard {
+  const campaign = campaigns.find((c) => c.id === spec.campaignId) ?? campaigns[0];
+  const client = clientById(campaign.clientId);
+  let tabs = buildTabs(spec.id, spec.campaignId);
+  if (spec.defaultTabId) {
+    const i = tabs.findIndex((t) => t.id === spec.defaultTabId);
+    if (i > 0) tabs = [tabs[i], ...tabs.filter((_, idx) => idx !== i)];
+  }
+  return {
+    id: spec.id,
+    name: spec.name,
+    client: client.name,
+    clientInitials: client.initials,
+    owner: 'You',
+    ownership: 'owned',
+    lastUpdated: spec.createdAt.slice(0, 10),
+    description: `Generated view of ${campaign.name}.`,
+    accentColor: client.accentColor,
+    filters: ['Campaign', 'Market', 'Format'],
+    campaignId: spec.campaignId,
+    tabs,
+  };
+}
+
+const GOAL_WORDS: { word: string; tab: TabKind | 'search' }[] = [
+  { word: 'awareness', tab: 'awareness' },
+  { word: 'engagement', tab: 'engagement' },
+  { word: 'conversion', tab: 'conversion' },
+  { word: 'search', tab: 'search' },
+];
+
+/** Compose a dashboard spec from a free-text prompt. Heuristic today — this is
+ *  the seam a Media Analyst agent call drops into for true generative layout. */
+export function generateDashboardSpec(prompt: string): UserDashboardSpec {
+  const p = prompt.toLowerCase();
+  const campaign =
+    campaigns.find((c) => {
+      const name = clientById(c.clientId).name.toLowerCase();
+      return p.includes(name) || p.includes(name.split(' ')[0]) || p.includes(c.name.toLowerCase());
+    }) ?? campaigns[0];
+  const goal = GOAL_WORDS.find((g) => p.includes(g.word));
+  const client = clientById(campaign.clientId);
+  const trimmed = prompt.trim();
+  const name =
+    trimmed.length > 0 && trimmed.length <= 60
+      ? trimmed
+      : `${client.name} — ${goal ? goal.tab[0].toUpperCase() + goal.tab.slice(1) : 'Performance'} View`;
+  return {
+    id: newId('dash'),
+    name,
+    campaignId: campaign.id,
+    defaultTabId: goal?.tab ?? 'overall',
+    createdAt: new Date().toISOString(),
+  };
+}

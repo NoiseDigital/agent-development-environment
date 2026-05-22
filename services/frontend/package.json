@@ -16,7 +16,10 @@
     "react-dom": "^19.0.0",
     "react-grid-layout": "^2.2.3",
     "react-markdown": "^10.1.0",
-    "recharts": "^3.1.0"
+    "react-vega": "^8.0.0",
+    "recharts": "^3.1.0",
+    "vega": "^6.2.0",
+    "vega-lite": "^6.4.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

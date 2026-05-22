@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { toPng } from 'html-to-image';
-import { mockDashboards } from '../data/mock-dashboard-data';
+import { mockDashboards, dashboardFromSpec, type Dashboard } from '../data/mock-dashboard-data';
+import { loadUserDashboards } from '../lib/user-dashboards';
 import { addChartToDashboard } from '../lib/dashboard-store';
 import { ChartData } from '../types/chart';
 
@@ -16,6 +17,9 @@ interface ChartActionsProps {
 function slug(s?: string): string {
   return (s || 'chart').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
+
+// A client dashboard is titled by the client; internal ones by their name.
+const dashTitle = (d: Dashboard) => (d.ownership === 'client' ? d.client : d.name);
 
 function triggerDownload(filename: string, href: string) {
   const a = document.createElement('a');
@@ -44,15 +48,26 @@ function chartToCsv(chart: ChartData): string {
   ].join('\n');
 }
 
-// "+" menu on chat / Analyze visuals: save to a dashboard, export PNG, export CSV.
+// "+" menu on chat / Analyze visuals: save to a dashboard, export PNG, export
+// CSV. Saving is a two-step pick — a dashboard, then which of its tabs — since
+// a dashboard's tiles live on tabs.
 export default function ChartActions({ chart, captureRef }: ChartActionsProps) {
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<'menu' | 'dashboards'>('menu');
-  const [savedTo, setSavedTo] = useState<{ id: string; name: string } | null>(null);
+  const [view, setView] = useState<'menu' | 'dashboards' | 'tabs'>('menu');
+  const [picked, setPicked] = useState<Dashboard | null>(null);
+  const [savedTo, setSavedTo] = useState<{ id: string; name: string; tab: string } | null>(null);
+
+  // User-created dashboards are pinnable too — loaded client-side, listed first.
+  const [userDashboards, setUserDashboards] = useState<Dashboard[]>([]);
+  useEffect(() => {
+    setUserDashboards(loadUserDashboards().map(dashboardFromSpec));
+  }, []);
+  const allDashboards = [...userDashboards, ...mockDashboards];
 
   const close = () => {
     setOpen(false);
     setView('menu');
+    setPicked(null);
   };
 
   const handlePng = async () => {
@@ -79,27 +94,29 @@ export default function ChartActions({ chart, captureRef }: ChartActionsProps) {
     URL.revokeObjectURL(url);
   };
 
-  const handleSaveToDashboard = (id: string) => {
-    const dashboard = mockDashboards.find((d) => d.id === id);
-    if (!dashboard) return;
-    addChartToDashboard(dashboard, chart);
+  const saveToTab = (tab: { id: string; label: string }) => {
+    if (!picked) return;
+    addChartToDashboard(picked.id, tab.id, chart);
+    const target = { id: picked.id, name: dashTitle(picked), tab: tab.label };
     close();
-    setSavedTo({ id: dashboard.id, name: dashboard.name });
+    setSavedTo(target);
     window.setTimeout(() => setSavedTo(null), 6000);
   };
 
   if (savedTo) {
     return (
       <Link
-        href={`/dashboards?id=${savedTo.id}`}
+        href={`/dashboards/${savedTo.id}`}
         title={`Open ${savedTo.name}`}
-        className="group/saved flex items-center gap-1.5 text-[11px] font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
+        className="group/saved flex items-center gap-1.5 text-[11px] font-medium text-emerald-400 transition-colors hover:text-emerald-300"
       >
-        <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
-        <span className="group-hover/saved:underline">Saved to {savedTo.name}</span>
-        <svg className="w-3 h-3 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <span className="group-hover/saved:underline">
+          Saved to {savedTo.name} · {savedTo.tab}
+        </span>
+        <svg className="h-3 w-3 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       </Link>
@@ -112,9 +129,9 @@ export default function ChartActions({ chart, captureRef }: ChartActionsProps) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         title="Chart actions"
-        className="flex h-6 w-6 items-center justify-center rounded-md text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors"
+        className="flex h-6 w-6 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-white"
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
         </svg>
       </button>
@@ -122,8 +139,8 @@ export default function ChartActions({ chart, captureRef }: ChartActionsProps) {
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={close} />
-          <div className="absolute right-0 top-full mt-1 z-20 w-56 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl py-1">
-            {view === 'menu' ? (
+          <div className="absolute right-0 top-full z-20 mt-1 max-h-80 w-60 overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
+            {view === 'menu' && (
               <>
                 <MenuItem
                   label="Save to dashboard"
@@ -142,32 +159,51 @@ export default function ChartActions({ chart, captureRef }: ChartActionsProps) {
                   icon="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                 />
               </>
-            ) : (
+            )}
+
+            {view === 'dashboards' && (
               <>
-                <button
-                  type="button"
-                  onClick={() => setView('menu')}
-                  className="flex items-center gap-1.5 w-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 hover:text-zinc-300"
-                >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  Add to dashboard
-                </button>
-                {mockDashboards.map((d) => (
+                <BackHeader label="Choose a dashboard" onClick={() => setView('menu')} />
+                {allDashboards.map((d) => (
                   <button
                     key={d.id}
                     type="button"
-                    onClick={() => handleSaveToDashboard(d.id)}
-                    className="flex items-center gap-2.5 w-full px-3 py-2 text-left hover:bg-zinc-800 transition-colors"
+                    onClick={() => {
+                      setPicked(d);
+                      setView('tabs');
+                    }}
+                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-zinc-800"
                   >
-                    <span className="w-6 h-6 rounded bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[9px] font-bold text-zinc-300 shrink-0">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-zinc-700 bg-zinc-800 text-[9px] font-bold text-zinc-300">
                       {d.clientInitials}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-xs text-white truncate">{d.name}</span>
-                      <span className="block text-[10px] text-zinc-500 truncate">{d.client}</span>
+                      <span className="block truncate text-xs text-white">{dashTitle(d)}</span>
+                      <span className="block truncate text-[10px] text-zinc-500">{d.client}</span>
                     </span>
+                    <svg className="h-3 w-3 shrink-0 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                ))}
+              </>
+            )}
+
+            {view === 'tabs' && picked && (
+              <>
+                <BackHeader label={`Add to ${dashTitle(picked)}`} onClick={() => setView('dashboards')} />
+                <p className="px-3 pb-1 pt-0.5 text-[10px] text-zinc-600">Pick a tab</p>
+                {picked.tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => saveToTab(tab)}
+                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+                  >
+                    <svg className="h-3.5 w-3.5 shrink-0 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                    </svg>
+                    <span className="flex-1">{tab.label}</span>
                   </button>
                 ))}
               </>
@@ -176,6 +212,21 @@ export default function ChartActions({ chart, captureRef }: ChartActionsProps) {
         </>
       )}
     </div>
+  );
+}
+
+function BackHeader({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 hover:text-zinc-300"
+    >
+      <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+      </svg>
+      <span className="truncate">{label}</span>
+    </button>
   );
 }
 
@@ -188,14 +239,14 @@ function MenuItem({
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-2.5 w-full px-3 py-2 text-left text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+      className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
     >
-      <svg className="w-3.5 h-3.5 shrink-0 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="h-3.5 w-3.5 shrink-0 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
       </svg>
       <span className="flex-1">{label}</span>
       {chevron && (
-        <svg className="w-3 h-3 shrink-0 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="h-3 w-3 shrink-0 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
         </svg>
       )}

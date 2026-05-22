@@ -1,55 +1,77 @@
 import { ChartData } from '../types/chart';
-import { Dashboard, DashboardTile, ChartTile } from '../data/mock-dashboard-data';
+import { newId } from './id';
 
-// Mock persistence layer for dashboards. Layouts and saved visuals live in
-// localStorage, keyed by dashboard id. Swapping these functions for a backend
-// API later would not require touching any component.
+// Personal pinned charts — agent-generated visuals a user pins to a dashboard
+// TAB. Kept separate from the code-defined report tiles (which derive their
+// data from the media model): pins are user data. A dashboard has tabs, so a
+// pin is addressed by (dashboardId, tabId). localStorage today; moves to a
+// table with the rest of the user data.
 
-const KEY_PREFIX = 'noise:dashboard:';
-
-function storageKey(id: string): string {
-  return `${KEY_PREFIX}${id}`;
+export interface PinnedChart {
+  id: string;
+  chart: ChartData;
 }
 
-/** Load a dashboard's tiles — persisted edits if present, otherwise the defaults. */
-export function loadDashboardTiles(dashboard: Dashboard): DashboardTile[] {
-  if (typeof window === 'undefined') return dashboard.tiles;
+const KEY = 'noise:dashboard-pins';
+
+// { [dashboardId]: { [tabId]: PinnedChart[] } }
+type TabMap = Record<string, PinnedChart[]>;
+type PinStore = Record<string, TabMap>;
+
+function readAll(): PinStore {
+  if (typeof window === 'undefined') return {};
   try {
-    const raw = window.localStorage.getItem(storageKey(dashboard.id));
-    if (raw) return JSON.parse(raw) as DashboardTile[];
+    const parsed = JSON.parse(window.localStorage.getItem(KEY) ?? '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   } catch {
-    /* ignore corrupt storage */
+    return {};
   }
-  return dashboard.tiles;
 }
 
-/** Persist a dashboard's tiles. */
-export function saveDashboardTiles(id: string, tiles: DashboardTile[]): void {
+function writeAll(store: PinStore): void {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(storageKey(id), JSON.stringify(tiles));
+    window.localStorage.setItem(KEY, JSON.stringify(store));
   } catch {
     /* ignore quota errors */
   }
 }
 
-/** Append a chart as a new tile at the bottom of a dashboard's grid and persist it. */
-export function addChartToDashboard(dashboard: Dashboard, chart: ChartData): void {
-  const tiles = loadDashboardTiles(dashboard);
-  const bottom = tiles.reduce((max, t) => Math.max(max, t.layout.y + t.layout.h), 0);
-  const isFunnel = chart.type === 'funnel';
-  const newTile: ChartTile = {
-    id: `chart-${Date.now()}-${Math.round(Math.random() * 10000)}`,
-    type: 'chart',
-    chart,
-    layout: {
-      x: 0,
-      y: bottom,
-      w: isFunnel ? 12 : 6,
-      h: 9,
-      minW: isFunnel ? 4 : 3,
-      minH: 5,
-    },
-  };
-  saveDashboardTiles(dashboard.id, [...tiles, newTile]);
+/** Coerce a dashboard entry to a plain tab-map. An earlier build keyed pins by
+ *  dashboard only (a bare array). A legacy array entry must be discarded, not
+ *  reused: writing a string (tab) key onto an array is dropped by JSON.stringify,
+ *  which silently loses every pin. This is the fix for that. */
+function asTabMap(value: unknown): TabMap {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as TabMap) : {};
+}
+
+/** The charts a user has pinned to one tab of a dashboard. */
+export function loadPinnedCharts(dashboardId: string, tabId: string): PinnedChart[] {
+  const tab = asTabMap(readAll()[dashboardId])[tabId];
+  return Array.isArray(tab) ? tab : [];
+}
+
+/** Pin an (agent-generated) chart to a specific dashboard tab. */
+export function addChartToDashboard(
+  dashboardId: string,
+  tabId: string,
+  chart: ChartData,
+): PinnedChart {
+  const store = readAll();
+  const pin: PinnedChart = { id: newId('pin'), chart };
+  const dash = asTabMap(store[dashboardId]);
+  dash[tabId] = [...(Array.isArray(dash[tabId]) ? dash[tabId] : []), pin];
+  store[dashboardId] = dash;
+  writeAll(store);
+  return pin;
+}
+
+/** Remove a pinned chart from a dashboard tab. */
+export function removePinnedChart(dashboardId: string, tabId: string, pinId: string): void {
+  const store = readAll();
+  const dash = asTabMap(store[dashboardId]);
+  if (!Array.isArray(dash[tabId])) return;
+  dash[tabId] = dash[tabId].filter((p) => p.id !== pinId);
+  store[dashboardId] = dash;
+  writeAll(store);
 }

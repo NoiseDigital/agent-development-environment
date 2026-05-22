@@ -99,9 +99,35 @@ export default function ChartVisualization({ chart, fill = false, saveable = fal
         return (
           <ResponsiveContainer width="100%" height={chartHeight}>
             <LineChart data={data}>
-              {cartesianBase()}
-              {hasMultipleMetrics(data) ? (
+              {chart.dualAxis && getMetrics(data).length === 2 ? (
                 <>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis dataKey="name" tick={AXIS_TICK} axisLine={AXIS_LINE} />
+                  <YAxis yAxisId="left" tick={AXIS_TICK} axisLine={AXIS_LINE} tickFormatter={formatNumber} />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tick={AXIS_TICK}
+                    axisLine={AXIS_LINE}
+                    tickFormatter={formatNumber}
+                  />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={tooltipFormatter} />
+                  <Legend {...LEGEND_PROPS} />
+                  {getMetrics(data).map((metric, index) => (
+                    <Line
+                      key={metric}
+                      yAxisId={index === 0 ? 'left' : 'right'}
+                      type="monotone"
+                      dataKey={metric}
+                      stroke={palette[index % palette.length]}
+                      strokeWidth={2}
+                      dot={{ fill: palette[index % palette.length], strokeWidth: 2, r: 4 }}
+                    />
+                  ))}
+                </>
+              ) : hasMultipleMetrics(data) ? (
+                <>
+                  {cartesianBase()}
                   <Legend {...LEGEND_PROPS} />
                   {getMetrics(data).map((metric, index) => (
                     <Line
@@ -115,13 +141,16 @@ export default function ChartVisualization({ chart, fill = false, saveable = fal
                   ))}
                 </>
               ) : (
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  stroke={accent ?? '#3B82F6'}
-                  strokeWidth={2}
-                  dot={{ fill: accent ?? '#3B82F6', strokeWidth: 2, r: 4 }}
-                />
+                <>
+                  {cartesianBase()}
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke={accent ?? '#3B82F6'}
+                    strokeWidth={2}
+                    dot={{ fill: accent ?? '#3B82F6', strokeWidth: 2, r: 4 }}
+                  />
+                </>
               )}
             </LineChart>
           </ResponsiveContainer>

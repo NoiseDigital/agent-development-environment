@@ -38,12 +38,47 @@ export interface ChoicesProps {
   questions: ChoiceQuestion[];
 }
 
+/** One proposed change to an ad line within a `recommendation` block. Budget
+ *  is the only field today; the shape leaves room for more. */
+export interface RecommendationChange {
+  /** The ad line to change — its id in the media model. */
+  adLineId: string;
+  /** The field being changed. Defaults to 'budget'. */
+  field?: 'budget';
+  /** The line's value as the agent sees it now. */
+  from: number;
+  /** The proposed value. */
+  to: number;
+  /** Why this line specifically — shown under the row. */
+  reason?: string;
+}
+
+/** A closed-loop optimization the agent proposes: a titled set of ad-line
+ *  changes the user can apply (and undo) as one batch. The applied changes
+ *  flow into the line-change log and surface on the Plan page. */
+export interface RecommendationProps {
+  /** Headline, e.g. "Shift budget toward converting search lines". */
+  title: string;
+  /** One or two sentences motivating the whole plan. */
+  rationale?: string;
+  /** The proposed changes — one row per ad line. */
+  changes: RecommendationChange[];
+}
+
+/** A Vega-Lite spec. Unlike ChartData — a fixed union the frontend hand-
+ *  translates into Recharts — a Vega-Lite spec is an open grammar: `props` and
+ *  the chart are one object, rendered by the Vega-Lite compiler with no
+ *  per-chart-type frontend code. */
+export type VegaSpec = Record<string, unknown>;
+
 /** One renderable block. Discriminated on `component`; `props` is that
  *  component's typed payload. `id` is the handle interactive blocks use to
  *  route events back to the agent. */
 export type UIBlock =
   | { component: 'chart'; props: ChartData; id?: string }
-  | { component: 'choices'; props: ChoicesProps; id?: string };
+  | { component: 'choices'; props: ChoicesProps; id?: string }
+  | { component: 'recommendation'; props: RecommendationProps; id?: string }
+  | { component: 'vega'; props: VegaSpec; id?: string };
 
 /** Component names an agent may emit — the catalog surface. */
 export type UIComponent = UIBlock['component'];
