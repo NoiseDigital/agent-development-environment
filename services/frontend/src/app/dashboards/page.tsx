@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { mockDashboards, dashboardFromSpec, Dashboard, DashboardOwnership } from '../../data/mock-dashboard-data';
 import { loadUserDashboards } from '../../lib/user-dashboards';
+import { dashboardTitle } from '../../lib/dashboard-access';
 import NewDashboardModal from '../../components/NewDashboardModal';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -41,8 +42,7 @@ const ownershipLabel: Record<DashboardOwnership, string> = {
 // ── Dashboard card ────────────────────────────────────────────────────────────
 
 function DashboardCard({ dashboard, onClick }: { dashboard: Dashboard; onClick: () => void }) {
-  // A client dashboard is titled by the client; internal ones by their name.
-  const title = dashboard.ownership === 'client' ? dashboard.client : dashboard.name;
+  const title = dashboardTitle(dashboard);
   return (
     <button
       type="button"

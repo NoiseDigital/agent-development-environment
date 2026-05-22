@@ -1,13 +1,19 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Layout } from 'react-grid-layout';
 import type { Dashboard, DashboardTile, ChartTile } from '../data/mock-dashboard-data';
 import { loadDashboardMeta, saveDashboardMeta, type DashboardMeta } from '../lib/dashboard-meta';
 import { loadPinnedCharts, removePinnedChart } from '../lib/dashboard-store';
+import { isClientDashboard, isEditable, isPinnable } from '../lib/dashboard-access';
+import { saveUserDashboard } from '../lib/user-dashboards';
+import { newId } from '../lib/id';
+import { showToast } from '../lib/toast';
 import DashboardCanvas from './DashboardCanvas';
 import DashboardReportHeader from './DashboardReportHeader';
 import DashboardFilterBar from './DashboardFilterBar';
+import CodifyDashboardModal from './CodifyDashboardModal';
 
 // The opened-dashboard view: branded header, filter/edit toolbar, a tab bar
 // (Overall + KPI-goal views), and the editable tile grid for the active tab.
@@ -30,6 +36,8 @@ export default function DashboardDetail({
   const [tiles, setTiles] = useState<DashboardTile[]>(activeTab?.tiles ?? []);
   const [deliveryDate, setDeliveryDate] = useState(dashboard.lastUpdated);
   const [refreshing, setRefreshing] = useState(false);
+  const [codifyOpen, setCodifyOpen] = useState(false);
+  const router = useRouter();
 
   // A tab's tiles = its code-derived report tiles plus any charts the user has
   // pinned to that tab from chat. Pins stack two-per-row beneath the report.
@@ -37,6 +45,9 @@ export default function DashboardDetail({
     (tabId: string): DashboardTile[] => {
       const tab = dashboard.tabs.find((t) => t.id === tabId);
       const codeTiles = tab?.tiles ?? [];
+      // Client dashboards are code — immutable at runtime, so they never carry
+      // pinned charts (the chat picker also excludes them as pin targets).
+      if (!isPinnable(dashboard)) return codeTiles;
       const pins = loadPinnedCharts(dashboard.id, tabId);
       if (pins.length === 0) return codeTiles;
       const bottomY = codeTiles.reduce((m, t) => Math.max(m, t.layout.y + t.layout.h), 0);
@@ -58,14 +69,13 @@ export default function DashboardDetail({
   }, [activeTabId, buildTiles]);
 
   // Editable meta (internal dashboards only) — loaded after mount for SSR parity.
-  const isClient = dashboard.ownership === 'client';
+  const isClient = isClientDashboard(dashboard);
   const [meta, setMeta] = useState<DashboardMeta>({});
   useEffect(() => {
     setMeta(loadDashboardMeta(dashboard.id));
   }, [dashboard.id]);
 
   const title = isClient ? dashboard.client : meta.title ?? dashboard.name;
-  const shared = meta.shared ?? dashboard.ownership === 'shared';
 
   const persistMeta = useCallback(
     (next: DashboardMeta) => {
@@ -81,11 +91,6 @@ export default function DashboardDetail({
     },
     [meta, persistMeta],
   );
-  const toggleShare = useCallback(
-    () => persistMeta({ ...meta, shared: !shared }),
-    [meta, shared, persistMeta],
-  );
-
   const handleLayoutChange = useCallback((layout: Layout) => {
     setTiles((prev) =>
       prev.map((t) => {
@@ -137,6 +142,20 @@ export default function DashboardDetail({
     }, 900);
   }, [buildTiles, activeTabId]);
 
+  // Duplicate a code-defined client dashboard into an editable internal copy.
+  // The copy is a fork — it becomes owned/editable and loses client share-out.
+  const handleDuplicate = useCallback(() => {
+    const id = newId('dash');
+    saveUserDashboard({
+      id,
+      name: `${dashboard.client} (copy)`,
+      campaignId: dashboard.campaignId,
+      createdAt: new Date().toISOString(),
+    });
+    showToast({ message: 'Copied to an editable internal dashboard.', tone: 'success' });
+    router.push(`/dashboards/${id}`);
+  }, [dashboard.client, dashboard.campaignId, router]);
+
   return (
     <div className="flex h-full flex-col bg-black">
       <DashboardReportHeader
@@ -146,17 +165,29 @@ export default function DashboardDetail({
         refreshing={refreshing}
         onRefresh={handleRefresh}
         title={title}
-        editableTitle={!isClient}
+        editableTitle={isEditable(dashboard)}
         onTitleCommit={commitTitle}
-        shared={shared}
-        onShareToggle={toggleShare}
       />
 
       {/* Toolbar — report filters + layout editing */}
       <div className="flex shrink-0 items-end justify-between gap-4 border-b border-zinc-800/60 px-6 py-3">
         <DashboardFilterBar filters={dashboard.filters} />
         <div className="flex shrink-0 items-center gap-2">
-          {editing ? (
+          {isClient ? (
+            // Client dashboards are code — not editable here. Duplicate forks an
+            // editable internal copy; Share lives in the header.
+            <button
+              type="button"
+              onClick={handleDuplicate}
+              title="Copy into an editable internal dashboard"
+              className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white"
+            >
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+              </svg>
+              Duplicate to edit
+            </button>
+          ) : editing ? (
             <>
               <button
                 type="button"
@@ -187,16 +218,29 @@ export default function DashboardDetail({
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white"
-            >
-              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              Edit layout
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setCodifyOpen(true)}
+                title="Submit this dashboard to engineering to be codified"
+                className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white"
+              >
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+                Submit for codification
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white"
+              >
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Edit layout
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -238,6 +282,10 @@ export default function DashboardDetail({
           onRemoveTile={handleRemoveTile}
         />
       </div>
+
+      {codifyOpen && (
+        <CodifyDashboardModal dashboard={dashboard} onClose={() => setCodifyOpen(false)} />
+      )}
     </div>
   );
 }

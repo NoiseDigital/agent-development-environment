@@ -6,6 +6,7 @@ import { toPng } from 'html-to-image';
 import { mockDashboards, dashboardFromSpec, type Dashboard } from '../data/mock-dashboard-data';
 import { loadUserDashboards } from '../lib/user-dashboards';
 import { addChartToDashboard } from '../lib/dashboard-store';
+import { dashboardTitle as dashTitle, isPinnable } from '../lib/dashboard-access';
 import { ChartData } from '../types/chart';
 
 interface ChartActionsProps {
@@ -17,9 +18,6 @@ interface ChartActionsProps {
 function slug(s?: string): string {
   return (s || 'chart').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
-
-// A client dashboard is titled by the client; internal ones by their name.
-const dashTitle = (d: Dashboard) => (d.ownership === 'client' ? d.client : d.name);
 
 function triggerDownload(filename: string, href: string) {
   const a = document.createElement('a');
@@ -57,12 +55,14 @@ export default function ChartActions({ chart, captureRef }: ChartActionsProps) {
   const [picked, setPicked] = useState<Dashboard | null>(null);
   const [savedTo, setSavedTo] = useState<{ id: string; name: string; tab: string } | null>(null);
 
-  // User-created dashboards are pinnable too — loaded client-side, listed first.
+  // Pinning is a runtime edit, so it can only target editable dashboards —
+  // client dashboards are code-defined and immutable. User-created dashboards
+  // load client-side and list first.
   const [userDashboards, setUserDashboards] = useState<Dashboard[]>([]);
   useEffect(() => {
     setUserDashboards(loadUserDashboards().map(dashboardFromSpec));
   }, []);
-  const allDashboards = [...userDashboards, ...mockDashboards];
+  const editableDashboards = [...userDashboards, ...mockDashboards].filter(isPinnable);
 
   const close = () => {
     setOpen(false);
@@ -164,28 +164,37 @@ export default function ChartActions({ chart, captureRef }: ChartActionsProps) {
             {view === 'dashboards' && (
               <>
                 <BackHeader label="Choose a dashboard" onClick={() => setView('menu')} />
-                {allDashboards.map((d) => (
-                  <button
-                    key={d.id}
-                    type="button"
-                    onClick={() => {
-                      setPicked(d);
-                      setView('tabs');
-                    }}
-                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-zinc-800"
-                  >
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-zinc-700 bg-zinc-800 text-[9px] font-bold text-zinc-300">
-                      {d.clientInitials}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs text-white">{dashTitle(d)}</span>
-                      <span className="block truncate text-[10px] text-zinc-500">{d.client}</span>
-                    </span>
-                    <svg className="h-3 w-3 shrink-0 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                ))}
+                {editableDashboards.length > 0 ? (
+                  editableDashboards.map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => {
+                        setPicked(d);
+                        setView('tabs');
+                      }}
+                      className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-zinc-800"
+                    >
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-zinc-700 bg-zinc-800 text-[9px] font-bold text-zinc-300">
+                        {d.clientInitials}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-xs text-white">{dashTitle(d)}</span>
+                        <span className="block truncate text-[10px] text-zinc-500">{d.client}</span>
+                      </span>
+                      <svg className="h-3 w-3 shrink-0 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  ))
+                ) : (
+                  <p className="px-3 py-3 text-[11px] text-zinc-500">
+                    No editable dashboards yet — create one from the Dashboards page.
+                  </p>
+                )}
+                <p className="mt-1 border-t border-zinc-800 px-3 pb-1 pt-2 text-[10px] leading-relaxed text-zinc-600">
+                  Client dashboards are code-defined — duplicate one to pin to it.
+                </p>
               </>
             )}
 

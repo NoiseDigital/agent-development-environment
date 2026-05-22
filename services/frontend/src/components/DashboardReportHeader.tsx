@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import type { Dashboard } from '../data/mock-dashboard-data';
+import { isClientDashboard } from '../lib/dashboard-access';
+import ShareDashboardModal from './ShareDashboardModal';
 
 // The branded report header band — client logo, report title, latest delivery
 // date, Refresh, share status, and the Noise mark. A client dashboard's title
@@ -83,8 +85,6 @@ export default function DashboardReportHeader({
   title,
   editableTitle,
   onTitleCommit,
-  shared,
-  onShareToggle,
 }: {
   dashboard: Dashboard;
   onBack: () => void;
@@ -94,10 +94,9 @@ export default function DashboardReportHeader({
   title: string;
   editableTitle: boolean;
   onTitleCommit: (next: string) => void;
-  shared: boolean;
-  onShareToggle: () => void;
 }) {
-  const isClient = dashboard.ownership === 'client';
+  const [shareOpen, setShareOpen] = useState(false);
+  const isClient = isClientDashboard(dashboard);
   const subtitle = isClient ? 'Performance Report' : dashboard.client;
 
   return (
@@ -154,27 +153,17 @@ export default function DashboardReportHeader({
           </button>
 
           <div className="flex items-center gap-3">
-            {isClient ? (
-              <span className="rounded-full border border-white/25 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/80">
-                Client
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={onShareToggle}
-                title={shared ? 'Shared with the team — click to make private' : 'Private — click to share with the team'}
-                className="flex items-center gap-1 rounded-full border border-white/25 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/80 transition-colors hover:bg-white/10"
-              >
-                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  {shared ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 100-8 4 4 0 000 8z" />
-                  ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  )}
-                </svg>
-                {shared ? 'Shared' : 'Private'}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setShareOpen(true)}
+              title="Share this dashboard"
+              className="flex items-center gap-1.5 rounded-md border border-white/25 px-2.5 py-1.5 text-[11px] font-medium text-white/80 transition-colors hover:bg-white/10"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+              Share
+            </button>
             <div className="leading-none">
               <span className="block text-[9px] text-white/50">powered by</span>
               <span className="text-sm font-bold tracking-tight text-white">NOISE</span>
@@ -182,6 +171,9 @@ export default function DashboardReportHeader({
           </div>
         </div>
       </div>
+      {shareOpen && (
+        <ShareDashboardModal dashboard={dashboard} onClose={() => setShareOpen(false)} />
+      )}
     </div>
   );
 }
