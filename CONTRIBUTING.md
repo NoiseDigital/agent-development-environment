@@ -55,8 +55,9 @@ Use the **service name** as scope, and drill down to the agent if the change is 
 |---|---|
 | `agents` | Changes across the agent service generally |
 | `agents/media-agent` | Changes specific to one agent |
-| `database` | DB schema, init scripts |
-| `mcp` | MCP services/configs (`images/*`, `math`, and toolbox tool definitions) |
+| `gateway` | Gateway service (auth, proxy, future direct routes) |
+| `db` | Alembic migrations + Postgres init scripts |
+| `mcp` | MCP services/configs (`images/*`, `math`, `stats`, and toolbox tool definitions) |
 | `frontend` | Next.js app |
 | `infra` | docker-compose, Dockerfiles, Terraform |
 | `deps` | Dependency bumps |
@@ -106,7 +107,9 @@ All PRs must pass the following checks before merge:
 | Check | What it runs |
 |---|---|
 | `Backend — ruff + mypy` | `ruff check` + `ruff format --check` on `services/backend/agents/` |
-| `Frontend — ESLint + TypeScript` | `next lint` + `tsc --noEmit` on `services/frontend/` |
+| `Backend — pytest` | `pytest -q` on `services/backend/agents/tests/` |
+| `Frontend — ESLint + TypeScript` | `next lint` + `tsc --noEmit` + `vitest run` on `services/frontend/` |
+| `Gateway — alembic upgrade` | applies every Alembic migration to a fresh Postgres, then re-applies it to confirm idempotency |
 | `Terraform — fmt + validate` | `terraform fmt -check` + `terraform validate` on `terraform/` |
 | `Docker Compose — config validation` | `docker compose config` on root `docker-compose.yml` |
 
@@ -164,6 +167,81 @@ Other guidelines:
    - `comingSoon: true` — agent appears in the library as a disabled card with a "Coming soon" badge
    - Omit both (or set neither) for a fully active agent
 4. Document any new env vars in `.env.example`
+
+## Schema Migrations
+
+Every platform-owned Postgres table (`session_metadata`, `event_metadata`,
+`sources`, future ones) is owned by **Alembic** in the gateway service. The
+agent service only reads and writes those tables; it never DDLs them. ADK
+manages its own tables and ships its own migrations on version updates —
+nothing in this repo touches those.
+
+### Where migrations live
+
+```
+services/backend/gateway/
+├── alembic.ini
+└── alembic/
+    ├── env.py
+    └── versions/
+        └── <utc_timestamp>_<slug>.py
+```
+
+### How they run
+
+On `docker compose up`, the `db-migrate` one-shot service runs
+`alembic upgrade head` and exits successfully. The gateway and agent both
+depend on it (`service_completed_successfully`), so they never see a
+half-migrated schema. The same migration set runs in CI against a fresh
+Postgres, including an idempotency re-run.
+
+### Adding a migration
+
+```bash
+docker compose exec gateway uv run alembic revision -m "add fk on event_metadata"
+```
+
+Then edit the generated file. The platform uses raw SQL via `asyncpg` (no
+ORM), so migrations use `op.execute("...")` rather than `op.create_table(...)`.
+A typical migration:
+
+```python
+def upgrade() -> None:
+    op.execute("ALTER TABLE event_metadata ADD COLUMN ...")
+
+def downgrade() -> None:
+    op.execute("ALTER TABLE event_metadata DROP COLUMN ...")
+```
+
+Apply it to your running compose:
+
+```bash
+docker compose up -d db-migrate   # re-runs migrations
+```
+
+`alembic upgrade head` is idempotent, so running this against an already
+migrated database is a safe no-op.
+
+### Don't touch ADK tables
+
+ADK's `sessions` / `events` tables are off-limits — they're its schema and it
+ships its own migrations. If you find yourself wanting to denormalize ADK
+data, add a new platform table for the derived view instead.
+
+## Gateway vs. Agent — where does new code go?
+
+When you add a new HTTP route, ask:
+
+| Concern | Goes in |
+| --- | --- |
+| Anything that needs the ADK runtime (sessions, events, agent run/stream) | Agent (`services/backend/agents/api/`) |
+| Anything that reads/writes ADK-keyed metadata (session names, event ratings) | Agent (it sits next to the data it touches) |
+| Auth, presence, user prefs, anything that doesn't need ADK | Gateway (`services/backend/gateway/api/`) |
+| Platform-owned database schema changes | Gateway (via Alembic) |
+
+The gateway is the **only** service the frontend talks to. Anything in the
+agent service is reached via the gateway's catch-all proxy (`api/proxy.py`),
+including SSE streams.
 
 ## Adding MCP Tools
 

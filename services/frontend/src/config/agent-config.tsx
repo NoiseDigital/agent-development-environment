@@ -46,6 +46,25 @@ export const agentConfigurations: Record<string, AgentConfig> = {
       d: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'
     }))
   },
+  // Internal one-shot agents — not browsable in the library, just endpoints
+  // the platform calls through the standard ADK /run path. ONE auth path
+  // through ADC; no separate genai.Client lives in the platform code.
+  'dashboard_insights_agent': {
+    name: 'dashboard_insights_agent',
+    displayName: 'Dashboard Insights (internal)',
+    description: 'Generates Noise Analyst bullets from a totals payload.',
+    url: process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'http://localhost:8080',
+    hidden: true,
+    icon: React.createElement('svg', { className: 'w-8 h-8', key: 'internal-insights' }),
+  },
+  'session_naming_agent': {
+    name: 'session_naming_agent',
+    displayName: 'Session Naming (internal)',
+    description: 'Generates a short title for a chat session.',
+    url: process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'http://localhost:8080',
+    hidden: true,
+    icon: React.createElement('svg', { className: 'w-8 h-8', key: 'internal-naming' }),
+  },
   'timesheet_agent': {
     name: 'timesheet_agent',
     displayName: 'Timesheet Agent',

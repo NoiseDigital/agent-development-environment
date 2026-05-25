@@ -12,33 +12,15 @@ from typing import Any, Optional
 
 import asyncpg
 
-from api.db import ensure_schema
+from api.db import get_pool
 
-# Schema bootstrap. CREATE is idempotent for fresh databases; the ALTERs migrate
-# an older `sources` table that still carried BigQuery columns (BigQuery tables
-# are now referenced live instead of registered).
-_SCHEMA = """
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE TABLE IF NOT EXISTS sources (
-    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id     TEXT NOT NULL,
-    name        TEXT NOT NULL,
-    storage_key TEXT NOT NULL,
-    file_ext    TEXT,
-    size_bytes  BIGINT,
-    metadata    JSONB NOT NULL DEFAULT '{}'::jsonb,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-ALTER TABLE sources DROP COLUMN IF EXISTS kind;
-ALTER TABLE sources DROP COLUMN IF EXISTS bq_project;
-ALTER TABLE sources DROP COLUMN IF EXISTS bq_dataset;
-ALTER TABLE sources DROP COLUMN IF EXISTS bq_table;
-CREATE INDEX IF NOT EXISTS idx_sources_user ON sources (user_id, created_at DESC);
-"""
+# Schema ownership: `sources` is created by the gateway's Alembic migration
+# (`baseline_metadata_tables`). To change the shape, add a new migration in
+# `services/backend/gateway/alembic/versions/`.
 
 
 async def _pool() -> asyncpg.Pool:
-    return await ensure_schema("sources", _SCHEMA)
+    return await get_pool()
 
 
 def _row_to_dict(row: asyncpg.Record) -> dict[str, Any]:

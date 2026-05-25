@@ -21,7 +21,7 @@ services:
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://user:password@postgres:5432/postgres}
       - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
       - GOOGLE_GENAI_USE_VERTEXAI=${GOOGLE_GENAI_USE_VERTEXAI:-true}
-      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-nd-agentspace-sbx}
       - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-northamerica-northeast1}
       - TOOLBOX_ENDPOINT=${TOOLBOX_ENDPOINT:-http://mcp-toolbox:5000}
       - MCP_STATS_URL=${MCP_STATS_URL:-http://mcp-stats:8080/sse}
@@ -32,6 +32,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      # Wait for Alembic to finish so the platform tables are at head before
+      # the agent reads/writes them. ADK manages its own tables/migrations and
+      # is unaffected by this gate.
+      db-migrate:
+        condition: service_completed_successfully
       mcp-toolbox:
         condition: service_started
     stdin_open: true
@@ -53,7 +58,7 @@ services:
       - "${MCP_PORT:-5000}:${MCP_PORT:-5000}"
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
-      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-nd-agentspace-sbx}
       - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-northamerica-northeast1}
     depends_on:
       postgres:
@@ -113,12 +118,59 @@ services:
       - AGENT_URL=${AGENT_URL:-http://agent:8000}
       - STORAGE_LOCAL_PATH=/data/uploads
       - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
-      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-nd-agentspace-sbx}
     depends_on:
       agent:
         condition: service_started
     stdin_open: true
     tty: true
+
+  # ── Gateway — the public entry point for the frontend ─────────────────────
+  # Owns auth and (incrementally) the platform's non-agent HTTP routes.
+  # Everything not handled directly is proxied to the private agent service;
+  # `/run_sse` streams through unchanged, header-by-header (see api/proxy.py).
+  # One-shot Alembic runner — applies every platform-owned migration once,
+  # then exits. Both the gateway and the agent service wait for it to finish
+  # so they never see a half-migrated schema. Re-runs are idempotent.
+  # Reuses the gateway image (same dependencies, same source tree); compose
+  # builds the image as `gateway` and we pull it by tag here so the Dockerfile
+  # is built once per stack rather than twice.
+  db-migrate:
+    image: agent-platform-gateway:latest
+    volumes:
+      - ./services/backend/gateway:/workspace
+    working_dir: /workspace
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://user:password@postgres:5432/postgres}
+      - UV_LINK_MODE=copy
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    command: uv run alembic upgrade head
+
+  gateway:
+    build:
+      context: ./services/backend/gateway
+      dockerfile: Dockerfile
+    volumes:
+      - ./services/backend/gateway:/workspace
+    ports:
+      - "${GATEWAY_PORT:-8080}:${GATEWAY_PORT:-8080}"
+    environment:
+      - PORT=${GATEWAY_PORT:-8080}
+      - AGENT_URL=${AGENT_URL_INTERNAL:-http://agent:8000}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://user:password@postgres:5432/postgres}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost,http://localhost:3000,http://frontend:3000}
+      - UV_LINK_MODE=copy
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      agent:
+        condition: service_started
+    stdin_open: true
+    tty: true
+    command: uv run uvicorn main:app --host 0.0.0.0 --port ${GATEWAY_PORT:-8080} --reload
 
   frontend:
     build:
@@ -133,10 +185,12 @@ services:
       - "${FRONTEND_PORT:-3000}:${FRONTEND_PORT:-3000}"
     environment:
       - NODE_ENV=${NODE_ENV:-development}
-      - NEXT_PUBLIC_AGENTS_BASE_URL=${NEXT_PUBLIC_AGENTS_BASE_URL:-http://localhost:8000}
+      # The frontend talks to the gateway. The gateway then proxies to the
+      # private agent service for anything that lives there.
+      - NEXT_PUBLIC_AGENTS_BASE_URL=${NEXT_PUBLIC_AGENTS_BASE_URL:-http://localhost:8080}
       - NEXT_PUBLIC_STATS_BASE_URL=${NEXT_PUBLIC_STATS_BASE_URL:-http://localhost:5003}
     depends_on:
-      agent:
+      gateway:
         condition: service_started
     stdin_open: true
     tty: true

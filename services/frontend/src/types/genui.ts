@@ -5,8 +5,6 @@
 // here, and a renderer for it in components/genui/registry. Agents never emit
 // arbitrary markup — only blocks whose `component` is in this union.
 
-import type { ChartData } from './chart';
-
 /** One selectable option in a clarifying question. */
 export interface ChoiceOption {
   /** What the user sees. */
@@ -38,47 +36,57 @@ export interface ChoicesProps {
   questions: ChoiceQuestion[];
 }
 
-/** One proposed change to an ad line within a `recommendation` block. Budget
- *  is the only field today; the shape leaves room for more. */
-export interface RecommendationChange {
-  /** The ad line to change — its id in the media model. */
-  adLineId: string;
-  /** The field being changed. Defaults to 'budget'. */
-  field?: 'budget';
-  /** The line's value as the agent sees it now. */
-  from: number;
-  /** The proposed value. */
-  to: number;
-  /** Why this line specifically — shown under the row. */
-  reason?: string;
-}
-
-/** A closed-loop optimization the agent proposes: a titled set of ad-line
- *  changes the user can apply (and undo) as one batch. The applied changes
- *  flow into the line-change log and surface on the Plan page. */
-export interface RecommendationProps {
-  /** Headline, e.g. "Shift budget toward converting search lines". */
-  title: string;
-  /** One or two sentences motivating the whole plan. */
-  rationale?: string;
-  /** The proposed changes — one row per ad line. */
-  changes: RecommendationChange[];
-}
-
-/** A Vega-Lite spec. Unlike ChartData — a fixed union the frontend hand-
- *  translates into Recharts — a Vega-Lite spec is an open grammar: `props` and
- *  the chart are one object, rendered by the Vega-Lite compiler with no
- *  per-chart-type frontend code. */
+/** A Vega-Lite spec — the platform's one chart format. An open grammar (mark +
+ *  encoding + transform): `props` and the chart are one object, rendered by the
+ *  Vega-Lite compiler with no per-chart-type frontend code. */
 export type VegaSpec = Record<string, unknown>;
+
+/** One lever on a `filters` block — the agent declares which knobs the user
+ *  can turn, and the block renders the right control for each.
+ *
+ *  `key` is the parameter name the agent will recognise when the user submits;
+ *  `label` is what the user sees. `value` is the currently-set value; the
+ *  block submits `<key>=<value>` pairs back to the agent on Apply. */
+export type FilterField =
+  | {
+      kind: 'select';
+      key: string;
+      label: string;
+      options: ChoiceOptionInput[];
+      value?: string;
+    }
+  | { kind: 'date'; key: string; label: string; value?: string }
+  | {
+      kind: 'number';
+      key: string;
+      label: string;
+      min?: number;
+      max?: number;
+      step?: number;
+      value?: number;
+    }
+  | { kind: 'text'; key: string; label: string; placeholder?: string; value?: string };
+
+/** Lightweight "levers" — controls the user can adjust to re-run the same
+ *  question with new parameters. Surfaced next to a chart so an analyst can
+ *  iterate on an answer without leaving the chat bubble. Submitting reposts
+ *  the original question with the updated params baked into the message. */
+export interface FiltersProps {
+  /** Optional headline shown above the controls. */
+  title?: string;
+  /** One control per lever the agent wants exposed. */
+  fields: FilterField[];
+  /** Button label — defaults to "Update". */
+  applyLabel?: string;
+}
 
 /** One renderable block. Discriminated on `component`; `props` is that
  *  component's typed payload. `id` is the handle interactive blocks use to
  *  route events back to the agent. */
 export type UIBlock =
-  | { component: 'chart'; props: ChartData; id?: string }
+  | { component: 'chart'; props: VegaSpec; id?: string }
   | { component: 'choices'; props: ChoicesProps; id?: string }
-  | { component: 'recommendation'; props: RecommendationProps; id?: string }
-  | { component: 'vega'; props: VegaSpec; id?: string };
+  | { component: 'filters'; props: FiltersProps; id?: string };
 
 /** Component names an agent may emit — the catalog surface. */
 export type UIComponent = UIBlock['component'];

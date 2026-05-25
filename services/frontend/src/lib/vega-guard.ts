@@ -9,7 +9,7 @@ import type { VegaSpec } from '../types/genui';
 /** Mark types the agent is permitted to use. Narrow this to lock things down
  *  (e.g. just bar/line/area to mirror today's charts); widen it to open up. */
 const ALLOWED_MARKS = new Set([
-  'bar', 'line', 'area', 'point', 'circle', 'square', 'rule', 'tick', 'text', 'arc',
+  'bar', 'line', 'area', 'point', 'circle', 'square', 'rule', 'tick', 'text', 'arc', 'rect',
 ]);
 
 /** Inline data is capped — an agent can't drop a 100k-row payload into the UI. */

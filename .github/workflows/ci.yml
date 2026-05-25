@@ -65,6 +65,111 @@ jobs:
       - name: TypeScript type check
         run: npx tsc --noEmit
 
+      - name: Vitest unit tests
+        run: npm test
+
+  # ── Backend unit tests (agent harness + lib tests) ────────────────────────
+  backend-test:
+    name: Backend — pytest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/backend/agents
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install project + test deps
+        # Editable install lets pytest resolve the `api`, `shared`, `adk_agents`
+        # packages without a PYTHONPATH dance. `dev` dependencies live under
+        # PEP 735 `[dependency-groups]`, so install pytest tooling explicitly.
+        run: |
+          pip install -e . --quiet
+          pip install pytest pytest-asyncio pyyaml --quiet
+
+      - name: pytest
+        run: pytest -q
+
+  # ── Schema discipline ─────────────────────────────────────────────────────
+  # Two checks, both fast (no DB needed):
+  #
+  # 1. Forbid DDL outside the Alembic versions dir. The Alembic gateway is
+  #    the only place a CREATE TABLE / ALTER TABLE may live; if someone
+  #    reverts to inline ensure_schema() DDL in a repo file, fail the build.
+  #
+  # 2. PRs that touch a platform-owned repo (`services/backend/agents/api/*/repo.py`)
+  #    must also add a new migration under `services/backend/gateway/alembic/versions/`.
+  #    Catches "I changed how the row is shaped but forgot the migration."
+  #
+  # The actual `alembic upgrade head` check ran against a live Postgres was
+  # noisy and slow; this pair gives the same coverage statically.
+  schema-discipline:
+    name: Schema — DDL discipline + migration parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need the merge-base for the parity check below
+
+      - name: Forbid DDL outside the Alembic versions dir
+        # `grep -rn` exits non-zero (1) when no match — that's the success
+        # case. We negate it: hits anywhere outside alembic/versions/ fail
+        # the job. Tests + comments are excluded.
+        run: |
+          set -e
+          if grep -rEn '\b(CREATE TABLE|ALTER TABLE|CREATE INDEX|DROP TABLE)\b' \
+              --include='*.py' --include='*.sql' \
+              services/backend \
+              | grep -v 'services/backend/gateway/alembic/versions/' \
+              | grep -v 'services/backend/database/init/' \
+              | grep -v '^[^:]*:[[:space:]]*#'; then
+            echo "::error::DDL found outside services/backend/gateway/alembic/versions/. Move it to a new Alembic migration."
+            exit 1
+          fi
+          echo "ok — no inline DDL outside Alembic"
+
+      - name: Require an Alembic migration when a repo changes
+        # If any file under services/backend/agents/api/*/repo.py changed on
+        # this branch but no new file was added under
+        # services/backend/gateway/alembic/versions/, fail with a clear hint.
+        # `pull_request` events have refs/remotes/origin/<base>; we diff
+        # against it. On a direct push, we diff against HEAD^.
+        env:
+          # Pipe untrusted user input through the env so shell never sees it
+          # inlined — see
+          # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions
+          BASE_REF: ${{ github.base_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -e
+          if [ -n "$BASE_REF" ]; then
+            base="origin/$BASE_REF"
+            git fetch --depth=1 origin "$BASE_REF"
+          else
+            base="HEAD^"
+          fi
+          changed_repos=$(git diff --name-only "$base"...HEAD -- 'services/backend/agents/api/*/repo.py' || true)
+          new_migrations=$(git diff --name-only --diff-filter=A "$base"...HEAD -- 'services/backend/gateway/alembic/versions/' || true)
+          if [ -n "$changed_repos" ] && [ -z "$new_migrations" ]; then
+            echo "::error::Repo files changed but no new Alembic migration was added."
+            echo "Changed repos:"
+            echo "$changed_repos"
+            echo ""
+            echo "If the schema changed, add a migration:"
+            echo "  docker compose exec gateway uv run alembic revision -m \"short description\""
+            echo "If the shape did NOT change, add a [skip-migration] tag to the PR title."
+            case "$PR_TITLE" in
+              *"[skip-migration]"*) echo "skip-migration tag present — allowing" ;;
+              *) exit 1 ;;
+            esac
+          fi
+          echo "ok — migration parity satisfied"
+
   # ── Terraform fmt + validate ───────────────────────────────────────────────
   terraform-check:
     name: Terraform — fmt + validate

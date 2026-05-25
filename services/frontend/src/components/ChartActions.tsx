@@ -5,17 +5,29 @@ import Link from 'next/link';
 import { toPng } from 'html-to-image';
 import { mockDashboards, dashboardFromSpec, type Dashboard } from '../data/mock-dashboard-data';
 import { loadUserDashboards } from '../lib/user-dashboards';
-import { addChartToDashboard } from '../lib/dashboard-store';
+import { pinsApi } from '../lib/pins-api';
 import { dashboardTitle as dashTitle, isPinnable } from '../lib/dashboard-access';
-import { ChartData } from '../types/chart';
+import type { VegaSpec } from '../types/genui';
 
 interface ChartActionsProps {
-  chart: ChartData;
+  chart: VegaSpec;
   /** The chart card node — captured for PNG export. */
   captureRef: React.RefObject<HTMLDivElement | null>;
+  /** Hide save-to-dashboard — for charts already on a dashboard (export-only menu). */
+  exportsOnly?: boolean;
 }
 
-function slug(s?: string): string {
+/** A Vega-Lite spec's title may be a bare string or a { text } object. */
+function specTitle(spec: VegaSpec): string {
+  const t = spec.title;
+  if (typeof t === 'string') return t;
+  if (t && typeof t === 'object' && typeof (t as { text?: unknown }).text === 'string') {
+    return (t as { text: string }).text;
+  }
+  return 'chart';
+}
+
+function slug(s: string): string {
   return (s || 'chart').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
@@ -26,30 +38,24 @@ function triggerDownload(filename: string, href: string) {
   a.click();
 }
 
-// Flatten a chart's underlying data to CSV — series rows, or a heatmap matrix.
-function chartToCsv(chart: ChartData): string {
-  if (chart.type === 'heatmap' && chart.rows && chart.cols && chart.matrix) {
-    const header = ['', ...chart.cols].join(',');
-    const body = chart.rows.map((r, i) =>
-      [r, ...(chart.matrix![i] ?? []).map((v) => (v ?? ''))].join(','),
-    );
-    return [header, ...body].join('\n');
-  }
-  const data = chart.data ?? [];
-  if (data.length === 0) return '';
-  const keys = Object.keys(data[0]);
+// Flatten a Vega-Lite spec's inline data to CSV.
+function chartToCsv(spec: VegaSpec): string {
+  const values = (spec.data as { values?: unknown[] } | undefined)?.values;
+  if (!Array.isArray(values) || values.length === 0) return '';
+  const rows = values as Record<string, unknown>[];
+  const keys = Object.keys(rows[0]);
   const cell = (v: unknown) =>
     typeof v === 'string' && /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v ?? '';
   return [
     keys.join(','),
-    ...data.map((row) => keys.map((k) => cell(row[k])).join(',')),
+    ...rows.map((row) => keys.map((k) => cell(row[k])).join(',')),
   ].join('\n');
 }
 
 // "+" menu on chat / Analyze visuals: save to a dashboard, export PNG, export
 // CSV. Saving is a two-step pick — a dashboard, then which of its tabs — since
 // a dashboard's tiles live on tabs.
-export default function ChartActions({ chart, captureRef }: ChartActionsProps) {
+export default function ChartActions({ chart, captureRef, exportsOnly = false }: ChartActionsProps) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<'menu' | 'dashboards' | 'tabs'>('menu');
   const [picked, setPicked] = useState<Dashboard | null>(null);
@@ -80,7 +86,7 @@ export default function ChartActions({ chart, captureRef }: ChartActionsProps) {
         backgroundColor: '#18181b',
         filter: (n) => !(n instanceof HTMLElement && n.dataset.noExport === 'true'),
       });
-      triggerDownload(`${slug(chart.title)}.png`, dataUrl);
+      triggerDownload(`${slug(specTitle(chart))}.png`, dataUrl);
     } catch (e) {
       console.error('PNG export failed', e);
     }
@@ -90,13 +96,27 @@ export default function ChartActions({ chart, captureRef }: ChartActionsProps) {
     close();
     const blob = new Blob([chartToCsv(chart)], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    triggerDownload(`${slug(chart.title)}.csv`, url);
+    triggerDownload(`${slug(specTitle(chart))}.csv`, url);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSvg = () => {
+    close();
+    const svg = captureRef.current?.querySelector('svg');
+    if (!svg) return;
+    const xml = new XMLSerializer().serializeToString(svg);
+    const blob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    triggerDownload(`${slug(specTitle(chart))}.svg`, url);
     URL.revokeObjectURL(url);
   };
 
   const saveToTab = (tab: { id: string; label: string }) => {
     if (!picked) return;
-    addChartToDashboard(picked.id, tab.id, chart);
+    // Fire-and-forget: optimistic close. A failure surfaces as the chart not
+    // appearing on the target dashboard, which the user discovers naturally;
+    // we don't block the close on the network round-trip.
+    void pinsApi.create(picked.id, tab.id, chart).catch(() => {});
     const target = { id: picked.id, name: dashTitle(picked), tab: tab.label };
     close();
     setSavedTo(target);
@@ -132,7 +152,7 @@ export default function ChartActions({ chart, captureRef }: ChartActionsProps) {
         className="flex h-6 w-6 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-white"
       >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01" />
         </svg>
       </button>
 
@@ -142,16 +162,23 @@ export default function ChartActions({ chart, captureRef }: ChartActionsProps) {
           <div className="absolute right-0 top-full z-20 mt-1 max-h-80 w-60 overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
             {view === 'menu' && (
               <>
-                <MenuItem
-                  label="Save to dashboard"
-                  chevron
-                  onClick={() => setView('dashboards')}
-                  icon="M9 17V7m6 10v-4M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"
-                />
+                {!exportsOnly && (
+                  <MenuItem
+                    label="Save to dashboard"
+                    chevron
+                    onClick={() => setView('dashboards')}
+                    icon="M9 17V7m6 10v-4M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"
+                  />
+                )}
                 <MenuItem
                   label="Save as PNG"
                   onClick={handlePng}
                   icon="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM10 9a1 1 0 11-2 0 1 1 0 012 0z"
+                />
+                <MenuItem
+                  label="Save as SVG"
+                  onClick={handleSvg}
+                  icon="M16 18l6-6-6-6M8 6l-6 6 6 6"
                 />
                 <MenuItem
                   label="Export raw data"

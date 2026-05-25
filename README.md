@@ -54,7 +54,8 @@ git config --global user.name "Your Name"
 | URL | Description | Open On Startup |
 |---|---|---|
 | <http://localhost:3000> | Frontend chat UI | true |
-| <http://localhost:8000/dev-ui> | ADK API / dev UI | true |
+| <http://localhost:8080/healthz> | Gateway (public API, proxies the agent) | true |
+| <http://localhost:8000/dev-ui> | ADK dev UI (private — gateway proxies anything the frontend needs) | true |
 | <http://localhost:5000/ui> | MCP Toolbox UI | false |
 | <http://localhost:5001/mcp> | Google Ads MCP (optional profile) | false |
 | <http://localhost:5002/mcp> | Math MCP (optional profile) | false |
@@ -64,33 +65,39 @@ git config --global user.name "Your Name"
 
 ```
 services/
-├── frontend/               # Platform UI
+├── frontend/                       # Next.js 15 platform UI (chat + dashboards + GenUI)
 ├── backend/
-│   ├── agents/             # ADK agents + FastAPI host
-│   │   ├── adk_agents/     # Individual agent packages
-│   │   └── main.py         # get_fast_api_app() entrypoint
-│   ├── mcp/                # MCP servers (image-based + code-based)
-│   │   ├── images/        # Image-based MCP configs and thin-wrapper images
-│   │   └── math/           # Code-based MCP server
-│   └── database/           # Postgres
-terraform/                  # GCP infrastructure
+│   ├── gateway/                    # FastAPI gateway — auth, Alembic, proxy to agent
+│   │   ├── alembic/                #   platform-owned Postgres migrations
+│   │   └── api/                    #   auth, health, agent proxy
+│   ├── agents/                     # ADK agents + FastAPI host
+│   │   ├── adk_agents/             #   one package per agent
+│   │   ├── api/                    #   platform-owned routes (sessions, events, sources, dashboards)
+│   │   └── main.py                 #   get_fast_api_app() entrypoint
+│   ├── mcp/                        # MCP servers (image-based + code-based)
+│   │   ├── images/                 #   image-based MCP configs (toolbox tools.yaml lives here)
+│   │   ├── math/                   #   code-based MCP server
+│   │   └── stats/                  #   code-based MCP server (correlate / regress / QA)
+│   └── database/                   # Postgres init scripts
+terraform/                          # GCP infrastructure
 ```
+
+### Service topology
+
+```text
+browser ─► gateway (8080) ─► agent (8000)            ─► postgres
+            │                  ├─► mcp-toolbox (5000) ─► BigQuery
+            │                  └─► mcp-stats (5003)
+            └─► (Alembic at boot via the db-migrate one-shot)
+```
+
+The frontend talks **only** to the gateway. The gateway owns auth and the
+platform's Postgres schema (via Alembic); everything not handled directly is
+streamed through to the private agent service, SSE included.
 
 ## Adding an Agent
 
-The ADK server auto-discovers agents — no registration needed. See [CONTRIBUTING.md](CONTRIBUTING.md) for full steps and `agentConfig.tsx` display flags.
-
-**Minimal `agent.py`:**
-
-```python
-from google.adk.agents import Agent
-
-root_agent = Agent(
-    name="my_agent",
-    model="gemini-2.5-flash",
-    instruction="You are a helpful assistant.",
-)
-```
+The ADK server auto-discovers agents in `services/backend/agents/adk_agents/<name>/agent.py` — define a top-level `root_agent`. See [CONTRIBUTING.md](CONTRIBUTING.md#adding-an-agent) for the full steps including the `agentConfig.tsx` display flags.
 
 ## Using MCP Toolbox
 
@@ -128,15 +135,37 @@ Notes:
   - `GOOGLE_IMPERSONATE_SERVICE_ACCOUNT` (optional; uses IAM impersonation, no local key file)
 - If the current user cannot access the configured secret, the generated `.env` is removed and `mcp-google-ads` cannot be started.
 
+## Schema Migrations
+
+Platform-owned Postgres tables (`session_metadata`, `event_metadata`, `sources`)
+are managed by **Alembic** in the gateway. ADK manages its own tables and
+ships its own migrations on version updates — we never touch those.
+
+On `docker compose up`, the `db-migrate` one-shot service runs
+`alembic upgrade head` against Postgres and exits; the gateway and agent both
+wait for it (`service_completed_successfully`) before they start. Migrations
+are idempotent, so a restart is safe. CI applies them to a fresh Postgres on
+every PR.
+
+Add a migration:
+
+```bash
+docker compose exec gateway uv run alembic revision -m "short description"
+# edit the generated file in services/backend/gateway/alembic/versions/
+docker compose up -d db-migrate   # re-runs it; the gateway then restarts cleanly
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md#schema-migrations) for the full workflow.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming, commit conventions, CI requirements, and guidelines for adding agents and tools.
 
 ## Deployment
 
-CI runs on every push and PR (`ruff`, `ESLint`, `tsc`, `terraform validate`, `docker compose config`). All checks must pass before merge.
+CI runs on every push and PR (`ruff`, `ESLint`, `tsc`, `vitest`, `pytest`, `alembic upgrade head`, `terraform validate`, `docker compose config`). All checks must pass before merge.
 
-### MCP Toolbox to Cloud Run
+### EX: MCP Toolbox to Cloud Run
 
 ```bash
 export IMAGE=us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:1.1.0

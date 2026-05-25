@@ -1,17 +1,39 @@
-import os
+"""The Media Performance agent — a router that delegates the final envelope
+to the right specialist subagent.
+
+Architecture (peer subagents):
+- Root: tool-using LlmAgent with the data toolset + stats MCP. It picks the
+  workflow, fetches the data, and decides which subagent should render the
+  reply. The root NEVER emits the envelope itself when a subagent is
+  appropriate — it returns the subagent's response verbatim.
+- ChoicesAgent: produces `{ text, ui: [choices block] }` when a request is
+  ambiguous. Has its OWN data tools so options are grounded in real values.
+- VegaChartsAgent: produces `{ text, ui: [chart block] }` from data the root
+  fetched. Has NO data tools — it must use the data the root passed it.
+
+Why peer subagents (vs. one mega-agent): each subagent owns ONE response
+shape, so its prompt is short and its output stays clean. The root never has
+to remember "should I emit text-only or wrap a chart?" — it picks a subagent.
+"""
+
 import logging
+import os
 from datetime import date
 
-from google.adk.agents import LlmAgent, SequentialAgent
+from google.adk.agents import LlmAgent
 from google.adk.tools.agent_tool import AgentTool
-from google.adk.tools.mcp_tool import MCPToolset, SseConnectionParams
+from google.adk.tools.mcp_tool import McpToolset, SseConnectionParams
 
 from shared.toolbox import get_toolbox_client
 
 from .prompts.root_agent import get_root_agent_prompt
-from .subagents.react_charts_agent import root_agent as react_charts_root_agent
 from .subagents.choices_agent import root_agent as choices_root_agent
-from .subagents.response_formatter import root_agent as response_formatter
+from .subagents.vega_charts_agent import root_agent as vega_charts_root_agent
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+MODEL_NAME = "gemini-2.5-flash"
 
 
 def today() -> str:
@@ -19,39 +41,30 @@ def today() -> str:
     return date.today().isoformat()
 
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-MODEL_NAME = "gemini-2.5-flash"
-
-
-def _build_worker() -> LlmAgent:
-    """The worker: queries media data, runs analysis, and delegates charts /
-    clarifying questions to its subagents — producing a draft answer."""
+def _build_root_agent() -> LlmAgent:
+    """Wire data tools + stats MCP + the two peer subagents (ChoicesAgent,
+    VegaChartsAgent) into the router LlmAgent."""
     toolbox = get_toolbox_client()
-    tools = toolbox.load_toolset("media_performance_recharts_friendly")
+    tools = toolbox.load_toolset("media_performance_query")
     tools.append(today)
-    tools.append(AgentTool(react_charts_root_agent))
     tools.append(AgentTool(choices_root_agent))
+    tools.append(AgentTool(vega_charts_root_agent))
 
-    # Statistical analysis tools (correlation, regression, QA) from the stats MCP server.
+    # Stats MCP server — correlation, regression, QA on user-uploaded sources.
     stats_url = os.getenv("MCP_STATS_URL", "http://mcp-stats:8080/sse")
-    tools.append(MCPToolset(connection_params=SseConnectionParams(url=stats_url)))
+    tools.append(McpToolset(connection_params=SseConnectionParams(url=stats_url)))
+
     return LlmAgent(
         model=MODEL_NAME,
-        name="MediaPerformanceWorker",
-        description="Queries media performance data and drafts the analysis.",
+        name="MediaPerformanceAgent",
+        description=(
+            "Routes media-performance questions to the right specialist "
+            "subagent (ChoicesAgent for ambiguity, VegaChartsAgent for "
+            "visualised answers); answers text-only questions directly."
+        ),
         instruction=get_root_agent_prompt(),
         tools=tools,
-        output_key="draft",
     )
 
 
-# A tool-using LlmAgent can't carry an output_schema, so its hand-formatted JSON
-# is unreliable. Splitting the turn fixes that: the worker (tools) drafts the
-# answer, then the ResponseFormatter (output_schema, no tools) turns that draft
-# into the deterministic { text, ui } envelope as the terminal step.
-root_agent = SequentialAgent(
-    name="MediaPerformanceAgent",
-    description="Agent to answer questions about Media Performance with data visualizations and insights.",
-    sub_agents=[_build_worker(), response_formatter],
-)
+root_agent = _build_root_agent()

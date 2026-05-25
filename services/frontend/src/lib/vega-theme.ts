@@ -1,17 +1,21 @@
 // One Vega-Lite `config` that themes every chart to the platform's dark
-// surface — the Vega-Lite analogue of the palette/axis/mark props scattered
-// through ChartVisualization, except declared once and applied to every chart
-// shape, including ones no one has hand-coded a renderer for.
+// surface — declared once and applied to every chart shape, including ones no
+// one has hand-coded a renderer for.
 //
-// Tuned to match the Recharts charts: emerald primary, rounded bar tops, faint
-// dashed grid, no axis domain lines, muted zinc labels.
+// House style: emerald primary, rounded bar tops, faint dashed grid, no axis
+// domain lines, muted zinc labels.
 
 export const vegaDarkTheme = {
   background: 'transparent',
   font: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-  padding: 4,
+  // Friendly number formatting everywhere — uppercase K / M / B with $ and %
+  // honored from the format string. The implementation is the `compactNum`
+  // Vega expression function, registered when the Vega runtime loads.
+  customFormatTypes: true,
+  numberFormat: '',
+  numberFormatType: 'compactNum',
 
-  // Title — matches the white, start-anchored chart titles in ChartVisualization.
+  // Title — white, start-anchored, sits above the plot.
   title: {
     color: '#f4f4f5',
     fontSize: 13,
@@ -43,9 +47,13 @@ export const vegaDarkTheme = {
 
   // Mark defaults — every bar gets rounded tops and the emerald primary; lines
   // and areas get the accent blue. Specs inherit these and stay terse.
+  //
+  // Lines + points share one color (the line's stroke). A `point: true` mark
+  // shorthand inherits the parent line color in Vega-Lite; this `point` block
+  // is the fallback for hand-authored point marks so they match the line.
   bar: { cornerRadiusEnd: 4, color: '#10b981' },
-  line: { stroke: '#3b82f6', strokeWidth: 2.5 },
-  point: { fill: '#3b82f6', size: 55, filled: true },
+  line: { stroke: '#3b82f6', strokeWidth: 2.5, interpolate: 'monotone', point: { filled: true, size: 45 } },
+  point: { fill: '#3b82f6', size: 45, filled: true, stroke: '#0b1220', strokeWidth: 1 },
   area: { line: { color: '#3b82f6', strokeWidth: 2 }, opacity: 0.9 },
   rule: { color: '#52525b' },
   text: { fill: '#a1a1aa', fontSize: 10 },

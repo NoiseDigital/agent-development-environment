@@ -12,37 +12,17 @@ from typing import Any, Optional
 
 import asyncpg
 
-from api.db import ensure_schema
+from api.db import get_pool
 
 VALID_RATINGS = ("up", "down")
 
-# Schema bootstrap — idempotent so it also works on a provisioned volume. The
-# UNIQUE key gives one rating per user per message and powers the upsert below.
-# `event_metadata` is intentionally general — feedback is its first use; other
-# per-event platform metadata can be added as columns later.
-_SCHEMA = """
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
--- Migration: the feedback table was renamed message_feedback -> event_metadata.
-DROP TABLE IF EXISTS message_feedback;
-CREATE TABLE IF NOT EXISTS event_metadata (
-    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    app_name    TEXT NOT NULL,
-    user_id     TEXT NOT NULL,
-    session_id  TEXT NOT NULL,
-    event_id    TEXT NOT NULL,
-    rating      TEXT NOT NULL CHECK (rating IN ('up', 'down')),
-    comment     TEXT,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (app_name, user_id, session_id, event_id)
-);
-CREATE INDEX IF NOT EXISTS idx_event_metadata_session
-    ON event_metadata (app_name, user_id, session_id);
-"""
+# Schema ownership: `event_metadata` is created by the gateway's Alembic
+# migration (`baseline_metadata_tables`). To change the shape, add a new
+# migration in `services/backend/gateway/alembic/versions/`.
 
 
 async def _pool() -> asyncpg.Pool:
-    return await ensure_schema("feedback", _SCHEMA)
+    return await get_pool()
 
 
 def _row_to_dict(row: asyncpg.Record) -> dict[str, Any]:

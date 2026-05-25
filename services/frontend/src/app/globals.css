@@ -177,3 +177,36 @@ body {
   font-weight: 600;
   text-align: right;
 }
+
+/* Slow drifting ambient blobs behind the chat page — chat/[agentId]/[sessionId]
+ * mounts two of these and a backdrop blur. Pure CSS so it costs nothing on
+ * the JS side; pointer-events:none is set on the wrapper so the blobs never
+ * intercept clicks. */
+@keyframes chatBlobA {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(40px, -30px) scale(1.08); }
+}
+@keyframes chatBlobB {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(-50px, 20px) scale(1.05); }
+}
+
+/* Ambient neural-expressive background — three slow-drifting orbs that
+ * blend over the dark surface for that "Gemini Neural Expressive" feel.
+ * Mounted at the layout level on non-dashboard pages so the canvas of
+ * /d/* stays clean for charts. Pointer-events:none everywhere so the
+ * orbs never intercept clicks. */
+@keyframes neuralOrbA {
+  0%, 100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  33%      { transform: translate(-35%, -45%) scale(1.08) rotate(60deg); }
+  66%      { transform: translate(-60%, -55%) scale(0.95) rotate(120deg); }
+}
+@keyframes neuralOrbB {
+  0%, 100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  33%      { transform: translate(-65%, -50%) scale(1.05) rotate(-50deg); }
+  66%      { transform: translate(-40%, -60%) scale(1.10) rotate(-100deg); }
+}
+@keyframes neuralOrbC {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50%      { transform: translate(-55%, -42%) scale(1.12); }
+}

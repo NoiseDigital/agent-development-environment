@@ -1,7 +1,7 @@
-"""HTTP API for user-facing session display names.
+"""HTTP API for user-facing session metadata (display names + hidden flag).
 
-Names are keyed by the ADK session identity. See session_meta.db for why they
-live in their own table rather than in ADK's `sessions` state.
+Metadata is keyed by the ADK session identity; see repo.py for why it lives in
+its own table rather than ADK's `sessions` state.
 
 The user is taken from `current_user` (the auth seam), never from the request,
 so a client cannot read or rename another user's sessions.
@@ -27,13 +27,18 @@ class NameRequest(BaseModel):
     display_name: str
 
 
+class HideRequest(BaseModel):
+    app_name: str
+    session_id: str
+
+
 @router.get("/session-names")
 async def list_session_names(
     app_name: str = Query(...),
     user: CurrentUser = Depends(current_user),
 ):
-    """All session display names for an app, for the current user."""
-    return {"names": await repo.list_names(app_name, user.uid)}
+    """Session metadata for an app + current user: `{ names, hidden }`."""
+    return await repo.list_meta(app_name, user.uid)
 
 
 @router.put("/session-names")
@@ -48,12 +53,23 @@ async def set_session_name(
     return {"session_id": req.session_id, "display_name": name}
 
 
+@router.post("/session-names/hide")
+async def hide_session(
+    req: HideRequest,
+    user: CurrentUser = Depends(current_user),
+):
+    """Soft-delete — hide the session from the frontend but keep ADK's row."""
+    await repo.hide_session(req.app_name, user.uid, req.session_id)
+    return {"hidden": req.session_id}
+
+
 @router.delete("/session-names")
 async def delete_session_name(
     app_name: str = Query(...),
     session_id: str = Query(...),
     user: CurrentUser = Depends(current_user),
 ):
-    """Remove a session's name — used when the session is deleted."""
-    await repo.delete_name(app_name, user.uid, session_id)
+    """Hard-delete the metadata row — used when the underlying ADK session is
+    also being hard-deleted (e.g. empty-session auto-cleanup)."""
+    await repo.delete_meta(app_name, user.uid, session_id)
     return {"deleted": session_id}

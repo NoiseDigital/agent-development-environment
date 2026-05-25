@@ -6,11 +6,16 @@ from pathlib import Path
 import uvicorn
 from google.adk.cli.fast_api import get_fast_api_app
 
+from api.pins.routes import router as pins_router
 from api.sources.routes import router as sources_router
 from api.events.routes import router as events_router
 from api.sessions.routes import router as sessions_router
 from api.tools.routes import router as tools_router
-from api.naming import router as naming_router
+# Note: session naming + dashboard insights are no longer custom routes that
+# build their own genai.Client. They are now real ADK agents (the
+# `session_naming_agent` and `dashboard_insights_agent` apps under adk_agents/),
+# invoked by the frontend through the standard ADK /run endpoint. ONE auth
+# path — ADK + ADC — for every model interaction in the platform.
 
 AGENTS_DIR = str(Path(__file__).resolve().parent / "adk_agents")
 
@@ -24,10 +29,12 @@ app = get_fast_api_app(
 
 # Platform API — everything ADK's FastAPI app doesn't already provide.
 app.include_router(sources_router)  # uploads + BigQuery catalog
-app.include_router(events_router)  # per-message event metadata (feedback)
+app.include_router(events_router)  # per-message event metadata
 app.include_router(sessions_router)  # session display names
 app.include_router(tools_router)  # MCP toolbox query catalog (admin)
-app.include_router(naming_router)  # session-name generation
+# Dashboard query route moved to the gateway — it's a platform-owned BFF
+# concern, not part of the ADK runtime. See services/backend/gateway/api/dashboards.py.
+app.include_router(pins_router)  # pinned charts (FloatingAssistant → dashboard)
 
 
 if __name__ == "__main__":

@@ -11,13 +11,6 @@ import ResizeHandle from './ResizeHandle';
 
 // ── Icons ────────────────────────────────────────────────────────────────────
 
-const PlanIcon = () => (
-  <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-  </svg>
-);
-
 const DashboardsIcon = () => (
   <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
@@ -109,7 +102,6 @@ export default function PlatformSidebar() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>
-        {collapsedItem(pathname.startsWith('/plan'), () => router.push('/plan'), 'Plan', <PlanIcon />)}
         {collapsedItem(pathname.startsWith('/dashboards'), () => router.push('/dashboards'), 'Dashboards', <DashboardsIcon />)}
         {collapsedItem(pathname.startsWith('/analyze'), () => router.push('/analyze'), 'Analyze', <AnalyzeIcon />)}
         {collapsedItem(inAgentsSection, () => router.push('/agents'), 'Agents', <AgentsIcon />)}
@@ -143,16 +135,6 @@ export default function PlatformSidebar() {
 
       {/* ── Navigation ────────────────────────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto p-2 space-y-px">
-
-        {/* Plan */}
-        <button
-          type="button"
-          onClick={() => router.push('/plan')}
-          className={navItem(pathname.startsWith('/plan'))}
-        >
-          <PlanIcon />
-          <span>Plan</span>
-        </button>
 
         {/* Dashboards */}
         <button

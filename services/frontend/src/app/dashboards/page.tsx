@@ -1,11 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { mockDashboards, dashboardFromSpec, Dashboard, DashboardOwnership } from '../../data/mock-dashboard-data';
-import { loadUserDashboards } from '../../lib/user-dashboards';
-import { dashboardTitle } from '../../lib/dashboard-access';
-import NewDashboardModal from '../../components/NewDashboardModal';
+import { clientBySlug } from '../../data/clients';
+import { loadUserDashboards, deleteUserDashboard, isUserDashboard, saveUserDashboard } from '../../lib/user-dashboards';
+import { dashboardTitle, canDelete } from '../../lib/dashboard-access';
+import { newId } from '../../lib/id';
+import { showToast } from '../../lib/toast';
+import NewDashboardModal from '../../components/dashboards/NewDashboardModal';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -40,38 +44,139 @@ const ownershipLabel: Record<DashboardOwnership, string> = {
 };
 
 // ── Dashboard card ────────────────────────────────────────────────────────────
+// Quiet card: brand mark, title, ownership badge, last updated, kebab menu.
+// The card is a navigation target; the kebab is the in-list quick-action
+// surface (copy / delete) so users don't have to enter the dashboard first.
+// Client dashboards never expose Delete — `canDelete(dashboard)` is false
+// for them. Inside-dashboard actions stay in the dashboard's own ⋯ menu.
 
-function DashboardCard({ dashboard, onClick }: { dashboard: Dashboard; onClick: () => void }) {
+interface CardActions {
+  onOpen: () => void;
+  onCopy: () => void;
+  onDelete: () => void;
+}
+
+function DashboardCard({
+  dashboard,
+  actions,
+}: {
+  dashboard: Dashboard;
+  actions: CardActions;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const title = dashboardTitle(dashboard);
+  const client = clientBySlug(dashboard.clientInitials.toLowerCase());
+  const deletable = canDelete(dashboard) && isUserDashboard(dashboard.id);
+
+  // The whole card is a button to open the dashboard, but the kebab is its
+  // own button stacked on top. We stop click propagation on the kebab so the
+  // menu doesn't navigate.
+  return (
+    <div className="group relative">
+      <button
+        type="button"
+        onClick={actions.onOpen}
+        className="flex w-full items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-4 text-left transition-colors duration-150 hover:border-zinc-700 hover:bg-zinc-900/60"
+      >
+        {/* Brand mark — image when the client has a logo, initials badge otherwise. */}
+        {client.logoPath ? (
+          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
+            <Image
+              src={client.logoPath}
+              alt={client.name}
+              width={40}
+              height={40}
+              className="h-full w-full object-contain"
+            />
+          </div>
+        ) : (
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-800 text-[11px] font-bold text-zinc-300">
+            {dashboard.clientInitials}
+          </div>
+        )}
+
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-semibold leading-snug text-white">{title}</h3>
+          <p className="mt-0.5 truncate text-[11px] text-zinc-500">
+            Updated {fmtDate(dashboard.lastUpdated)}
+          </p>
+        </div>
+
+        <span
+          className={`mr-7 shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${ownershipBadge[dashboard.ownership]}`}
+        >
+          {ownershipLabel[dashboard.ownership]}
+        </span>
+      </button>
+
+      {/* Kebab — absolute-positioned over the card so the card itself stays a
+          single click target for navigation. */}
+      <div
+        className="absolute right-3 top-1/2 -translate-y-1/2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setMenuOpen((v) => !v);
+          }}
+          aria-label="Dashboard actions"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-white"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01" />
+          </svg>
+        </button>
+
+        {menuOpen && (
+          <>
+            <button
+              type="button"
+              aria-label="Close menu"
+              onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }}
+              className="fixed inset-0 z-10 cursor-default"
+            />
+            <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 py-1 shadow-xl">
+              <CardMenuItem
+                label="Make a copy"
+                onClick={() => { setMenuOpen(false); actions.onCopy(); }}
+              />
+              {deletable && (
+                <CardMenuItem
+                  label="Delete"
+                  destructive
+                  onClick={() => { setMenuOpen(false); actions.onDelete(); }}
+                />
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CardMenuItem({
+  label,
+  onClick,
+  destructive,
+}: {
+  label: string;
+  onClick: () => void;
+  destructive?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group flex h-full w-full flex-col rounded-xl border border-zinc-800 bg-zinc-950 p-5 text-left transition-all duration-150 hover:border-zinc-700 hover:bg-zinc-900/60"
+      className={`flex w-full items-center px-3 py-2 text-left text-[11px] transition-colors ${
+        destructive
+          ? 'text-red-400 hover:bg-red-500/10 hover:text-red-300'
+          : 'text-zinc-300 hover:bg-zinc-900 hover:text-white'
+      }`}
     >
-      <div className="flex shrink-0 items-start justify-between gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-800 text-xs font-bold text-zinc-300 transition-colors group-hover:border-zinc-600">
-          {dashboard.clientInitials}
-        </div>
-        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${ownershipBadge[dashboard.ownership]}`}>
-          {ownershipLabel[dashboard.ownership]}
-        </span>
-      </div>
-
-      <div className="mt-3 flex-1">
-        <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-white transition-colors group-hover:text-zinc-100">
-          {title}
-        </h3>
-        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-zinc-500">{dashboard.description}</p>
-      </div>
-
-      <div className="mt-4 shrink-0 space-y-1 text-[11px] text-zinc-600">
-        <div className="flex items-center justify-between gap-2">
-          <span className="truncate">{dashboard.client}</span>
-          <span className="shrink-0 whitespace-nowrap">Updated {fmtDate(dashboard.lastUpdated)}</span>
-        </div>
-        <p className="h-[1em]">{dashboard.ownership !== 'owned' ? `By ${dashboard.owner}` : ''}</p>
-      </div>
+      {label}
     </button>
   );
 }
@@ -90,6 +195,29 @@ export default function DashboardsPage() {
   }, []);
 
   const allDashboards = [...userDashboards, ...mockDashboards];
+
+  // Copy + Delete from the card kebab. Both refresh the user-dashboards
+  // list in place so the grid reflects the change immediately.
+  const handleCopy = useCallback((d: Dashboard) => {
+    const id = newId();
+    saveUserDashboard({
+      id,
+      name: dashboardTitle(d),
+      campaignId: d.campaignId,
+      createdAt: new Date().toISOString(),
+    });
+    showToast({ message: 'Copy created — rename it from the new dashboard.', tone: 'success' });
+    router.push(`/dashboards/${id}`);
+  }, [router]);
+
+  const handleDelete = useCallback((d: Dashboard) => {
+    if (!isUserDashboard(d.id)) return;
+    if (!window.confirm(`Delete "${dashboardTitle(d)}"? This can't be undone.`)) return;
+    deleteUserDashboard(d.id);
+    setUserDashboards(loadUserDashboards().map(dashboardFromSpec));
+    showToast({ message: 'Dashboard deleted.', tone: 'success' });
+  }, []);
+
   const filtered = allDashboards.filter((d) => {
     const matchesTab = activeTab === 'all' || d.ownership === activeTab;
     const matchesSearch =
@@ -103,12 +231,7 @@ export default function DashboardsPage() {
     <div className="flex h-full flex-col bg-black">
       {/* Page header */}
       <div className="flex shrink-0 items-center justify-between border-b border-zinc-800/60 px-8 py-5">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight text-white">Dashboards</h1>
-          <p className="mt-0.5 text-xs text-zinc-500">
-            {allDashboards.length} dashboards across {new Set(allDashboards.map((d) => d.client)).size} clients
-          </p>
-        </div>
+        <h1 className="text-lg font-semibold tracking-tight text-white">Dashboards</h1>
         <div className="flex items-center gap-3">
           <div className="relative">
             <svg className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -171,7 +294,11 @@ export default function DashboardsPage() {
               <DashboardCard
                 key={dashboard.id}
                 dashboard={dashboard}
-                onClick={() => router.push(`/dashboards/${dashboard.id}`)}
+                actions={{
+                  onOpen: () => router.push(`/dashboards/${dashboard.id}`),
+                  onCopy: () => handleCopy(dashboard),
+                  onDelete: () => handleDelete(dashboard),
+                }}
               />
             ))}
           </div>

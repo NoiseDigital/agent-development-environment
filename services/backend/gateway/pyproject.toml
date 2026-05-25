@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "noise-gateway"
+version = "0.1.0"
+description = "API gateway for the NoiseOS frontend — owns auth, proxies agent traffic, hosts platform-owned routes, and manages the platform's Postgres schema via Alembic."
+readme = "README.md"
+requires-python = "==3.13.*"
+dependencies = [
+    "fastapi>=0.116.0",
+    "uvicorn>=0.35.0",
+    "httpx>=0.28.0",
+    # Schema migrations for every platform-owned Postgres table. ADK manages
+    # its own tables and ships its own migrations; we never touch those.
+    "alembic>=1.13.0",
+    "psycopg[binary]>=3.2.0",
+    # Async driver for the platform's own runtime DB access (clients,
+    # user_dashboards, share_links). Sync psycopg above is Alembic-only.
+    "asyncpg>=0.30.0",
+    # Async MCP Toolbox client — the gateway is the dashboard-data BFF and
+    # talks to the toolbox concurrently for every tile. Same library the
+    # agent service uses (sync flavour), so the SQL surface in tools.yaml
+    # is shared. See services/backend/gateway/api/toolbox.py.
+    "toolbox-core>=0.5.4",
+]
+
+[tool.setuptools]
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+include = ["api*"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.3.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

@@ -1,18 +1,26 @@
-// Client for the session display-name API on the agent service.
-// Names are keyed by the ADK session identity and persisted server-side.
+// Client for the session-metadata API on the agent service.
+// Names + the hidden (soft-deleted) flag are keyed by the ADK session identity
+// and persisted server-side. Soft-deletes survive across devices and reloads.
 
 import { apiRequest } from './http';
 
 const BASE_URL = process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'http://localhost:8000';
 
+export interface SessionMeta {
+  /** Per-session display name, keyed by ADK session id. */
+  names: Record<string, string>;
+  /** Session ids the user has soft-deleted. */
+  hidden: string[];
+}
+
 export const sessionNamesApi = {
-  /** All session display names for an app + user, as { [sessionId]: name }. */
-  async list(appName: string, userId = 'user-1'): Promise<Record<string, string>> {
+  /** Session metadata for an app + user — names and hidden ids. */
+  async list(appName: string, userId = 'user-1'): Promise<SessionMeta> {
     const q = new URLSearchParams({ app_name: appName, user_id: userId });
-    const data = await apiRequest<{ names: Record<string, string> }>(
+    const data = await apiRequest<Partial<SessionMeta>>(
       `${BASE_URL}/api/session-names?${q}`,
     );
-    return data.names;
+    return { names: data.names ?? {}, hidden: data.hidden ?? [] };
   },
 
   /** Set the display name for one session. */
@@ -34,7 +42,21 @@ export const sessionNamesApi = {
     });
   },
 
-  /** Remove a session's name — called when the session is deleted. */
+  /** Soft-delete: hide the session in the UI while keeping ADK's data. */
+  async hide(appName: string, sessionId: string, userId = 'user-1'): Promise<void> {
+    await apiRequest<unknown>(`${BASE_URL}/api/session-names/hide`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        app_name: appName,
+        user_id: userId,
+        session_id: sessionId,
+      }),
+    });
+  },
+
+  /** Hard-delete the metadata row — used when the ADK session is also being
+   *  hard-deleted (e.g. empty-session auto-cleanup). */
   async remove(appName: string, sessionId: string, userId = 'user-1'): Promise<void> {
     const q = new URLSearchParams({
       app_name: appName,

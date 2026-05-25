@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { mockDashboards, dashboardFromSpec, type Dashboard } from '../../../data/mock-dashboard-data';
 import { loadUserDashboards } from '../../../lib/user-dashboards';
-import DashboardDetail from '../../../components/DashboardDetail';
+import DashboardDetail from '../../../components/dashboards/DashboardDetail';
 
 // Per-dashboard route — every dashboard has its own URL (/dashboards/<id>).
 // A code-defined dashboard resolves synchronously; a user-created one is loaded

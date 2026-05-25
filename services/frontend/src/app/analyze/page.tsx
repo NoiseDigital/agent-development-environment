@@ -5,8 +5,8 @@ import { sourcesApi } from '../../lib/sources-api';
 import { statsApi, type CorrelateResult, type QaResult, type ColumnProfile } from '../../lib/stats-api';
 import type { Upload, SourceRef, BigQueryTableRef } from '../../types/source';
 import { sourceUri, sourceLabel } from '../../types/source';
-import type { ChartData } from '../../types/chart';
-import ChartVisualization from '../../components/ChartVisualization';
+import { heatmapSpec } from '../../lib/vega-specs';
+import VegaChart from '../../components/VegaChart';
 import InfoHint from '../../components/InfoHint';
 
 // ── Control helpers ───────────────────────────────────────────────────────────
@@ -258,16 +258,15 @@ export default function AnalyzePage() {
     }
   };
 
-  const heatmapChart: ChartData | null = result
-    ? {
-        type: 'heatmap',
+  const heatmapChart = result
+    ? heatmapSpec({
         title: `Correlation — ${result.method === 'spearman' ? 'Spearman' : 'Pearson'}`,
-        insight: `${result.n_rows_used.toLocaleString()} rows analyzed${source ? ` · ${sourceLabel(source)}` : ''}`,
+        subtitle: `${result.n_rows_used.toLocaleString()} rows analyzed${source ? ` · ${sourceLabel(source)}` : ''}`,
         rows: result.rows,
         cols: result.cols,
         matrix: result.matrix,
         significant: result.significant,
-      }
+      })
     : null;
 
   return (
@@ -480,7 +479,7 @@ export default function AnalyzePage() {
             </div>
           ) : (
             <div className="space-y-6 max-w-4xl">
-              {heatmapChart && <ChartVisualization chart={heatmapChart} saveable />}
+              {heatmapChart && <VegaChart spec={heatmapChart} saveable />}
 
               {/* Top signals */}
               <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4">

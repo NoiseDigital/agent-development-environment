@@ -197,8 +197,17 @@ export default function Choices({
         </div>
       )}
 
-      {/* Active question */}
-      <p className="text-sm font-medium text-white mb-3">{q.question}</p>
+      {/* Active question — show a "Pick all that apply" hint when the
+          question is multi-select so the user knows the chips are checkboxes
+          rather than radios. */}
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <p className="text-sm font-medium text-white">{q.question}</p>
+        {q.multiSelect && (
+          <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+            Pick all that apply
+          </span>
+        )}
+      </div>
 
       <div className="flex flex-wrap gap-2">
         {q.options.map((o) => {
@@ -209,13 +218,35 @@ export default function Choices({
               key={val}
               type="button"
               onClick={() => toggle(val)}
-              className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
                 isActive
                   ? 'border-accent-500 bg-accent-500/15 text-white'
                   : 'border-line-strong bg-surface-sunken text-zinc-300 hover:border-zinc-600'
               }`}
             >
-              {o.label}
+              {/* Indicator: square+tick for multi-select, dot for single. Filled
+                  when active. Keeps the affordance discoverable without an
+                  extra row of explanation. */}
+              {q.multiSelect ? (
+                <span
+                  className={`flex h-3 w-3 shrink-0 items-center justify-center rounded-sm border ${
+                    isActive ? 'border-accent-500 bg-accent-500' : 'border-zinc-600'
+                  }`}
+                >
+                  {isActive && (
+                    <svg className="h-2.5 w-2.5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </span>
+              ) : (
+                <span
+                  className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                    isActive ? 'bg-accent-500 ring-2 ring-accent-500/30' : 'border border-zinc-600'
+                  }`}
+                />
+              )}
+              <span>{o.label}</span>
             </button>
           );
         })}

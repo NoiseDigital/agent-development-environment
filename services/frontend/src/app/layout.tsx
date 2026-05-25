@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import PlatformSidebar from "../components/PlatformSidebar";
-import FloatingAssistant from "../components/FloatingAssistant";
+import FloatingAssistant from "../components/chat/FloatingAssistant";
+import NeuralBackground from "../components/NeuralBackground";
 import Toaster from "../components/Toaster";
 import { SidebarProvider } from "../contexts/SidebarContext";
 
@@ -32,7 +33,8 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <SidebarProvider>
-          <div className="flex h-screen bg-black overflow-hidden">
+          <NeuralBackground />
+          <div className="relative z-10 flex h-screen bg-black/0 overflow-hidden">
             <PlatformSidebar />
             <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
               {children}

@@ -197,16 +197,48 @@ export class ADKApiClient {
     }
   }
 
-  async nameSession(appName: string, messages: Array<{ content: string; role: string }>): Promise<string> {
+  /** One-shot ADK agent call: ephemeral session → send → final text → delete.
+   *  Used for non-conversational agents (insights, naming) so they share the
+   *  same ADK + ADC auth path as the chat agents. */
+  async runOneShot(
+    appName: string,
+    userId: string,
+    text: string,
+  ): Promise<string> {
     const baseUrl = this.getBaseUrl(appName);
-    const response = await fetch(`${baseUrl}/name_session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages }),
-    });
-    if (!response.ok) throw new Error('Failed to name session');
-    const data = await response.json();
-    return data.name as string;
+    const sessionId = `oneshot-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+    const createRes = await fetch(
+      `${baseUrl}/apps/${appName}/users/${userId}/sessions/${sessionId}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: {}, events: [] }),
+      },
+    );
+    if (!createRes.ok) {
+      throw new Error(`one-shot session create failed: ${createRes.status}`);
+    }
+
+    try {
+      const events = await this.sendMessage({
+        appName,
+        userId,
+        sessionId,
+        newMessage: { parts: [{ text }], role: 'user' },
+      });
+
+      const finalEvent = [...events].reverse().find(
+        (e) => e.author && e.author !== 'user' && e.partial !== true && e.content?.parts?.some((p) => p.text),
+      );
+      const finalText = finalEvent?.content?.parts
+        ?.map((p) => p.text ?? '')
+        .join('')
+        .trim() ?? '';
+      return finalText;
+    } finally {
+      this.deleteSession(appName, userId, sessionId).catch(() => {});
+    }
   }
 }
 

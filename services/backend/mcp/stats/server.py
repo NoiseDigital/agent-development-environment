@@ -18,7 +18,7 @@ from mcp.server.sse import SseServerTransport
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from starlette.routing import Mount, Route
 
 from google.adk.tools.function_tool import FunctionTool
@@ -201,6 +201,9 @@ async def handle_sse(request):
         request.scope, request.receive, request._send
     ) as streams:
         await app.run(streams[0], streams[1], app.create_initialization_options())
+    # Starlette >=0.49 requires a route endpoint to return a Response; the SSE
+    # stream itself was already sent inside connect_sse via request._send.
+    return Response()
 
 
 # --- Plain HTTP API -----------------------------------------------------------
