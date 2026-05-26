@@ -3,8 +3,9 @@
 ADK manages its session/event tables itself and ships its own migrations on
 version updates. The platform's other tables (session_metadata, event_metadata,
 sources) are owned by the gateway service via Alembic — the agent only reads
-and writes them. By the time this pool is used, the gateway's `db-migrate`
-one-shot has already brought the schema to head (see docker-compose.yml).
+and writes them. The gateway runs `alembic upgrade head` in its entrypoint
+and the agent waits on `gateway: service_healthy`, so by the time this pool
+is used the schema is always at head (see docker-compose.yml).
 """
 
 from __future__ import annotations

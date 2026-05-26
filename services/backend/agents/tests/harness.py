@@ -17,8 +17,10 @@ Programmatic use:
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import importlib
+import json
 import sys
 import uuid
 from abc import ABC, abstractmethod
@@ -47,6 +49,11 @@ class AgentRun:
     message: str
     text: str = ""
     tool_calls: list[ToolCall] = field(default_factory=list)
+    # UI component names emitted by ANY event in the turn (not just the final
+    # response). This is what the frontend recovers via the `fallbackUi` path
+    # when the root agent paraphrases a subagent's envelope — the test should
+    # see what the user sees, so it tracks the same fallback.
+    ui_components: list[str] = field(default_factory=list)
     error: str | None = None
 
     @property
@@ -64,6 +71,61 @@ class AgentHarness(ABC):
     async def run(
         self, agent: str, message: str, *, user_id: str = "harness"
     ) -> AgentRun: ...
+
+
+def _extract_ui_components(text: str) -> list[str]:
+    """Pull `component` names from any `{ "ui": [{...}] }` envelope embedded
+    in `text`. Lenient — tolerates Python literals (True/None), markdown
+    fences, and embedded envelopes inside prose. Empty list when nothing
+    parseable."""
+    if not text:
+        return []
+    # Strip an outer ```json fence so the brace search lands inside the JSON
+    # rather than on the fence itself.
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = stripped.split("\n", 1)[-1]
+        if stripped.endswith("```"):
+            stripped = stripped[:-3]
+    start, end = stripped.find("{"), stripped.rfind("}")
+    if start == -1 or end <= start:
+        return []
+    blob = stripped[start : end + 1]
+    payload: Any
+    try:
+        payload = json.loads(blob)
+    except json.JSONDecodeError:
+        try:
+            payload = ast.literal_eval(blob)
+        except (ValueError, SyntaxError):
+            return []
+    if not isinstance(payload, dict):
+        return []
+    ui = payload.get("ui")
+    if not isinstance(ui, list):
+        return []
+    comps: list[str] = []
+    for b in ui:
+        if not isinstance(b, dict):
+            continue
+        comp = b.get("component")
+        if isinstance(comp, str) and comp:
+            comps.append(comp)
+    return comps
+
+
+def _ui_from_tool_response(response: Any) -> list[str]:
+    """ADK's AgentTool captures the wrapped subagent's output INTO the tool
+    response (`{ "result": "<envelope>" }`) instead of streaming it as its
+    own text event. We pull the same envelope out from there."""
+    if isinstance(response, dict):
+        for key in ("result", "output", "text"):
+            value = response.get(key)
+            if isinstance(value, str):
+                comps = _extract_ui_components(value)
+                if comps:
+                    return comps
+    return []
 
 
 class ADKHarness(AgentHarness):
@@ -108,12 +170,27 @@ class ADKHarness(AgentHarness):
                         if fc.id:
                             calls_by_id[fc.id] = call
                     fr = getattr(part, "function_response", None)
-                    if fr is not None and fr.id in calls_by_id:
-                        calls_by_id[fr.id].response = fr.response
-                    if getattr(part, "text", None):
-                        last_text = part.text
+                    if fr is not None:
+                        if fr.id in calls_by_id:
+                            calls_by_id[fr.id].response = fr.response
+                        # Tool responses may contain a `{text, ui}` envelope
+                        # (AgentTool wraps the subagent's output here instead
+                        # of streaming it as text). Capture its UI too.
+                        for comp in _ui_from_tool_response(fr.response):
+                            if comp not in result.ui_components:
+                                result.ui_components.append(comp)
+                    text = getattr(part, "text", None)
+                    if text:
+                        last_text = text
                         if event.is_final_response():
-                            result.text = part.text
+                            result.text = text
+                        # Track UI emitted by ANY event in the turn so the
+                        # test sees what the user sees — the frontend
+                        # recovers a subagent's UI even when root
+                        # paraphrases. The harness does the same.
+                        for comp in _extract_ui_components(text):
+                            if comp not in result.ui_components:
+                                result.ui_components.append(comp)
             if not result.text:
                 result.text = last_text
         except Exception as e:  # noqa: BLE001 — the harness reports failure, never raises

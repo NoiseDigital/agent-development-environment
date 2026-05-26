@@ -175,11 +175,15 @@ export function parseAgentResponse(text: string): ParsedAgentResponse {
 export function streamingDisplayText(raw: string): string {
   const key = raw.indexOf('"text"');
   if (key === -1) {
-    // No `"text"` field yet. If a `{` has appeared, the envelope is starting —
-    // show only the prose BEFORE the brace so the JSON itself never leaks. If
-    // there's no brace yet, show whatever has streamed (plain prose so far).
-    const brace = raw.indexOf('{');
-    return brace === -1 ? raw : raw.slice(0, brace).trimEnd();
+    // No `"text"` field yet. If a JSON-structural char (`{` or `[`) has
+    // appeared, the envelope is starting — show only the prose BEFORE it so
+    // the JSON itself never leaks. If there's no JSON yet, show whatever has
+    // streamed (plain prose so far). The leading-`[` case caught a real bug
+    // where an array-shaped chunk leaked a stray `[` into the chat bubble.
+    const cutoff = [raw.indexOf('{'), raw.indexOf('[')]
+      .filter((i) => i >= 0)
+      .reduce((a, b) => Math.min(a, b), raw.length);
+    return cutoff === raw.length ? raw : raw.slice(0, cutoff).trimEnd();
   }
   let i = key + 6;
   while (i < raw.length && raw[i] !== ':') i++;

@@ -115,9 +115,7 @@ export function singleMetricLineSpec(opts: {
       x: { field: 'name', type: xType, title: null, axis: { labelOverlap: true } },
     },
     layer: [
-      ...(opts.windows && opts.windows.length > 0
-        ? [flightBandLayer(opts.windows) as Record<string, unknown>]
-        : []),
+      ...flightBandLayers(opts.windows ?? []),
       {
         mark: { type: 'line', point: true },
         encoding: {
@@ -152,24 +150,28 @@ export function singleMetricLineSpec(opts: {
   };
 }
 
-/** A faint shaded rectangle layer suitable for overlaying flight bands
- *  (campaign windows) behind a temporal chart. Pass empty `windows` to opt
- *  out — the layer renders nothing in that case. */
-function flightBandLayer(windows: readonly { name: string; start_date: string; end_date: string }[]): Record<string, unknown> | null {
-  if (!windows || windows.length === 0) return null;
-  return {
-    data: { values: windows },
-    mark: { type: 'rect', opacity: 0.08, color: '#10b981' },
-    encoding: {
-      x: { field: 'start_date', type: 'temporal' },
-      x2: { field: 'end_date', type: 'temporal' },
-      tooltip: [
-        { field: 'name', title: 'Campaign' },
-        { field: 'start_date', type: 'temporal', title: 'Start' },
-        { field: 'end_date', type: 'temporal', title: 'End' },
-      ],
+/** Flight-band overlay — faint rect per campaign window. Labels are NOT
+ *  drawn inside the chart (they overlap when campaigns share a window);
+ *  the caller renders a separate legend strip beneath the chart instead. */
+function flightBandLayers(
+  windows: readonly { name: string; start_date: string; end_date: string }[],
+): Record<string, unknown>[] {
+  if (!windows || windows.length === 0) return [];
+  return [
+    {
+      data: { values: windows },
+      mark: { type: 'rect', opacity: 0.08, color: '#10b981', tooltip: true },
+      encoding: {
+        x: { field: 'start_date', type: 'temporal' },
+        x2: { field: 'end_date', type: 'temporal' },
+        tooltip: [
+          { field: 'name', title: 'Campaign' },
+          { field: 'start_date', type: 'temporal', title: 'Start' },
+          { field: 'end_date', type: 'temporal', title: 'End' },
+        ],
+      },
     },
-  };
+  ];
 }
 
 /** Two-metric line chart on independent left/right Y axes. Both axes use
@@ -227,9 +229,7 @@ export function dualMetricLineSpec(opts: {
     layer: [
       // Flight bands go in FIRST so the lines render on top — the band is a
       // background hint, not a visual focus.
-      ...(opts.windows && opts.windows.length > 0
-        ? [flightBandLayer(opts.windows) as Record<string, unknown>]
-        : []),
+      ...flightBandLayers(opts.windows ?? []),
       line(opts.primary.field, PRIMARY_COLOR, opts.primary.label, opts.primary.format),
       line(opts.secondary.field, SECONDARY_COLOR, opts.secondary.label, opts.secondary.format),
       {

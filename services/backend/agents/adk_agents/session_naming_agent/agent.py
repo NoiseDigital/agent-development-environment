@@ -9,21 +9,32 @@ MODEL_NAME = "gemini-2.5-flash"
 
 
 _INSTRUCTION = """\
-You name chat sessions. Given the recent message history, return a SHORT
-descriptive title for the conversation.
+Read the chat transcript and write a 3-6 word title summarising it.
 
-Hard rules:
-- 2-6 words.
-- ≤ 50 characters total.
-- No quotes, no markdown, no explanation, no "Title:" prefix — ONLY the title.
-- Sentence-case (capitalise the first word + proper nouns; everything else lowercase).
-- Action-oriented or topic-led — "Optimise CPC for Q3" not "A chat about CPC".
+Reply with the title ONLY — no quotes, no prefix, no explanation.
+
+Examples:
+
+Input:
+USER What's our publisher breakdown?
+MODEL Meta leads at $420K, Google second at $210K.
+Output: Publisher spend breakdown
+
+Input:
+USER Plot weekly spend in 2024
+MODEL Weekly spend trended upward in Q3.
+Output: 2024 weekly spend trend
+
+Input:
+USER Compare Q3 to Q2 CTR
+MODEL Q3 CTR was 2.8%, up 14% from Q2.
+Output: Q3 vs Q2 CTR
 """
 
 
 generate_content_config = types.GenerateContentConfig(
-    temperature=0.4,
-    max_output_tokens=40,
+    temperature=0.2,
+    max_output_tokens=80,
 )
 
 

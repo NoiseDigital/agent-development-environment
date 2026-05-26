@@ -158,6 +158,42 @@ Example — line chart + levers:
 }
 
 ═══════════════════════════════════════════════════════════════════════════════
+SUGGESTIONS — proactive next-step pills (almost always append one)
+═══════════════════════════════════════════════════════════════════════════════
+After the chart (and after the filters block, if any), append a `suggestions`
+block with 2-4 follow-up questions the user is likely to want next. This is
+what makes the experience feel agentic — the user gets a guided exploration
+rather than a sterile Q&A. Each suggestion is a plain-text follow-up that
+sends as the next user message when clicked.
+
+Pick suggestions that DEEPEN the current view, not ones that abandon it:
+  - A different breakdown of the SAME data ("Break this down by publisher")
+  - A comparison anchored to the current window ("Compare to the prior period")
+  - A drill-in on an outlier the chart reveals ("Why the spike in October?")
+  - A natural next-question for the same metric ("Show CTR over the same window")
+
+Example envelope — line chart + follow-ups:
+{
+  "text": "**Weekly spend trended up** through Q2, peaking the week of June 17.",
+  "ui": [
+    { "component": "chart", "props": { ... } },
+    { "component": "suggestions", "props": {
+        "title": "Want to look at",
+        "items": [
+          "Break this down by publisher",
+          "Compare to the prior quarter",
+          "What drove the June peak?",
+          "Show CTR over the same window"
+        ]
+    }}
+  ]
+}
+
+Skip the suggestions block ONLY when:
+  - The reply is a one-shot scalar (you wouldn't be here in branch 2 then).
+  - The user explicitly asked a single yes/no question.
+
+═══════════════════════════════════════════════════════════════════════════════
 STRICT RULES
 ═══════════════════════════════════════════════════════════════════════════════
 - Put EVERY row from the parent's data into `data.values` — same field names,

@@ -12,6 +12,8 @@ import {
   parseAgentResponse,
   streamingDisplayText,
 } from '../lib/agent-response';
+import { setNeuralThinking } from '../lib/neural-pulse';
+import type { UIBlock } from '../types/genui';
 import {
   phaseFromEvent,
   extractToolCalls,
@@ -127,7 +129,10 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
     loadApps();
   }, []);
 
-  // Load sessions when app changes — no currentSession dep to avoid re-fetch loops
+  // Load sessions when app changes — no currentSession dep to avoid re-fetch loops.
+  // After the listing arrives we also prune sessions with zero events (stale
+  // "New chat" placeholders left behind by previous tabs); a session that has
+  // any message at all is never touched.
   useEffect(() => {
     if (!selectedApp) return;
     let cancelled = false;
@@ -135,7 +140,33 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
       setIsLoadingSessions(true);
       try {
         const sessionList = await adkApi.listSessions(selectedApp, userId);
-        if (!cancelled) setAllSessions(sessionList);
+        if (cancelled) return;
+        setAllSessions(sessionList);
+        // listSessions returns metadata only (events is always empty there) —
+        // so we cap getSession fan-out to a reasonable number and only act on
+        // sessions where the FULL event list comes back empty.
+        const PRUNE_CAP = 40;
+        const candidates = sessionList.slice(0, PRUNE_CAP);
+        const prunedIds: string[] = [];
+        await Promise.all(
+          candidates.map(async (s) => {
+            try {
+              const full = await adkApi.getSession(selectedApp, userId, s.id);
+              if (!full.events || full.events.length === 0) {
+                await adkApi.deleteSession(selectedApp, userId, s.id);
+                prunedIds.push(s.id);
+              }
+            } catch {
+              /* best-effort — leave the session alone on any failure */
+            }
+          }),
+        );
+        if (!cancelled && prunedIds.length > 0) {
+          setAllSessions((cur) => cur.filter((s) => !prunedIds.includes(s.id)));
+          // Also drop any of these from name/feedback maps + the local fresh-
+          // session ledger so a follow-up "new chat" doesn't try to re-delete.
+          for (const id of prunedIds) localFreshSessions.current.delete(id);
+        }
       } catch (err) {
         if (!cancelled)
           setError(`Failed to load sessions: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -293,6 +324,7 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
     if (!currentSession || !content.trim() || !selectedApp) return;
 
     setIsLoading(true);
+    setNeuralThinking(true);
     setError(null);
     // The moment a message is sent, this session has content — pull it off
     // the auto-cleanup ledger so the next "new chat" click can't touch it.
@@ -346,6 +378,11 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
       let uiKind: 'chart' | 'choices' | 'filters' | undefined;
       // Tool calls made this turn — surfaced under the reply for admins.
       const toolCalls: ToolCall[] = [];
+      // Fallback UI captured from any subagent's complete text event. The root
+      // agent is INSTRUCTED to return a subagent's envelope verbatim — but
+      // models paraphrase sometimes, which would otherwise drop the ChoicesAgent
+      // / VegaChartsAgent UI block on the floor. This is the safety net.
+      let fallbackUi: UIBlock[] | undefined;
 
       for await (const event of adkApi.sendMessageSSE(request)) {
         if (event.author && event.author !== 'user') agentAuthor = event.author;
@@ -371,6 +408,40 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
           } else {
             accumulated = textPart.text;
             finalEventId = event.id;
+            // Safety net #1: a subagent emitted its envelope as a standalone
+            // text event. Capture its UI as a fallback in case the root
+            // paraphrases and drops it.
+            if (
+              supportsVisualization &&
+              event.author &&
+              event.author !== 'user' &&
+              event.author !== 'MediaPerformanceAgent'
+            ) {
+              const subParsed = parseAgentResponse(textPart.text);
+              if (subParsed.ui?.length) fallbackUi = subParsed.ui;
+            }
+          }
+        }
+
+        // Safety net #2: ADK's AgentTool wraps a subagent's output INTO the
+        // tool response (functionResponse.response.result), instead of
+        // streaming it as its own text. Pull that envelope out so a
+        // ChoicesAgent or VegaChartsAgent UI block reaches the bubble even
+        // when the root agent emits no text at all after the tool call.
+        if (supportsVisualization) {
+          for (const part of event.content?.parts ?? []) {
+            const fr = part.functionResponse as { response?: unknown } | undefined;
+            const resp = fr?.response;
+            if (!resp || typeof resp !== 'object') continue;
+            const result = (resp as Record<string, unknown>).result;
+            if (typeof result !== 'string') continue;
+            const subParsed = parseAgentResponse(result);
+            if (subParsed.ui?.length) fallbackUi = subParsed.ui;
+            // If the root never produced text of its own, surface the
+            // subagent's text content too so the bubble isn't empty.
+            if (!accumulated.trim() && subParsed.content) {
+              accumulated = subParsed.content;
+            }
           }
         }
 
@@ -391,6 +462,20 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
       const parsed = supportsVisualization
         ? parseAgentResponse(accumulated)
         : { content: accumulated, ui: undefined };
+      // Final safety net: if parsing failed (case 3) and we're STILL holding a
+      // raw `{ "text": ..., "ui": ... }` envelope as content, surface only the
+      // text via the streaming extractor so a user never sees raw JSON.
+      const looksLikeEnvelope =
+        supportsVisualization &&
+        /^\s*\{[\s\S]*"text"\s*:/.test(parsed.content);
+      if (looksLikeEnvelope) {
+        parsed.content = streamingDisplayText(parsed.content);
+      }
+      // If the root agent paraphrased away a subagent's UI block, recover it
+      // from the fallback captured during the stream.
+      if (!parsed.ui?.length && fallbackUi?.length) {
+        parsed.ui = fallbackUi;
+      }
       // A blank reply with nothing to render → a graceful fallback message.
       const finalText = parsed.content.trim() || (parsed.ui?.length ? '' : FALLBACK_REPLY);
       // Adopt the real ADK event id so feedback (keyed by event id) survives a reload.
@@ -417,26 +502,33 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
       const updatedSession = await adkApi.getSession(selectedApp, userId, currentSession.id);
       setCurrentSession(updatedSession);
 
-      // Auto-rename the session at message 1, 10, 20, 30… so the name stays
-      // fresh as the conversation evolves.
+      // Auto-rename the session at message 1, 10, 20, 30… Empty replies
+      // (Gemini occasionally truncates a 2-6 word title to nothing) get ONE
+      // retry. Errors are surfaced as a console warning rather than swallowed
+      // silently so a regression in the naming agent is visible.
       if (shouldAutoRename) {
+        const prompt = namingPrompt([
+          { content: content.trim(), role: 'user' },
+          { content: parsed.content.slice(0, 300), role: 'model' },
+        ]);
+        const tryRename = async (): Promise<string> => {
+          const reply = await adkApi.runOneShot(NAMING_AGENT, userId, prompt);
+          return cleanName(reply);
+        };
         try {
-          const reply = await adkApi.runOneShot(
-            NAMING_AGENT,
-            userId,
-            namingPrompt([
-              { content: content.trim(), role: 'user' },
-              { content: parsed.content.slice(0, 300), role: 'model' },
-            ]),
-          );
-          const name = cleanName(reply);
+          let name = await tryRename();
+          if (!name || name.length < 2) name = await tryRename();
           if (name) {
             saveSessionName(currentSession.id, name);
             setAllSessions(prev =>
               prev.map(s => s.id === currentSession.id ? { ...s } : s)
             );
+          } else {
+            console.warn('[session-naming] agent returned empty after retry');
           }
-        } catch { /* non-fatal */ }
+        } catch (e) {
+          console.warn('[session-naming] failed', e);
+        }
       }
 
     } catch (err) {
@@ -452,6 +544,7 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
       );
     } finally {
       setIsLoading(false);
+      setNeuralThinking(false);
     }
   };
 

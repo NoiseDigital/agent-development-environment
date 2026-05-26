@@ -14,6 +14,7 @@ import { useDashboardRefresh } from '../../lib/dashboard-refresh-context';
 import { dashboardData, type CampaignWindow, type MetricSeriesRow } from '../../lib/dashboards';
 import VegaChart from '../VegaChart';
 import TileChartShell from './TileChartShell';
+import CampaignLegend from './CampaignLegend';
 
 type TrendMetric =
   | 'total_spend' | 'impressions' | 'clicks' | 'landing_page_views'
@@ -78,7 +79,7 @@ export default function TrendTile({
   if (showCampaignWindows) {
     notes.push(
       windows.length > 0
-        ? `Faint emerald bands behind the line are campaign flight windows (top ${windows.length} by spend). Hover for the campaign name + dates.`
+        ? `Faint emerald bands behind the line are campaign flight windows (top ${windows.length} by spend). Names + dates listed in the legend below the chart.`
         : 'Campaign flight windows would render here as faint emerald bands; none touched this window.',
     );
   }
@@ -111,35 +112,45 @@ export default function TrendTile({
     }));
     return (
       <TileChartShell title={title} info={info}>
-        <VegaChart
-          spec={singleMetricLineSpec({ data, valueFormat: fmtFor(metric), windows })}
-          fill
-          saveable
-        />
+        <div className="flex h-full flex-col">
+          <div className="min-h-0 flex-1">
+            <VegaChart
+              spec={singleMetricLineSpec({ data, valueFormat: fmtFor(metric), windows })}
+              fill
+              saveable
+            />
+          </div>
+          <CampaignLegend windows={windows} />
+        </div>
       </TileChartShell>
     );
   }
 
   return (
     <TileChartShell title={title} info={info}>
-      <VegaChart
-        spec={dualMetricLineSpec({
-          data: series as unknown as readonly Record<string, string | number>[],
-          primary: {
-            field: metric,
-            label: METRIC_LABEL[metric],
-            format: fmtFor(metric),
-          },
-          secondary: {
-            field: secondaryMetric!,
-            label: METRIC_LABEL[secondaryMetric!],
-            format: fmtFor(secondaryMetric!),
-          },
-          windows,
-        })}
-        fill
-        saveable
-      />
+      <div className="flex h-full flex-col">
+        <div className="min-h-0 flex-1">
+          <VegaChart
+            spec={dualMetricLineSpec({
+              data: series as unknown as readonly Record<string, string | number>[],
+              primary: {
+                field: metric,
+                label: METRIC_LABEL[metric],
+                format: fmtFor(metric),
+              },
+              secondary: {
+                field: secondaryMetric!,
+                label: METRIC_LABEL[secondaryMetric!],
+                format: fmtFor(secondaryMetric!),
+              },
+              windows,
+            })}
+            fill
+            saveable
+          />
+        </div>
+        <CampaignLegend windows={windows} />
+      </div>
     </TileChartShell>
   );
 }

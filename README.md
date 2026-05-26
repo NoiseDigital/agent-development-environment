@@ -86,9 +86,12 @@ terraform/                          # GCP infrastructure
 
 ```text
 browser ─► gateway (8080) ─► agent (8000)            ─► postgres
-            │                  ├─► mcp-toolbox (5000) ─► BigQuery
-            │                  └─► mcp-stats (5003)
-            └─► (Alembic at boot via the db-migrate one-shot)
+                              ├─► mcp-toolbox (5000) ─► BigQuery
+                              └─► mcp-stats (5003)
+
+# Boot: gateway runs `alembic upgrade head` in its entrypoint, then starts
+# uvicorn. Its /healthz turns green only once both have completed; the
+# agent waits on that healthcheck before reading the platform tables.
 ```
 
 The frontend talks **only** to the gateway. The gateway owns auth and the
@@ -141,18 +144,19 @@ Platform-owned Postgres tables (`session_metadata`, `event_metadata`, `sources`)
 are managed by **Alembic** in the gateway. ADK manages its own tables and
 ships its own migrations on version updates — we never touch those.
 
-On `docker compose up`, the `db-migrate` one-shot service runs
-`alembic upgrade head` against Postgres and exits; the gateway and agent both
-wait for it (`service_completed_successfully`) before they start. Migrations
-are idempotent, so a restart is safe. CI applies them to a fresh Postgres on
-every PR.
+On `docker compose up`, the gateway's entrypoint runs `alembic upgrade head`
+against Postgres and only then starts uvicorn — its `/healthz` flips green
+once both steps complete. Any service that touches the platform tables
+(currently just `agent`) waits on `gateway: service_healthy`, so the schema
+is always at head before anyone reads it. Migrations are idempotent, so a
+restart is safe. CI applies them to a fresh Postgres on every PR.
 
 Add a migration:
 
 ```bash
 docker compose exec gateway uv run alembic revision -m "short description"
 # edit the generated file in services/backend/gateway/alembic/versions/
-docker compose up -d db-migrate   # re-runs it; the gateway then restarts cleanly
+docker compose restart gateway   # gateway re-runs upgrade head on boot
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md#schema-migrations) for the full workflow.

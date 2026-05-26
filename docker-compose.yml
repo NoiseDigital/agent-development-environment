@@ -32,11 +32,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      # Wait for Alembic to finish so the platform tables are at head before
-      # the agent reads/writes them. ADK manages its own tables/migrations and
-      # is unaffected by this gate.
-      db-migrate:
-        condition: service_completed_successfully
+      # Gateway owns the platform schema and runs `alembic upgrade head` in
+      # its entrypoint. Waiting on its healthcheck means migrations are done
+      # AND uvicorn is up before the agent starts reading/writing tables.
+      # ADK manages its own tables/migrations and is unaffected by this gate.
+      gateway:
+        condition: service_healthy
       mcp-toolbox:
         condition: service_started
     stdin_open: true
@@ -126,29 +127,13 @@ services:
     tty: true
 
   # ── Gateway — the public entry point for the frontend ─────────────────────
-  # Owns auth and (incrementally) the platform's non-agent HTTP routes.
-  # Everything not handled directly is proxied to the private agent service;
-  # `/run_sse` streams through unchanged, header-by-header (see api/proxy.py).
-  # One-shot Alembic runner — applies every platform-owned migration once,
-  # then exits. Both the gateway and the agent service wait for it to finish
-  # so they never see a half-migrated schema. Re-runs are idempotent.
-  # Reuses the gateway image (same dependencies, same source tree); compose
-  # builds the image as `gateway` and we pull it by tag here so the Dockerfile
-  # is built once per stack rather than twice.
-  db-migrate:
-    image: agent-platform-gateway:latest
-    volumes:
-      - ./services/backend/gateway:/workspace
-    working_dir: /workspace
-    environment:
-      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://user:password@postgres:5432/postgres}
-      - UV_LINK_MODE=copy
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: "no"
-    command: uv run alembic upgrade head
-
+  # Owns auth, the platform's non-agent HTTP routes, AND the database
+  # schema. Boot order: `alembic upgrade head` → uvicorn → /healthz returns
+  # OK. The agent (and anything else that touches the platform tables)
+  # waits on this service's healthcheck so the schema is always at head.
+  # Everything the gateway doesn't handle directly is proxied to the
+  # private agent service; `/run_sse` streams through unchanged
+  # (see api/proxy.py).
   gateway:
     build:
       context: ./services/backend/gateway
@@ -164,13 +149,23 @@ services:
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost,http://localhost:3000,http://frontend:3000}
       - UV_LINK_MODE=copy
     depends_on:
-      db-migrate:
-        condition: service_completed_successfully
-      agent:
-        condition: service_started
+      postgres:
+        condition: service_healthy
     stdin_open: true
     tty: true
-    command: uv run uvicorn main:app --host 0.0.0.0 --port ${GATEWAY_PORT:-8080} --reload
+    # Run Alembic to head, THEN start uvicorn. Re-runs are idempotent.
+    command: >
+      sh -c "uv run alembic upgrade head &&
+             exec uv run uvicorn main:app --host 0.0.0.0 --port ${GATEWAY_PORT:-8080} --reload"
+    # Healthcheck flips green only once both migrations finished and uvicorn
+    # is serving /healthz. `start_period` gives the migration step room on a
+    # cold image build (~30s) before the failing probes start counting.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${GATEWAY_PORT:-8080}/healthz || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
 
   frontend:
     build:

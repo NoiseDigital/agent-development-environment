@@ -189,11 +189,12 @@ services/backend/gateway/
 
 ### How they run
 
-On `docker compose up`, the `db-migrate` one-shot service runs
-`alembic upgrade head` and exits successfully. The gateway and agent both
-depend on it (`service_completed_successfully`), so they never see a
-half-migrated schema. The same migration set runs in CI against a fresh
-Postgres, including an idempotency re-run.
+On `docker compose up`, the gateway's entrypoint runs `alembic upgrade head`
+against Postgres and only then starts uvicorn. Its `/healthz` endpoint flips
+green once both steps complete; the agent service waits on
+`gateway: service_healthy` before booting. Migrations are idempotent — a
+restart is a safe no-op. CI applies them to a fresh Postgres on every PR
+and runs an explicit idempotency re-up.
 
 ### Adding a migration
 
@@ -216,10 +217,10 @@ def downgrade() -> None:
 Apply it to your running compose:
 
 ```bash
-docker compose up -d db-migrate   # re-runs migrations
+docker compose restart gateway   # the gateway runs `alembic upgrade head` on boot
 ```
 
-`alembic upgrade head` is idempotent, so running this against an already
+`alembic upgrade head` is idempotent, so restarting against an already
 migrated database is a safe no-op.
 
 ### Don't touch ADK tables

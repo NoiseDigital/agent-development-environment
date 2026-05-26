@@ -7,8 +7,6 @@ container:
     docker compose exec agent uv run pytest tests -v
 """
 
-import ast
-import json
 from pathlib import Path
 
 import pytest
@@ -36,27 +34,6 @@ def _load_cases():
     return params
 
 
-def _ui_components(text: str) -> list[str]:
-    """Parse the { text, ui } envelope from a reply and list its component names.
-
-    Tolerates LLM JSON that blends in Python literals (True/False/None) — the
-    frontend does the same, so the harness should not be stricter than it.
-    """
-    start, end = text.find("{"), text.rfind("}")
-    if start == -1 or end <= start:
-        return []
-    blob = text[start : end + 1]
-    try:
-        payload = json.loads(blob)
-    except json.JSONDecodeError:
-        try:
-            payload = ast.literal_eval(blob)
-        except (ValueError, SyntaxError):
-            return []
-    ui = payload.get("ui") if isinstance(payload, dict) else None
-    return [b.get("component") for b in ui or [] if isinstance(b, dict)]
-
-
 @pytest.fixture(scope="session")
 def harness():
     return get_harness()
@@ -77,12 +54,31 @@ async def test_agent_behaviour(harness, agent, case):
         assert run.ok, run.error
         assert run.text.strip(), "expected a non-empty reply"
 
+    # `ui`: a single component name OR a list of names that must all be present.
     if "ui" in expect:
-        components = _ui_components(run.text)
-        assert expect["ui"] in components, (
-            f"expected a '{expect['ui']}' UI block; got {components or 'none'}\n"
-            f"reply: {run.text[:300]}"
+        required = expect["ui"] if isinstance(expect["ui"], list) else [expect["ui"]]
+        missing = [c for c in required if c not in run.ui_components]
+        assert not missing, (
+            f"expected UI components {required}; got {run.ui_components or 'none'}\n"
+            f"final text: {run.text[:300]}"
         )
 
-    if expect.get("tools"):
-        assert run.tool_calls, f"expected tool calls; got none\nreply: {run.text[:200]}"
+    # `no_ui`: explicit negative — the reply must NOT have any UI blocks.
+    if expect.get("no_ui"):
+        assert not run.ui_components, (
+            f"expected no UI blocks; got {run.ui_components}\n"
+            f"final text: {run.text[:300]}"
+        )
+
+    # `tools`: bool (any tool used) OR a list of names that must all be called.
+    if "tools" in expect:
+        names = run.tool_names()
+        if isinstance(expect["tools"], list):
+            missing = [t for t in expect["tools"] if t not in names]
+            assert not missing, (
+                f"expected tool calls {expect['tools']}; got {names or 'none'}"
+            )
+        elif expect["tools"]:
+            assert names, (
+                f"expected at least one tool call; got none\nreply: {run.text[:200]}"
+            )

@@ -67,6 +67,16 @@ export type FilterField =
     }
   | { kind: 'text'; key: string; label: string; placeholder?: string; value?: string };
 
+/** Proactive follow-up pills — one-click "ask this" chips the agent drops
+ *  beneath a reply. Clicking a pill sends its text as the next user message,
+ *  so the chat reads as a guided exploration. */
+export interface SuggestionsProps {
+  /** Optional short header above the pills, e.g. "Want to look at…". */
+  title?: string;
+  /** Plain-text follow-up prompts — 2-4 ideal. */
+  items: string[];
+}
+
 /** Lightweight "levers" — controls the user can adjust to re-run the same
  *  question with new parameters. Surfaced next to a chart so an analyst can
  *  iterate on an answer without leaving the chat bubble. Submitting reposts
@@ -86,7 +96,8 @@ export interface FiltersProps {
 export type UIBlock =
   | { component: 'chart'; props: VegaSpec; id?: string }
   | { component: 'choices'; props: ChoicesProps; id?: string }
-  | { component: 'filters'; props: FiltersProps; id?: string };
+  | { component: 'filters'; props: FiltersProps; id?: string }
+  | { component: 'suggestions'; props: SuggestionsProps; id?: string };
 
 /** Component names an agent may emit — the catalog surface. */
 export type UIComponent = UIBlock['component'];

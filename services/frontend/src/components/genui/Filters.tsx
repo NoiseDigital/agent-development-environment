@@ -92,35 +92,36 @@ export default function Filters({
     );
   }
 
+  // Compact pill layout — fields flow horizontally, labels inline, all on one
+  // row when possible. The card chrome was clunky for what's effectively a
+  // toolbar; this reads as a footer beneath the chart.
   return (
-    <div className="bg-surface border border-line-strong rounded-xl p-4 mt-3">
+    <div className="mt-2 flex flex-wrap items-end gap-x-3 gap-y-2">
       {props.title && (
-        <p className="text-xs font-medium text-zinc-300 mb-3">{props.title}</p>
+        <span className="self-center text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+          {props.title}
+        </span>
       )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {fields.map((f) => (
-          <FieldControl
-            key={f.key}
-            field={f}
-            value={draft[f.key]}
-            onChange={(v) => patch(f.key, v)}
-          />
-        ))}
-      </div>
-
-      <div className="mt-4 flex items-center justify-end gap-2">
+      {fields.map((f) => (
+        <FieldControl
+          key={f.key}
+          field={f}
+          value={draft[f.key]}
+          onChange={(v) => patch(f.key, v)}
+        />
+      ))}
+      <div className="ml-auto flex items-center gap-1.5">
         <button
           type="button"
           onClick={reset}
-          className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-line-strong bg-surface-sunken text-zinc-300 hover:border-zinc-600 transition-colors"
+          className="rounded-md px-2 py-1 text-[11px] font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
         >
           Reset
         </button>
         <button
           type="button"
           onClick={apply}
-          className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-white text-black hover:bg-zinc-200 transition-colors"
+          className="rounded-md bg-white px-2.5 py-1 text-[11px] font-semibold text-black transition-colors hover:bg-zinc-200"
         >
           {props.applyLabel ?? 'Update'}
         </button>
@@ -138,23 +139,21 @@ function FieldControl({
   value: string | number | undefined;
   onChange: (next: string | number | undefined) => void;
 }) {
-  const label = (
-    <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
-      {field.label}
-    </span>
-  );
+  // Inline label + control on one line — reads as a "Metric: spend" pill.
+  const inputCls =
+    'rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-[11px] text-white focus:border-zinc-600 focus:outline-none';
 
   if (field.kind === 'select') {
     const opts = field.options
       .map(toOption)
       .filter((o): o is ChoiceOption => o !== null);
     return (
-      <label className="flex flex-col gap-1">
-        {label}
+      <label className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+        {field.label}
         <select
           value={(value as string) ?? ''}
           onChange={(e) => onChange(e.target.value || undefined)}
-          className="px-3 py-2 text-xs bg-surface-sunken border border-line rounded-lg text-white focus:outline-none focus:border-zinc-600"
+          className={`${inputCls} normal-case`}
         >
           <option value="">—</option>
           {opts.map((o) => (
@@ -169,13 +168,13 @@ function FieldControl({
 
   if (field.kind === 'date') {
     return (
-      <label className="flex flex-col gap-1">
-        {label}
+      <label className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+        {field.label}
         <input
           type="date"
           value={(value as string) ?? ''}
           onChange={(e) => onChange(e.target.value || undefined)}
-          className="px-3 py-2 text-xs bg-surface-sunken border border-line rounded-lg text-white focus:outline-none focus:border-zinc-600"
+          className={`${inputCls} normal-case`}
         />
       </label>
     );
@@ -183,8 +182,8 @@ function FieldControl({
 
   if (field.kind === 'number') {
     return (
-      <label className="flex flex-col gap-1">
-        {label}
+      <label className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+        {field.label}
         <input
           type="number"
           min={field.min}
@@ -194,7 +193,7 @@ function FieldControl({
           onChange={(e) =>
             onChange(e.target.value === '' ? undefined : Number(e.target.value))
           }
-          className="px-3 py-2 text-xs bg-surface-sunken border border-line rounded-lg text-white focus:outline-none focus:border-zinc-600"
+          className={`${inputCls} w-16`}
         />
       </label>
     );
@@ -202,14 +201,14 @@ function FieldControl({
 
   // text
   return (
-    <label className="flex flex-col gap-1">
-      {label}
+    <label className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+      {field.label}
       <input
         type="text"
         value={(value as string) ?? ''}
         placeholder={field.placeholder}
         onChange={(e) => onChange(e.target.value || undefined)}
-        className="px-3 py-2 text-xs bg-surface-sunken border border-line rounded-lg text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+        className={`${inputCls} placeholder-zinc-600 normal-case`}
       />
     </label>
   );

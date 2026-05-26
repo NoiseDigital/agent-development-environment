@@ -167,23 +167,21 @@ docker volume create agent-platform_gcloud_config >/dev/null 2>&1 || true
 # COMPOSE_IGNORE_ORPHANS suppresses the workspace container orphan warning — the
 # workspace service is intentionally absent from this up invocation.
 #
-# `gateway` must be built BEFORE `db-migrate` — db-migrate doesn't declare its
-# own `build:` and instead consumes `agent-platform-gateway:latest`, so the
-# image must exist by the time compose tries to start the migration container.
 docker compose \
     --project-directory "$PROJECT_ROOT" \
     -f "$PROJECT_ROOT/docker-compose.yml" \
     build gateway agent frontend mcp-stats
 
 # Up ordering:
-#   postgres (healthcheck) → db-migrate (one-shot, exits 0) → gateway / agent
-#   start in parallel — both depend on db-migrate having completed. The
-#   frontend depends on gateway. `--wait` waits for healthy / completed-OK.
+#   postgres (healthcheck) → gateway (runs `alembic upgrade head` then
+#   uvicorn; healthcheck flips green once /healthz responds) → agent
+#   (waits on gateway: service_healthy) → mcp-stats / frontend. `--wait`
+#   blocks until every named service is healthy.
 COMPOSE_IGNORE_ORPHANS=1 docker compose \
     --project-directory "$HOST_PROJECT_ROOT" \
     -f "$PROJECT_ROOT/docker-compose.yml" \
     up -d --no-build --wait --wait-timeout 120 \
-    postgres db-migrate mcp-toolbox agent gateway frontend mcp-stats
+    postgres mcp-toolbox gateway agent frontend mcp-stats
 
 echo ""
 echo "✔ All services running."

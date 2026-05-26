@@ -81,13 +81,39 @@ export default function MessageList({
     return () => clearTimeout(id);
   }, [messages]);
 
-  // Scroll to bottom only when the user sends a message (last message is from user)
+  // Scroll-to-bottom on user send. useChat pushes [userMessage,
+  // streamingPlaceholder] in one batch — the LAST message is the agent
+  // placeholder, NOT the user. So we scan the newly-appended slice for any
+  // user message instead of checking only the tail.
   useEffect(() => {
-    const added = messages.length > prevLengthRef.current;
+    const prev = prevLengthRef.current;
     prevLengthRef.current = messages.length;
-    if (added && messages[messages.length - 1]?.author === 'user') {
+    if (messages.length <= prev) return;
+    const userJustSent = messages.slice(prev).some((m) => m.author === 'user');
+    if (userJustSent) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
+  }, [messages]);
+
+  // Sticky-bottom while the agent streams. Only follows when the user is
+  // already pinned near the bottom — if they've scrolled up to re-read
+  // something, we don't yank them back down on every token.
+  const followStreamRef = useRef(true);
+  useEffect(() => {
+    const container = messagesEndRef.current?.parentElement;
+    if (!container) return;
+    const onScroll = () => {
+      const distanceFromBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      followStreamRef.current = distanceFromBottom < 120;
+    };
+    container.addEventListener('scroll', onScroll, { passive: true });
+    return () => container.removeEventListener('scroll', onScroll);
+  }, []);
+  useEffect(() => {
+    const streaming = messages.some((m) => m.isStreaming);
+    if (!streaming || !followStreamRef.current) return;
+    messagesEndRef.current?.scrollIntoView({ block: 'end' });
   }, [messages]);
 
   // Get agent configuration for display

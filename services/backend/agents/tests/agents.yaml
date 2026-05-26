@@ -3,29 +3,120 @@
 # adding an entry here, no Python needed.
 #
 # expect keys:
-#   ok:    reply is non-empty and error-free (default: true)
-#   ui:    the { text, ui } envelope must contain a block of this component
-#   tools: the agent must have made at least one tool call
+#   ok:     reply is non-empty and error-free (default: true)
+#   ui:     name (or list of names) of UI components the run must emit. The
+#           harness scans every event in the turn — so a subagent's choices /
+#           chart block counts even if the root agent paraphrases its text.
+#   no_ui:  true to assert the reply contains NO UI blocks (text-only).
+#   tools:  true to require at least one tool call, or a list of names that
+#           must all be present in the run's tool calls.
 # A case may also set `xfail: "reason"` to mark a known-failing behaviour.
 
 
 media_performance_agent:
-  - name: capability question returns text
-    message: "In one sentence, what can you help me with?"
+  # ── Greeting branch ────────────────────────────────────────────────────────
+  - name: bare greeting surfaces clickable starter choices
+    message: "hey"
     expect:
-      ok: true
+      ui: choices
+      tools: [ChoicesAgent]
 
-  - name: ambiguous request surfaces a choices block
-    message: "How did we do?"
+  - name: capability question greets via choices block, not static markdown
+    message: "what can you do?"
     expect:
       ui: choices
 
-  - name: explicit chart request returns a chart block
-    message: "Plot total spend by publisher as a bar chart."
+  # ── Ambiguous-request branch ───────────────────────────────────────────────
+  - name: vague "how did we do" delegates to ChoicesAgent
+    message: "How did we do?"
+    expect:
+      ui: choices
+      tools: [ChoicesAgent]
+
+  - name: vague performance summary delegates to ChoicesAgent
+    message: "Give me a performance summary"
+    expect:
+      ui: choices
+
+  - name: vague overview delegates to ChoicesAgent
+    message: "Just give me an overview"
+    expect:
+      ui: choices
+
+  # The ChoicesAgent must NOT offer a "scalar trap" option. Every option
+  # the user sees should yield a chart — otherwise picking "overall totals"
+  # forces a single-number reply when an analytical chart would be far more
+  # useful. Asserted via the next case (multi-turn replay).
+  - name: choices follow-up still produces a chart, not a scalar
+    message: |
+      Which metric(s) are you interested in? → Spend
+      What time range? → All time (2023-07-10 to 2025-11-01)
+      How would you like to see it? → Trend over time
     expect:
       ui: chart
+      tools: [VegaChartsAgent]
+
+  # ── Chart branch (the data path) ───────────────────────────────────────────
+  - name: weekly trend → chart block + suggestions follow-ups
+    message: "Plot weekly spend in 2024 as a line chart."
+    expect:
+      ui: [chart, suggestions]
+      tools: [performance_trend, VegaChartsAgent]
+
+  - name: publisher breakdown → chart block + suggestions follow-ups
+    message: "Show spend by publisher as a bar chart."
+    expect:
+      ui: [chart, suggestions]
+      tools: [publisher_spend_breakdown, VegaChartsAgent]
+
+  # ── Scalar / text-only branch ──────────────────────────────────────────────
+  - name: capability question returns text only
+    message: "In one sentence, what can you help me with?"
+    expect:
+      ok: true
+      no_ui: true
+
+  # Time-windowed totals belong in branch 2 (chart). The user almost always
+  # wants visual context for "how did <metric> look over <window>" even when
+  # the question is phrased as a single number.
+  - name: time-windowed total produces a trend chart (not a scalar)
+    message: "What was our total spend in 2024?"
+    expect:
+      ui: chart
+      tools: [VegaChartsAgent]
+
+  # An EXPLICIT scalar suppression should still go scalar.
+  - name: user explicitly requests only the number → scalar
+    message: "Give me just the total spend number for 2024, no chart."
+    expect:
+      no_ui: true
       tools: true
-    xfail: "flaky: the agent may clarify an under-specified request instead of charting (LLM behavioural variance) — the {text,ui} envelope itself is now reliable"
+
+  - name: definitional question returns text only
+    message: "What does CTR mean in this data?"
+    expect:
+      no_ui: true
+
+
+# ── Internal one-shot agents ─────────────────────────────────────────────────
+# These are non-conversational (called once per dashboard refresh / per
+# session). Tests check the contract holds.
+
+dashboard_insights_agent:
+  - name: produces structured insight bullets from a totals payload
+    message: |
+      {"window":"Last 90 days","filters":{},"current":{"total_spend":850000,"impressions":120000000,"clicks":350000,"engaged_visits":85000,"ctr":0.0029,"cpc":2.43},"prior":{"total_spend":720000,"impressions":110000000,"clicks":295000,"engaged_visits":68000,"ctr":0.0027,"cpc":2.44},"top_publisher":{"name":"Meta","value":420000}}
+    expect:
+      ok: true
+
+session_naming_agent:
+  - name: returns a short title from a message dump
+    message: |
+      USER What was our Meta spend in Q3?
+      MODEL Meta spend in Q3 was $420K, up 18% from Q2.
+    expect:
+      ok: true
+
 
 timesheet_agent:
   - name: capability question returns text

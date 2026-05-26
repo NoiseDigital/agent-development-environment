@@ -36,7 +36,13 @@ export default function PacingTile({ title, expectedShare }: PacingTileProps) {
     setError(null);
     dashboardData
       .pacing({
+        date_from: filters.date_from,
+        date_to: filters.date_to,
         campaign_phase_filter: filters.campaign_phase,
+        publisher_filter: filters.publisher,
+        market_group_filter: filters.market_group,
+        creative_format_filter: filters.creative_format,
+        kpi_goal_filter: filters.kpi_goal,
       })
       .then((data) => {
         if (cancelled) return;
@@ -50,7 +56,7 @@ export default function PacingTile({ title, expectedShare }: PacingTileProps) {
         setRows({ budget: 0, spent: 0 });
       });
     return () => { cancelled = true; };
-  }, [filters.campaign_phase, refreshVersion]);
+  }, [filters.date_from, filters.date_to, filters.campaign_phase, filters.publisher, filters.market_group, filters.creative_format, filters.kpi_goal, refreshVersion]);
 
   if (rows === null) {
     return (

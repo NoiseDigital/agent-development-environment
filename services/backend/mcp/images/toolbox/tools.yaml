@@ -619,28 +619,69 @@ name: budget_pacing
 type: bigquery-sql
 source: my-bq-source
 parameters:
+  - name: date_from
+    type: string
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
+    required: false
+    default: "2000-01-01"
+  - name: date_to
+    type: string
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
+    required: false
+    default: "2999-12-31"
   - name: campaign_phase_filter
     type: string
-    description: Filter by campaign phase. Omit (empty) for no filter.
+    description: Filter by campaign phase. Empty = no filter.
+    required: false
+    default: ""
+  - name: publisher_filter
+    type: string
+    description: Filter by publisher. Empty = no filter.
+    required: false
+    default: ""
+  - name: market_group_filter
+    type: string
+    description: Filter by market group. Empty = no filter.
+    required: false
+    default: ""
+  - name: creative_format_filter
+    type: string
+    description: Filter by creative format. Empty = no filter.
+    required: false
+    default: ""
+  - name: kpi_goal_filter
+    type: string
+    description: Filter by KPI goal. Empty = no filter.
     required: false
     default: ""
 statement: |
-  -- Pacing = spent vs. planned. The schema carries per-row `budget` (the
-  -- plan) and `total_spend` (actual delivery); the difference is pace.
-  WITH t AS (
+  -- Pacing = spent vs. planned. CRITICAL: the schema repeats `budget` on
+  -- every row of a line (per-day × per-creative). A naive SUM(budget)
+  -- multiplies the plan by the row count and inflates the number ~500x.
+  -- We collapse to one budget per line first, then sum.
+  WITH per_line AS (
     SELECT
-      SUM(budget) AS budget,
-      SUM(total_spend) AS spent
+      line_id,
+      MAX(budget) AS line_budget,
+      SUM(total_spend) AS line_spent
     FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
-    WHERE (@campaign_phase_filter = ''
-           OR LOWER(campaign_phase) IN UNNEST(SPLIT(LOWER(@campaign_phase_filter), '|')))
+    WHERE date_time >= PARSE_DATE('%Y-%m-%d', @date_from)
+      AND date_time <= PARSE_DATE('%Y-%m-%d', @date_to)
+      AND (@campaign_phase_filter  = '' OR LOWER(campaign_phase)  IN UNNEST(SPLIT(LOWER(@campaign_phase_filter),  '|')))
+      AND (@publisher_filter       = '' OR LOWER(publisher)       IN UNNEST(SPLIT(LOWER(@publisher_filter),       '|')))
+      AND (@market_group_filter    = '' OR LOWER(market_group)    IN UNNEST(SPLIT(LOWER(@market_group_filter),    '|')))
+      AND (@creative_format_filter = '' OR LOWER(creative_format) IN UNNEST(SPLIT(LOWER(@creative_format_filter), '|')))
+      AND (@kpi_goal_filter        = '' OR LOWER(kpi_goal)        IN UNNEST(SPLIT(LOWER(@kpi_goal_filter),        '|')))
+    GROUP BY line_id
   )
-  SELECT 'Budget' AS name, CAST(budget AS FLOAT64) AS value, 0 AS stage_order FROM t UNION ALL
-  SELECT 'Spent'  AS name, CAST(spent  AS FLOAT64) AS value, 1 AS stage_order FROM t
+  SELECT 'Budget' AS name, CAST(SUM(line_budget) AS FLOAT64) AS value, 0 AS stage_order FROM per_line UNION ALL
+  SELECT 'Spent'  AS name, CAST(SUM(line_spent)  AS FLOAT64) AS value, 1 AS stage_order FROM per_line
   ORDER BY stage_order
 description: |
-  Returns planned budget vs. actual spend in chart-ready format: two rows with
-  'name' (Budget / Spent) and 'value'. Plot as a bar to read pacing at a glance.
+  Returns planned budget vs. actual spend in chart-ready format: two rows
+  with 'name' (Budget / Spent) and 'value'. Budget is aggregated per line
+  (not per row) so it isn't inflated by the per-day repetition in the
+  schema.
 ---
 kind: tool
 name: period_over_period

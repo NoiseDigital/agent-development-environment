@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import type { UIBlock, UIComponent } from '../../types/genui';
 import Choices from './Choices';
 import Filters from './Filters';
+import Suggestions from './Suggestions';
 import ChartBlock from './ChartBlock';
 
 /** Host-provided capabilities a block renderer may use. */
@@ -23,4 +24,5 @@ export const registry: { [T in UIComponent]: Renderer<T> } = {
   chart: (props) => <ChartBlock spec={props} />,
   choices: (props, ctx) => <Choices props={props} onAction={ctx.onAction} />,
   filters: (props, ctx) => <Filters props={props} onAction={ctx.onAction} />,
+  suggestions: (props, ctx) => <Suggestions props={props} onAction={ctx.onAction} />,
 };

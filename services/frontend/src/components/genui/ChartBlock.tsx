@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { VegaSpec } from '../../types/genui';
 import VegaChart from '../VegaChart';
 import { useDashboardEdit } from '../../lib/dashboard-edit-context';
 import { pinsApi } from '../../lib/pins-api';
+import { enrichAgentSpec } from '../../lib/enrich-vega-spec';
 
 // One `chart` GenUI block. Wraps VegaChart with a conditional
 // "Save to dashboard" affordance — visible only when the dashboard-edit
@@ -17,6 +18,10 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 export default function ChartBlock({ spec }: { spec: VegaSpec }) {
   const editCtx = useDashboardEdit();
   const [state, setState] = useState<SaveState>('idle');
+  // Enrich the agent's spec at render time — compactNum on quantitative
+  // channels, crosshair on line charts — so chat visuals match the
+  // dashboard tiles without bloating the agent prompt.
+  const enriched = useMemo(() => enrichAgentSpec(spec), [spec]);
 
   const handleSave = async () => {
     if (!editCtx || state === 'saving' || state === 'saved') return;
@@ -31,7 +36,7 @@ export default function ChartBlock({ spec }: { spec: VegaSpec }) {
   };
 
   if (!editCtx?.canGenerate) {
-    return <VegaChart spec={spec} saveable />;
+    return <VegaChart spec={enriched} saveable />;
   }
 
   const label =
@@ -42,7 +47,7 @@ export default function ChartBlock({ spec }: { spec: VegaSpec }) {
 
   return (
     <div className="space-y-1.5">
-      <VegaChart spec={spec} saveable />
+      <VegaChart spec={enriched} saveable />
       <div className="flex justify-end">
         <button
           type="button"

@@ -142,4 +142,11 @@ describe('streamingDisplayText', () => {
   it('passes plain prose through when no envelope has appeared yet', () => {
     expect(streamingDisplayText('Hello, working')).toBe('Hello, working');
   });
+  it('never leaks a stray `[` from an array-shaped chunk', () => {
+    // Regression: an early chunk could be `[\n  {...}` (a tool-result echo);
+    // the streaming display was returning `[` for a frame, which the user
+    // saw as a stray bracket in the chat bubble.
+    expect(streamingDisplayText('[\n  {"name":"2024-01-01"')).toBe('');
+    expect(streamingDisplayText('intro [partial')).toBe('intro');
+  });
 });

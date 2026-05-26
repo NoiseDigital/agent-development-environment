@@ -93,10 +93,29 @@ export function eventsToMessages(
 ): ChatMessage[] {
   const messages: ChatMessage[] = [];
   let pendingCalls: ToolCall[] = [];
+  // Subagent UI captured per turn, kept until the root agent's text replaces
+  // the draft. Recovers the choices / chart block when root paraphrases away
+  // the subagent's verbatim envelope.
+  let fallbackUi: UIBlock[] | undefined;
 
   for (const event of events) {
     const calls = extractToolCalls(event);
     if (calls.length) pendingCalls.push(...calls);
+
+    // Tool responses (`functionResponse.response.result`) may contain a
+    // subagent's full envelope — ADK's AgentTool wraps it there. Mirror the
+    // streaming logic: capture any UI block + text from it.
+    if (supportsVisualization) {
+      for (const p of event.content?.parts ?? []) {
+        const fr = p.functionResponse as { response?: unknown } | undefined;
+        const resp = fr?.response;
+        if (!resp || typeof resp !== 'object') continue;
+        const result = (resp as Record<string, unknown>).result;
+        if (typeof result !== 'string') continue;
+        const subParsed = parseAgentResponse(result);
+        if (subParsed.ui?.length) fallbackUi = subParsed.ui;
+      }
+    }
 
     const part = event.content?.parts?.find(part => part.text);
     if (!part?.text) continue;
@@ -109,25 +128,37 @@ export function eventsToMessages(
         timestamp: normalizeTimestamp(event.timestamp),
       });
       pendingCalls = [];
+      fallbackUi = undefined;
       continue;
     }
 
     const parsed = supportsVisualization
       ? parseAgentResponse(part.text)
       : { content: part.text, ui: undefined };
+    // Cache UI from any non-root subagent so we can recover it if the root
+    // event later replaces this draft without its own ui field.
+    if (
+      supportsVisualization &&
+      event.author !== 'MediaPerformanceAgent' &&
+      parsed.ui?.length
+    ) {
+      fallbackUi = parsed.ui;
+    }
     const message: ChatMessage = {
       id: event.id,
       content: parsed.content,
       author: event.author,
       timestamp: normalizeTimestamp(event.timestamp),
-      ui: parsed.ui,
+      ui: parsed.ui ?? fallbackUi,
       toolCalls: pendingCalls.length ? dedupeToolCalls(pendingCalls) : undefined,
     };
     const prev = messages[messages.length - 1];
     if (prev && prev.author !== 'user') {
-      // Replacing the draft with the later output — keep the turn's tool calls.
+      // Replacing the draft with the later output — keep the turn's tool calls
+      // AND inherit any captured UI fallback when the new message lacks one.
       messages[messages.length - 1] = {
         ...message,
+        ui: message.ui ?? prev.ui,
         toolCalls: message.toolCalls ?? prev.toolCalls,
       };
     } else {

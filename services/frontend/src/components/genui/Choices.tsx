@@ -197,20 +197,41 @@ export default function Choices({
         </div>
       )}
 
-      {/* Active question — show a "Pick all that apply" hint when the
-          question is multi-select so the user knows the chips are checkboxes
-          rather than radios. */}
+      {/* Active question header. Multi-select hint + bulk actions sit on the
+          same row so the affordances are discoverable without crowding. */}
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <p className="text-sm font-medium text-white">{q.question}</p>
         {q.multiSelect && (
-          <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
-            Pick all that apply
-          </span>
+          <div className="flex shrink-0 items-center gap-2 text-[10px]">
+            <span className="font-medium uppercase tracking-wider text-zinc-500">
+              Pick all that apply
+            </span>
+            <button
+              type="button"
+              onClick={() => patch(active, { selected: q.options.map(valueOf) })}
+              className="rounded px-1.5 py-0.5 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+            >
+              Select all
+            </button>
+            <button
+              type="button"
+              onClick={() => patch(active, { selected: [] })}
+              className="rounded px-1.5 py-0.5 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+            >
+              Clear
+            </button>
+          </div>
         )}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {q.options.map((o) => {
+      {/* Option chips. The first 1-3 options are the agent's recommended
+          starts; subsequent ones live in a softer row so the eye lands on
+          the recommendations first. */}
+      {(() => {
+        const RECOMMEND_COUNT = Math.min(3, q.options.length);
+        const recs = q.options.slice(0, RECOMMEND_COUNT);
+        const rest = q.options.slice(RECOMMEND_COUNT);
+        const renderChip = (o: ChoiceOption, recommended: boolean) => {
           const val = valueOf(o);
           const isActive = draft.selected.includes(val);
           return (
@@ -218,15 +239,14 @@ export default function Choices({
               key={val}
               type="button"
               onClick={() => toggle(val)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
                 isActive
                   ? 'border-accent-500 bg-accent-500/15 text-white'
-                  : 'border-line-strong bg-surface-sunken text-zinc-300 hover:border-zinc-600'
+                  : recommended
+                    ? 'border-accent-500/40 bg-accent-500/5 text-zinc-200 hover:border-accent-500/70'
+                    : 'border-line-strong bg-surface-sunken text-zinc-300 hover:border-zinc-600'
               }`}
             >
-              {/* Indicator: square+tick for multi-select, dot for single. Filled
-                  when active. Keeps the affordance discoverable without an
-                  extra row of explanation. */}
               {q.multiSelect ? (
                 <span
                   className={`flex h-3 w-3 shrink-0 items-center justify-center rounded-sm border ${
@@ -249,17 +269,48 @@ export default function Choices({
               <span>{o.label}</span>
             </button>
           );
-        })}
-      </div>
+        };
+        return (
+          <>
+            {recs.length > 0 && (
+              <div>
+                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-accent-300/80">
+                  Recommended
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {recs.map((o) => renderChip(o, true))}
+                </div>
+              </div>
+            )}
+            {rest.length > 0 && (
+              <div className="mt-3">
+                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+                  More options
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {rest.map((o) => renderChip(o, false))}
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
+      {/* "Type your own" — always visible when allowCustom is set, with a
+          subtle divider so it reads as the catch-all path. */}
       {q.allowCustom && (
-        <input
-          type="text"
-          value={draft.custom}
-          onChange={(e) => patch(active, { custom: e.target.value })}
-          placeholder="Or type your own answer…"
-          className="mt-3 w-full px-3 py-2 text-xs bg-surface-sunken border border-line rounded-lg text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
-        />
+        <div className="mt-3 border-t border-zinc-800/60 pt-3">
+          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+            Or type your own
+          </p>
+          <input
+            type="text"
+            value={draft.custom}
+            onChange={(e) => patch(active, { custom: e.target.value })}
+            placeholder="Enter a custom answer…"
+            className="w-full rounded-lg border border-line bg-surface-sunken px-3 py-2 text-xs text-white placeholder-zinc-600 focus:border-zinc-600 focus:outline-none"
+          />
+        </div>
       )}
 
       {/* Footer — Back/Next nav, progress counter, and the gated Submit. */}
