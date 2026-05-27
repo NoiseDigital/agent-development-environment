@@ -8,8 +8,12 @@ export type IssueArea = 'data' | 'visual' | 'layout' | 'other';
 
 export interface IssueReport {
   id: string;
-  dashboardId: string;
-  dashboardName: string;
+  /** Dashboard context — present for dashboard-flagged issues, omitted for
+   *  issues raised against a chart in chat / Analyze. */
+  dashboardId?: string;
+  dashboardName?: string;
+  /** Chart title when the issue is scoped to a single visual. */
+  chartTitle?: string;
   area: IssueArea;
   notes: string;
   submittedAt: string;

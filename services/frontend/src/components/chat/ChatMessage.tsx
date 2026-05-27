@@ -117,7 +117,7 @@ export default function ChatMessage({
 
             {blocks.length > 0 && (
               <div className={v.uiGap}>
-                <GenUIRenderer blocks={blocks} onAction={onAction} />
+                <GenUIRenderer blocks={blocks} onAction={onAction} messageId={message.id} />
               </div>
             )}
 

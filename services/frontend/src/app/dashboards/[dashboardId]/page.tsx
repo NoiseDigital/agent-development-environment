@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { mockDashboards, dashboardFromSpec, type Dashboard } from '../../../data/mock-dashboard-data';
+import { clientDashboards, dashboardFromSpec, type Dashboard } from '../../../data/dashboards';
 import { loadUserDashboards } from '../../../lib/user-dashboards';
 import DashboardDetail from '../../../components/dashboards/DashboardDetail';
 
@@ -14,7 +14,7 @@ export default function DashboardPage() {
   const router = useRouter();
 
   const [dashboard, setDashboard] = useState<Dashboard | null | undefined>(
-    () => mockDashboards.find((d) => d.id === params.dashboardId),
+    () => clientDashboards.find((d) => d.id === params.dashboardId),
   );
 
   useEffect(() => {

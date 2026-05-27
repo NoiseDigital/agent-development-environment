@@ -10,8 +10,10 @@
 // Adding a new client is THREE coordinated changes:
 //   1. INSERT into the `clients` table (Alembic migration or admin path).
 //   2. Add the code below (so TypeScript narrows routes / lookups).
-//   3. Add a client SEED in `mock-dashboard-data.ts` whose id IS the code,
-//      so the canonical client report lives at `/dashboards/<CODE>`.
+//   3. Add a `data/dashboards/clients/<code>.ts` file (see noi.ts for the
+//      template) and register it in `data/dashboards/clients/index.ts`. The
+//      dashboard's `id` IS the code, so the canonical report lives at
+//      `/dashboards/<CODE>`.
 //
 // In production the `clients` table is authoritative; this list mirrors it
 // so the frontend can do compile-time checks without a network round-trip.

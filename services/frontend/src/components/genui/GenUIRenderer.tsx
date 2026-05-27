@@ -10,12 +10,15 @@ import BlockBoundary from './BlockBoundary';
 export default function GenUIRenderer({
   blocks,
   onAction,
+  messageId,
 }: {
   blocks: UIBlock[];
   /** Lets interactive blocks send a message back to the agent. */
   onAction?: (text: string) => void;
+  /** Parent message's ADK event id — interactive blocks key persisted state
+   *  off this + their block index so "Answered" / "Applied" survives remounts. */
+  messageId?: string;
 }) {
-  const ctx: RenderContext = { onAction };
   return (
     <>
       {blocks.map((block, i) => {
@@ -23,6 +26,7 @@ export default function GenUIRenderer({
           | ((props: unknown, ctx: RenderContext) => ReactNode)
           | undefined;
         if (!render) return null;
+        const ctx: RenderContext = { onAction, messageId, blockIndex: i };
         return (
           <div key={block.id ?? `${block.component}-${i}`}>
             <BlockBoundary>{render(block.props, ctx)}</BlockBoundary>

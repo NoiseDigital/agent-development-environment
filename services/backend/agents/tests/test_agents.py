@@ -70,6 +70,18 @@ async def test_agent_behaviour(harness, agent, case):
             f"final text: {run.text[:300]}"
         )
 
+    # `forbidden_ui`: components that must NOT appear, while others are fine.
+    # Use for assertions like "must not emit an `action` block" without
+    # constraining what *does* appear.
+    if "forbidden_ui" in expect:
+        banned = expect["forbidden_ui"]
+        if isinstance(banned, str):
+            banned = [banned]
+        present = [c for c in banned if c in run.ui_components]
+        assert not present, (
+            f"forbidden UI components present: {present}; got {run.ui_components}"
+        )
+
     # `tools`: bool (any tool used) OR a list of names that must all be called.
     if "tools" in expect:
         names = run.tool_names()

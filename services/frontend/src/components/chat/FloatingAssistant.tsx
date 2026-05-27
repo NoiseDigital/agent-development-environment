@@ -3,12 +3,17 @@
 import { useState, useRef, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useChat } from '../../hooks/useChat';
+import { useChatAutoScroll } from '../../hooks/useChatAutoScroll';
 import { useDashboardEdit, useAddVizIntent } from '../../lib/dashboard-edit-context';
+import { buildDashboardContext } from '../../lib/dashboard-context';
 import ChatMessage from './ChatMessage';
 
-// Defacto Platform assistant. For now every request is routed to the
-// Media Analyst agent; a dedicated plan/dashboard agent can replace this later.
-const AGENT_ID = 'media_performance_agent';
+// Two agents power the floating assistant, picked by context:
+//   - dashboard_editor_agent → in dashboard edit mode; can pin charts,
+//     recolour the banner, rename. Delegates analysis to media-performance.
+//   - media_performance_agent → otherwise; the analyst.
+const ANALYST_AGENT = 'media_performance_agent';
+const EDITOR_AGENT = 'dashboard_editor_agent';
 
 export default function FloatingAssistant() {
   const pathname = usePathname();
@@ -23,22 +28,33 @@ export default function FloatingAssistant() {
 function AssistantWidget() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
-  const { messages, isLoading, error, feedback, rateMessage, sendMessage, createNewSession } = useChat(AGENT_ID);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const initRef = useRef(false);
   const editCtx = useDashboardEdit();
+  // Picking the agent at the hook level means switching modes spawns a
+  // fresh session — the previous mode's history doesn't leak. useChat
+  // watches `agentId` for changes and clears state; we then create a fresh
+  // session below.
+  const agentId = editCtx?.canGenerate ? EDITOR_AGENT : ANALYST_AGENT;
+  const { messages, isLoading, error, feedback, rateMessage, sendMessage, createNewSession } = useChat(agentId);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastMsgRef = useRef<HTMLDivElement>(null);
+  const lastInitializedAgent = useRef<string | null>(null);
   const addVizIntent = useAddVizIntent();
   // Suggestion chips shown above the input while an intent is pending. Cleared
   // the moment the user sends ANY message so the chips don't linger across turns.
   const [pendingSuggestions, setPendingSuggestions] = useState<string[]>([]);
 
-  // Create a session once so the first message can send without a round-trip wait.
+  // Create a session for the active agent so the first message can send
+  // without a round-trip wait. Re-runs when the agent changes (edit-mode
+  // toggle) so the new agent gets its own session — without this, requests
+  // would target a session that lives under the OTHER agent and 404 on
+  // `/run_sse`. The `agentId` is passed explicitly because the underlying
+  // useChat state may not have committed the swap yet in the same render.
   useEffect(() => {
-    if (!initRef.current) {
-      initRef.current = true;
-      createNewSession();
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (lastInitializedAgent.current === agentId) return;
+    lastInitializedAgent.current = agentId;
+    createNewSession(agentId);
+  }, [agentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The first time the user enters dashboard edit mode in a session, auto-pop
   // the chat open so the "save to dashboard" workflow is discoverable. We
@@ -56,10 +72,10 @@ function AssistantWidget() {
     }
   }, [editCtx?.canGenerate]);
 
-  // Keep the newest message in view.
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages]);
+  // All chat scroll behaviour — session-load jump, scroll-on-send, top-of-
+  // new-reply, sticky-stream — comes from the shared hook so the floating
+  // surface and the full-chat panel scroll identically.
+  useChatAutoScroll({ containerRef, endRef: messagesEndRef, lastMsgRef, messages });
 
   // The add-viz button in the dashboard's edit toolbar fires an intent — open
   // the assistant, drop a starter prompt into the input, and surface a few
@@ -72,12 +88,27 @@ function AssistantWidget() {
     setPendingSuggestions(addVizIntent.suggestions);
   }, [addVizIntent?.tick]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Dashboard context — prefixed onto every user message so both agents
+  // (editor in edit mode, analyst in view mode) always know which
+  // dashboard + tab the user is on, what tiles are visible, and which other
+  // tabs exist. The prefix is hidden in the rendered bubble (useChat strips
+  // it from the displayed user message — only the agent sees it).
+  const dashboardPrefix = editCtx
+    ? buildDashboardContext({
+        dashboardId: editCtx.dashboardId,
+        dashboardName: editCtx.dashboardName,
+        activeTab: editCtx.activeTab,
+        tabs: editCtx.tabs,
+        mode: editCtx.canGenerate ? 'edit' : 'view',
+      })
+    : undefined;
+
   const handleSend = () => {
     const text = input.trim();
     if (!text || isLoading) return;
     setInput('');
     setPendingSuggestions([]);
-    sendMessage(text);
+    sendMessage(text, dashboardPrefix);
   };
 
   // Click a suggestion → send immediately (skip the input). Mirrors how the
@@ -86,7 +117,7 @@ function AssistantWidget() {
     if (isLoading) return;
     setInput('');
     setPendingSuggestions([]);
-    sendMessage(text);
+    sendMessage(text, dashboardPrefix);
   };
 
   // ── Collapsed: floating action button ──────────────────────────────────────
@@ -152,7 +183,7 @@ function AssistantWidget() {
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
+      <div ref={containerRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-6">
             <div className="w-11 h-11 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-3">
@@ -171,11 +202,12 @@ function AssistantWidget() {
             </p>
           </div>
         ) : (
-          messages.map((m) => (
+          messages.map((m, i) => (
             <ChatMessage
               key={m.id}
               message={m}
               variant="floating"
+              rowRef={i === messages.length - 1 ? lastMsgRef : undefined}
               rating={feedback[m.id] ?? null}
               onRate={(rating) => rateMessage(m.id, rating)}
               onAction={(text) => sendMessage(text)}
@@ -183,6 +215,7 @@ function AssistantWidget() {
           ))
         )}
         {error && <p className="text-[11px] text-red-400 px-1">{error}</p>}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}

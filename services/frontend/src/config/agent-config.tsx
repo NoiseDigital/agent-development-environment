@@ -65,6 +65,16 @@ export const agentConfigurations: Record<string, AgentConfig> = {
     hidden: true,
     icon: React.createElement('svg', { className: 'w-8 h-8', key: 'internal-naming' }),
   },
+  'dashboard_editor_agent': {
+    name: 'dashboard_editor_agent',
+    displayName: 'Dashboard Editor (internal)',
+    description: 'Acts on a dashboard — pin charts, recolour, rename. Delegates analysis to media-performance.',
+    url: process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'http://localhost:8080',
+    // Streams charts as `{text, ui}` envelopes the same way the analyst does.
+    supportsVisualization: true,
+    hidden: true,
+    icon: React.createElement('svg', { className: 'w-8 h-8', key: 'internal-editor' }),
+  },
   'timesheet_agent': {
     name: 'timesheet_agent',
     displayName: 'Timesheet Agent',

@@ -11,17 +11,28 @@
 // back to its default analyse-only behaviour.
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import type { DashboardTab } from '../data/dashboards';
 
 export interface DashboardEditContextValue {
   dashboardId: string;
+  /** Human-readable dashboard name — needed for the agent context preamble
+   *  so the agent can identify which dashboard it is grounded in. */
+  dashboardName: string;
   tabId: string;
   /** Human-readable tab name — shown in the chat header so the user knows
    *  where any saved chart will land. */
   tabLabel: string;
   /** True when the dashboard is in edit mode AND the user has the role to
    *  save tiles. The chat shows the save-to-dashboard affordance only when
-   *  this is true; outside edit mode the same chat surface is analysis-only. */
+   *  this is true; outside edit mode the same chat surface is analysis-only.
+   *  Also drives agent routing (editor vs analyst). */
   canGenerate: boolean;
+  /** Every tab on the dashboard — fed into the agent context preamble so the
+   *  analyst can point the user to a different tab when relevant. */
+  tabs: DashboardTab[];
+  /** The tab the user is currently looking at — supplies the tile manifest
+   *  for the agent context preamble. */
+  activeTab: DashboardTab;
   /** Notify the dashboard that a chart was pinned, so it re-derives tiles
    *  and the new pin appears immediately without a manual refresh. */
   onPinned: () => void;

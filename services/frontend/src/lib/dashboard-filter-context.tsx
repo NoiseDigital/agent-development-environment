@@ -30,6 +30,9 @@ export interface DashboardFilters {
   market_group?: string;
   creative_format?: string;
   kpi_goal?: string;
+  /** Pipe-delimited campaign names — multi-select. When ≥ 2 are selected the
+   *  TrendTile overlays each one's flight window as a comparison marker. */
+  campaign?: string;
   /** Inclusive YYYY-MM-DD. Both undefined = "all available history". */
   date_from?: string;
   date_to?: string;
@@ -55,7 +58,7 @@ const Ctx = createContext<FiltersValue | null>(null);
 function shallowEq(a: DashboardFilters, b: DashboardFilters): boolean {
   const keys: (keyof DashboardFilters)[] = [
     'campaign_phase', 'publisher', 'market_group', 'creative_format',
-    'kpi_goal', 'date_from', 'date_to',
+    'kpi_goal', 'campaign', 'date_from', 'date_to',
   ];
   return keys.every((k) => (a[k] ?? '') === (b[k] ?? ''));
 }

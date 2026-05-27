@@ -36,10 +36,10 @@ export default function MessageInput({
   };
 
   return (
-    // Page-bottom gradient veil masks the message list edge so the input
-    // appears to float above a softly-faded chat surface — no visible seam.
+    // The input shares the page's radial-wash backdrop with the message list
+    // above — no veil, no opaque divider, no hairline. Visual weight on the
+    // input pill comes from its own backdrop-blur + ring + shadow.
     <div className="pointer-events-none relative">
-      <div className="pointer-events-none absolute -top-12 left-0 right-0 h-12 bg-gradient-to-b from-transparent to-black" />
       <div className="pointer-events-auto px-4 pb-6 pt-2">
         <form onSubmit={handleSubmit} className="mx-auto w-full max-w-2xl">
           <div

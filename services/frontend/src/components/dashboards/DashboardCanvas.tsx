@@ -4,7 +4,7 @@ import { GridLayout, useContainerWidth, type Layout } from 'react-grid-layout';
 import { GridBackground } from 'react-grid-layout/extras';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
-import { DashboardTile } from '../../data/mock-dashboard-data';
+import type { DashboardTile } from '../../data/dashboards';
 import VegaChart from '../VegaChart';
 import TextTile from './TextTile';
 import TrendTile from './TrendTile';
@@ -152,7 +152,9 @@ export default function DashboardCanvas({
                   <button
                     type="button"
                     onClick={() => onRemoveTile(tile.id)}
-                    className="no-drag absolute top-2 right-2 z-10 flex h-6 w-6 items-center justify-center rounded-md border border-zinc-700 bg-zinc-800 text-zinc-400 opacity-0 transition group-hover/tile:opacity-100 hover:border-red-500/40 hover:bg-red-500/20 hover:text-red-400"
+                    // Sits to the LEFT of the chart's own ⋯ action menu so the
+                    // two buttons stay side-by-side rather than overlapping.
+                    className="no-drag absolute top-1.5 right-9 z-20 flex h-6 w-6 items-center justify-center rounded-md border border-zinc-700 bg-zinc-800 text-zinc-400 opacity-0 transition group-hover/tile:opacity-100 hover:border-red-500/40 hover:bg-red-500/20 hover:text-red-400"
                     aria-label="Remove tile"
                   >
                     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

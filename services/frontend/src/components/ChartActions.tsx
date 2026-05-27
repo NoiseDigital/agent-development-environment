@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { toPng } from 'html-to-image';
-import { mockDashboards, dashboardFromSpec, type Dashboard } from '../data/mock-dashboard-data';
+import { clientDashboards, dashboardFromSpec, type Dashboard } from '../data/dashboards';
 import { loadUserDashboards } from '../lib/user-dashboards';
 import { pinsApi } from '../lib/pins-api';
 import { dashboardTitle as dashTitle, isPinnable } from '../lib/dashboard-access';
+import { saveIssueReport } from '../lib/issue-reports';
+import { showToast } from '../lib/toast';
 import type { VegaSpec } from '../types/genui';
 
 interface ChartActionsProps {
@@ -57,9 +59,10 @@ function chartToCsv(spec: VegaSpec): string {
 // a dashboard's tiles live on tabs.
 export default function ChartActions({ chart, captureRef, exportsOnly = false }: ChartActionsProps) {
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<'menu' | 'dashboards' | 'tabs'>('menu');
+  const [view, setView] = useState<'menu' | 'dashboards' | 'tabs' | 'flag'>('menu');
   const [picked, setPicked] = useState<Dashboard | null>(null);
   const [savedTo, setSavedTo] = useState<{ id: string; name: string; tab: string } | null>(null);
+  const [flagNotes, setFlagNotes] = useState('');
 
   // Pinning is a runtime edit, so it can only target editable dashboards —
   // client dashboards are code-defined and immutable. User-created dashboards
@@ -68,12 +71,25 @@ export default function ChartActions({ chart, captureRef, exportsOnly = false }:
   useEffect(() => {
     setUserDashboards(loadUserDashboards().map(dashboardFromSpec));
   }, []);
-  const editableDashboards = [...userDashboards, ...mockDashboards].filter(isPinnable);
+  const editableDashboards = [...userDashboards, ...clientDashboards].filter(isPinnable);
 
   const close = () => {
     setOpen(false);
     setView('menu');
     setPicked(null);
+    setFlagNotes('');
+  };
+
+  const submitFlag = () => {
+    const notes = flagNotes.trim();
+    if (!notes) return;
+    saveIssueReport({
+      chartTitle: specTitle(chart),
+      area: 'visual',
+      notes,
+    });
+    showToast({ message: 'Chart flagged — thanks, the team will take a look.', tone: 'success' });
+    close();
   };
 
   const handlePng = async () => {
@@ -185,6 +201,48 @@ export default function ChartActions({ chart, captureRef, exportsOnly = false }:
                   onClick={handleCsv}
                   icon="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                 />
+                <div className="my-1 border-t border-zinc-800" />
+                <MenuItem
+                  label="Flag this chart"
+                  onClick={() => setView('flag')}
+                  icon="M3 21v-8m0 0V4h12l-2 4 2 4H3z"
+                />
+              </>
+            )}
+
+            {view === 'flag' && (
+              <>
+                <BackHeader label="Flag this chart" onClick={() => setView('menu')} />
+                <div className="px-3 pb-2 pt-1">
+                  <p className="mb-1.5 text-[10px] text-zinc-500">
+                    What&apos;s wrong with <span className="text-zinc-300">{specTitle(chart)}</span>?
+                  </p>
+                  <textarea
+                    value={flagNotes}
+                    onChange={(e) => setFlagNotes(e.target.value)}
+                    rows={3}
+                    placeholder="Describe the issue…"
+                    autoFocus
+                    className="w-full resize-none rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-[11px] text-white placeholder-zinc-600 focus:border-zinc-600 focus:outline-none"
+                  />
+                  <div className="mt-2 flex justify-end gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setView('menu')}
+                      className="rounded-md px-2 py-1 text-[10px] font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={submitFlag}
+                      disabled={!flagNotes.trim()}
+                      className="rounded-md bg-white px-2.5 py-1 text-[10px] font-semibold text-black transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Submit
+                    </button>
+                  </div>
+                </div>
               </>
             )}
 

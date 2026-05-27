@@ -4,6 +4,7 @@ import { useRef, useEffect, useState } from 'react';
 import { getAgentConfiguration } from '../../config/agent-config';
 import ChatMessage from './ChatMessage';
 import type { ChatMessage as ChatMessageData } from '../../hooks/useChat';
+import { useChatAutoScroll } from '../../hooks/useChatAutoScroll';
 import type { Rating } from '../../lib/feedback-api';
 
 // MessageList — the full-height chat transcript. Owns scroll behaviour and the
@@ -36,11 +37,9 @@ export default function MessageList({
   onRate,
   onAction,
 }: MessageListProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastMsgRef = useRef<HTMLDivElement>(null);
-  const wasStreamingRef = useRef(false);
-  const prevLengthRef = useRef(messages.length);
-  const lastLoadedFirstId = useRef<string | null>(null);
   const [verbIndex, setVerbIndex] = useState(0);
 
   // Cycle verbs while any message is loading
@@ -54,73 +53,16 @@ export default function MessageList({
     return () => clearInterval(id);
   }, [isLoading]);
 
-  // When a conversation loads (a refresh, or switching sessions) jump to the
-  // newest message. Keyed on the first message's id so it fires once per
-  // conversation — not on every streaming token within one.
-  useEffect(() => {
-    const firstId = messages[0]?.id ?? null;
-    if (firstId && firstId !== lastLoadedFirstId.current) {
-      lastLoadedFirstId.current = firstId;
-      messagesEndRef.current?.scrollIntoView({ block: 'end' });
-    }
-  }, [messages]);
-
-  // When a reply finishes, bring the TOP of that message to the top of the
-  // viewport so the user reads it from the start. `block: 'start'` is clamped
-  // by the browser — a message too short to fill the viewport just lands fully
-  // visible at the bottom. The delay lets a chart finish sizing first, so the
-  // scroll target is the message's final height.
-  useEffect(() => {
-    const streaming = messages.some(m => m.isStreaming);
-    const justFinished = wasStreamingRef.current && !streaming;
-    wasStreamingRef.current = streaming;
-    if (!justFinished) return;
-    const id = setTimeout(() => {
-      lastMsgRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 300);
-    return () => clearTimeout(id);
-  }, [messages]);
-
-  // Scroll-to-bottom on user send. useChat pushes [userMessage,
-  // streamingPlaceholder] in one batch — the LAST message is the agent
-  // placeholder, NOT the user. So we scan the newly-appended slice for any
-  // user message instead of checking only the tail.
-  useEffect(() => {
-    const prev = prevLengthRef.current;
-    prevLengthRef.current = messages.length;
-    if (messages.length <= prev) return;
-    const userJustSent = messages.slice(prev).some((m) => m.author === 'user');
-    if (userJustSent) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
-
-  // Sticky-bottom while the agent streams. Only follows when the user is
-  // already pinned near the bottom — if they've scrolled up to re-read
-  // something, we don't yank them back down on every token.
-  const followStreamRef = useRef(true);
-  useEffect(() => {
-    const container = messagesEndRef.current?.parentElement;
-    if (!container) return;
-    const onScroll = () => {
-      const distanceFromBottom =
-        container.scrollHeight - container.scrollTop - container.clientHeight;
-      followStreamRef.current = distanceFromBottom < 120;
-    };
-    container.addEventListener('scroll', onScroll, { passive: true });
-    return () => container.removeEventListener('scroll', onScroll);
-  }, []);
-  useEffect(() => {
-    const streaming = messages.some((m) => m.isStreaming);
-    if (!streaming || !followStreamRef.current) return;
-    messagesEndRef.current?.scrollIntoView({ block: 'end' });
-  }, [messages]);
+  // All four scroll behaviours — session-load jump, send-pin, top-of-reply,
+  // and sticky-stream — live in the shared hook so the floating assistant
+  // can mirror them exactly.
+  useChatAutoScroll({ containerRef, endRef: messagesEndRef, lastMsgRef, messages });
 
   // Get agent configuration for display
   const agentConfig = selectedApp ? getAgentConfiguration(selectedApp) : null;
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-6 space-y-5 bg-black">
+    <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-5">
       {messages.length === 0 ? (
         <div className="flex justify-center items-center h-full">
           <div className="text-center max-w-sm mx-auto">

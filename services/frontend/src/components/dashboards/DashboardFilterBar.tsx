@@ -30,6 +30,7 @@ interface FilterSpec {
 const FILTERS: FilterSpec[] = [
   { dim: 'publisher', label: 'Publisher' },
   { dim: 'campaign_phase', label: 'Campaign Phase' },
+  { dim: 'campaign', label: 'Campaign' },
   { dim: 'market_group', label: 'Market' },
   { dim: 'creative_format', label: 'Format' },
   { dim: 'kpi_goal', label: 'KPI Goal' },

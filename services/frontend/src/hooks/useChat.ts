@@ -129,6 +129,25 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
     loadApps();
   }, []);
 
+  // React to `initialApp` changes. The FloatingAssistant picks an agent based
+  // on dashboard edit mode — when the user toggles edit on/off, `initialApp`
+  // flips between media_performance_agent and dashboard_editor_agent. Without
+  // this effect the hook stayed bound to whichever app was active on the
+  // FIRST render, and `/run_sse` calls would 404 because the session was
+  // created under one app but the request URL referenced the other.
+  // We deliberately do NOT touch state when the prop matches the current
+  // selection — that's the steady state.
+  useEffect(() => {
+    if (!initialApp || initialApp === selectedApp) return;
+    setSelectedApp(initialApp);
+    // Drop everything tied to the previous app — the new one will spawn its
+    // own session via createNewSession on the consumer's mount effect.
+    setCurrentSession(null);
+    setMessages([]);
+    setFeedback({});
+    setError(null);
+  }, [initialApp, selectedApp]);
+
   // Load sessions when app changes — no currentSession dep to avoid re-fetch loops.
   // After the listing arrives we also prune sessions with zero events (stale
   // "New chat" placeholders left behind by previous tabs); a session that has
@@ -292,15 +311,20 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
     return ids;
   };
 
-  const createNewSession = async (): Promise<Session | null> => {
-    if (!selectedApp) return null;
+  // `appOverride` lets a caller create a session under a specific app even
+  // when `selectedApp` state hasn't yet committed (e.g. the FloatingAssistant
+  // swapping agents on edit-mode toggle — the state setter and this call fire
+  // in the same render, so the closure's selectedApp is still stale).
+  const createNewSession = async (appOverride?: string): Promise<Session | null> => {
+    const app = appOverride ?? selectedApp;
+    if (!app) return null;
 
     try {
-      const cleanedIds = await cleanupFreshUnusedSessions(selectedApp);
+      const cleanedIds = await cleanupFreshUnusedSessions(app);
       // The URL routes a session as /chat/<agent>/<id>, so the entity is
       // already implied by the path — the id itself is just a uuid, no prefix.
       const sessionId = newId();
-      const newSession = await adkApi.createSession(selectedApp, userId, sessionId);
+      const newSession = await adkApi.createSession(app, userId, sessionId);
       // Mark the new session as "fresh, unused" — it graduates off the ledger
       // the moment sendMessage is invoked against it.
       localFreshSessions.current.add(newSession.id);
@@ -533,12 +557,27 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
 
     } catch (err) {
       console.error('Failed to send message:', err);
-      // Keep the user's message; turn the streaming placeholder into a graceful
-      // fallback reply rather than dropping the exchange entirely.
+      // Keep the user's message; turn the streaming placeholder into a fallback
+      // reply rather than dropping the exchange entirely. Surface the specific
+      // failure when we know what it is — a 429 quota error reads very
+      // differently from a generic "something went wrong" message, and the
+      // user needs to know whether to retry or wait.
+      const msg = err instanceof Error ? err.message : '';
+      let fallback = FALLBACK_REPLY;
+      if (/\b429\b|RESOURCE_EXHAUSTED|Too Many/i.test(msg)) {
+        fallback =
+          'The model is rate-limiting requests right now (Vertex AI quota). ' +
+          'Wait a minute and try again — your message will still be here.';
+      } else if (/\b404\b/.test(msg)) {
+        fallback =
+          "Your chat session was lost (404). Please click 'New chat' to start a fresh session.";
+      } else if (msg) {
+        fallback = `${FALLBACK_REPLY}\n\n_Error: ${msg.slice(0, 200)}_`;
+      }
       setMessages(prev =>
         prev.map(m =>
           m.id === streamingId
-            ? { ...m, content: FALLBACK_REPLY, isStreaming: false, status: undefined, uiKind: undefined }
+            ? { ...m, content: fallback, isStreaming: false, status: undefined, uiKind: undefined }
             : m
         )
       );

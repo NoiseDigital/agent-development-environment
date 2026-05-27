@@ -67,6 +67,19 @@ export type FilterField =
     }
   | { kind: 'text'; key: string; label: string; placeholder?: string; value?: string };
 
+/** One side-effecting dashboard edit the editor agent asks the frontend to
+ *  apply. The frontend interprets these block-by-block and runs the matching
+ *  handler in dashboard-actions.ts. Unknown `kind` values are ignored.
+ *
+ *  Kinds:
+ *    - `pin_chart`        — pin a Vega spec to (dashboardId, tab_id)
+ *    - `set_accent`       — write a hex into dashboard-overrides
+ *    - `rename_dashboard` — write a name into user-dashboards */
+export type ActionProps =
+  | { kind: 'pin_chart'; tab_id: string; spec: VegaSpec }
+  | { kind: 'set_accent'; hex: string }
+  | { kind: 'rename_dashboard'; name: string };
+
 /** Proactive follow-up pills — one-click "ask this" chips the agent drops
  *  beneath a reply. Clicking a pill sends its text as the next user message,
  *  so the chat reads as a guided exploration. */
@@ -97,7 +110,8 @@ export type UIBlock =
   | { component: 'chart'; props: VegaSpec; id?: string }
   | { component: 'choices'; props: ChoicesProps; id?: string }
   | { component: 'filters'; props: FiltersProps; id?: string }
-  | { component: 'suggestions'; props: SuggestionsProps; id?: string };
+  | { component: 'suggestions'; props: SuggestionsProps; id?: string }
+  | { component: 'action'; props: ActionProps; id?: string };
 
 /** Component names an agent may emit — the catalog surface. */
 export type UIComponent = UIBlock['component'];

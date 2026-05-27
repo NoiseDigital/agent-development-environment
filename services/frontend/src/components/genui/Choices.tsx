@@ -1,7 +1,15 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ChoicesProps, ChoiceQuestion, ChoiceOption } from '../../types/genui';
+import { loadBlockState, saveBlockState } from '../../lib/genui-state';
+
+/** What we persist for a Choices block — the drafts a user has built up plus
+ *  the final submission string once they've sent it. */
+interface PersistedChoices {
+  drafts: Draft[];
+  submitted: string | null;
+}
 
 /** A clarifying question after normalization — options are always objects. */
 interface CleanQuestion {
@@ -84,20 +92,42 @@ function normalizeQuestions(props: LooseChoicesProps): CleanQuestion[] {
 export default function Choices({
   props,
   onAction,
+  messageId,
+  blockIndex,
 }: {
   props: ChoicesProps;
   onAction?: (text: string) => void;
+  messageId?: string;
+  blockIndex?: number;
 }) {
   const questions = useMemo(
     () => normalizeQuestions(props as LooseChoicesProps),
     [props],
   );
 
+  // Restore (if any) — once the message has a stable id we look up prior
+  // drafts + submission so the block doesn't reset on remount.
+  const restored = useMemo(
+    () => loadBlockState<PersistedChoices>(messageId, blockIndex ?? 0),
+    [messageId, blockIndex],
+  );
   const [drafts, setDrafts] = useState<Draft[]>(() =>
-    questions.map(() => ({ selected: [], custom: '' })),
+    restored?.drafts && restored.drafts.length === questions.length
+      ? restored.drafts
+      : questions.map(() => ({ selected: [], custom: '' })),
   );
   const [activeRaw, setActive] = useState(0);
-  const [submitted, setSubmitted] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState<string | null>(restored?.submitted ?? null);
+
+  // Persist drafts + submitted on every change. saveBlockState is a no-op
+  // until the message has a stable (non-streaming) id, so early renders
+  // during streaming don't write garbage keys.
+  useEffect(() => {
+    saveBlockState<PersistedChoices>(messageId, blockIndex ?? 0, {
+      drafts,
+      submitted,
+    });
+  }, [drafts, submitted, messageId, blockIndex]);
 
   if (questions.length === 0) return null;
 

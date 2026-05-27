@@ -48,6 +48,24 @@ describe('enrichAgentSpec', () => {
     expect((rule.params as Array<{ name?: string }>)[0]?.name).toBe('hover');
   });
 
+  it('hoists x to the outer encoding so the hover rule snaps to nearest point', () => {
+    // The reported bug: hover showed the same single data point everywhere.
+    // Root cause: x lived on the line layer only, so the rule layer had no
+    // x channel for the `nearest: true` selection to snap to. Pin the fix.
+    const enriched = enrichAgentSpec({
+      mark: 'line',
+      encoding: {
+        x: { field: 'name', type: 'temporal' },
+        y: { field: 'value', type: 'quantitative' },
+      },
+    }) as Record<string, unknown>;
+    const outerEncoding = enriched.encoding as { x?: { field?: string } };
+    expect(outerEncoding?.x?.field).toBe('name');
+    const params = (enriched.layer as Array<{ params?: unknown[] }>)[1]?.params;
+    const select = (params?.[0] as { select?: { fields?: string[] } })?.select;
+    expect(select?.fields).toEqual(['name']);
+  });
+
   it('passes a bar chart through without adding a crosshair', () => {
     const enriched = enrichAgentSpec({
       mark: 'bar',

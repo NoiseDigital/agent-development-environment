@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { mockDashboards, dashboardFromSpec, Dashboard, DashboardOwnership } from '../../data/mock-dashboard-data';
+import { clientDashboards, dashboardFromSpec, type Dashboard, type DashboardOwnership } from '../../data/dashboards';
 import { clientBySlug } from '../../data/clients';
 import { loadUserDashboards, deleteUserDashboard, isUserDashboard, saveUserDashboard } from '../../lib/user-dashboards';
 import { dashboardTitle, canDelete } from '../../lib/dashboard-access';
@@ -194,7 +194,7 @@ export default function DashboardsPage() {
     setUserDashboards(loadUserDashboards().map(dashboardFromSpec));
   }, []);
 
-  const allDashboards = [...userDashboards, ...mockDashboards];
+  const allDashboards = [...userDashboards, ...clientDashboards];
 
   // Copy + Delete from the card kebab. Both refresh the user-dashboards
   // list in place so the grid reflects the change immediately.

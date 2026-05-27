@@ -1,14 +1,30 @@
-// Dashboard tile model + the canonical client dashboard seeds.
+// ⚠️ DEPRECATED — DO NOT IMPORT FROM THIS FILE. ⚠️
 //
-// This file used to mix two roles: the mock data pipeline (in-memory tables
-// + sync builders) and the actual dashboard registry. The data pipeline is
-// gone — every tile is now live BigQuery — so the file is just the tile
-// type definitions, the tab/dashboard composition, and the SEED list.
+// This module has been split into a proper dashboards-as-code layer:
 //
-// Naming: tile discriminators are clean ('kpi', 'trend', 'pivot',
-// 'breakdown', 'narrative') because there is no mock counterpart any more.
-// `chart` and `text` remain for user-pinned arbitrary Vega specs and the
-// text-widget feature in dashboard edit mode.
+//   data/dashboards/
+//     ├── index.ts           — public re-exports (import everything from here)
+//     ├── types.ts           — tile + dashboard type definitions
+//     ├── primitives.ts      — KPI_SETS, TREND_PAIRS, PIVOT_COLUMNS, GOAL_TABS
+//     ├── builders.ts        — per-block tile builders (kpiStrip, trendHero, …)
+//     ├── tabs.ts            — reference tab assemblies (buildGoalTab, …)
+//     ├── user-dashboards.ts — dashboardFromSpec
+//     └── clients/<code>.ts  — one file per code-defined client dashboard
+//
+// All call sites were migrated; this file is intentionally left behind for
+// one release cycle as a safety net in case a regression is found in the
+// new structure. No symbols below are wired into the live app any more.
+//
+// TODO(2026-Q3): Delete this file. Adding ANYTHING new here is forbidden —
+// new tile types, new client dashboards, new builders all go under
+// `data/dashboards/`.
+//
+// Historical comment (preserved for context):
+// Dashboard tile model + the canonical client dashboard seeds. This file
+// used to mix two roles: the mock data pipeline (in-memory tables + sync
+// builders) and the actual dashboard registry. The data pipeline is gone —
+// every tile is now live BigQuery — so the file is just the tile type
+// definitions, the tab/dashboard composition, and the SEED list.
 
 import type { VegaSpec } from '../types/genui';
 import { clients } from './media-model';

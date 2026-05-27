@@ -97,15 +97,122 @@ media_performance_agent:
     expect:
       no_ui: true
 
+  # ── Dashboard-context awareness ────────────────────────────────────────────
+  # The floating assistant prepends a [Dashboard context: ...] preamble in
+  # both view and edit modes. The analyst must:
+  #   - treat the preamble as metadata (not a user request).
+  #   - still answer the user's actual question.
+  #   - not refuse, not echo the preamble back.
+
+  - name: dashboard context preamble is tolerated, not echoed
+    message: |
+      [Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=view]
+      Active tab: Overall
+      Other tabs: Awareness, Engagement, Conversion
+      Tiles on this tab:
+      - KPI: Spend
+      - KPI: CTR
+      - Trend: total_spend over time
+      - Breakdown: total_spend by publisher
+
+      Plot weekly spend in 2024 as a line chart.
+    expect:
+      ui: chart
+      tools: [VegaChartsAgent]
+
+  - name: dashboard context with scalar request still goes scalar
+    message: |
+      [Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=view]
+      Active tab: Overall
+      Tiles on this tab:
+      - KPI: Spend
+
+      Give me just the total spend number for 2024, no chart.
+    expect:
+      no_ui: true
+      tools: true
+
 
 # ── Internal one-shot agents ─────────────────────────────────────────────────
 # These are non-conversational (called once per dashboard refresh / per
 # session). Tests check the contract holds.
 
+dashboard_editor_agent:
+  # All editor cases use the rich multi-line preamble the FloatingAssistant
+  # now emits in BOTH view and edit modes (id+tab+mode on line 1; manifest
+  # lines beneath). The editor's prompt parses id+tab off the first line and
+  # treats the manifest as informational — see prompts/dashboard_editor_agent.py.
+  - name: rename → emits a rename_dashboard action
+    message: |
+      [Dashboard context: id=user-123, tab=overall, name=My Dashboard, mode=edit]
+      Active tab: Overall
+      Tiles on this tab:
+      - KPI: Spend
+
+      Rename this dashboard to Q3 Recap.
+    expect:
+      ui: action
+
+  - name: recolour banner → emits a set_accent action
+    message: |
+      [Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=edit]
+      Active tab: Overall
+      Tiles on this tab:
+      - KPI: Spend
+
+      Make the banner emerald.
+    expect:
+      ui: action
+
+  - name: ask to add a chart → emits chart + pin_chart action (delegates to analyst)
+    # Phrased unambiguously — the editor's prompt requires this, but the
+    # raw message itself also nails down shape + window so the analyst has
+    # zero room to ask for clarification.
+    message: |
+      [Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=edit]
+      Active tab: Overall
+      Other tabs: Awareness, Engagement, Conversion
+      Tiles on this tab:
+      - KPI: Spend
+      - Trend: total_spend over time
+
+      Add a bar chart of total spend by publisher over all available time to this tab.
+    expect:
+      ui: [chart, action]
+      tools: [MediaPerformanceAgent]
+
+  - name: analytical question → delegates, never emits an action
+    # The editor MAY return a chart or a choices block (depends on whether
+    # the analyst clarifies); the only invariant is "no `action` block,
+    # because the user wasn't asking to edit the dashboard."
+    message: |
+      [Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=edit]
+      Active tab: Overall
+      Other tabs: Awareness, Engagement, Conversion
+      Tiles on this tab:
+      - KPI: Spend
+      - Trend: total_spend over time
+      - Breakdown: total_spend by publisher
+
+      What was our top publisher last quarter?
+    expect:
+      forbidden_ui: action
+      tools: [MediaPerformanceAgent]
+
+
 dashboard_insights_agent:
   - name: produces structured insight bullets from a totals payload
     message: |
       {"window":"Last 90 days","filters":{},"current":{"total_spend":850000,"impressions":120000000,"clicks":350000,"engaged_visits":85000,"ctr":0.0029,"cpc":2.43},"prior":{"total_spend":720000,"impressions":110000000,"clicks":295000,"engaged_visits":68000,"ctr":0.0027,"cpc":2.44},"top_publisher":{"name":"Meta","value":420000}}
+    expect:
+      ok: true
+
+  - name: produces insights grounded in the dashboard tile manifest
+    # Forward-compat: the same payload with an optional `dashboard` field
+    # describing the active tab. The agent should still emit insights, ideally
+    # referencing visible tiles or other tabs.
+    message: |
+      {"window":"Last 90 days","filters":{},"current":{"total_spend":850000,"impressions":120000000,"clicks":350000,"engaged_visits":85000,"ctr":0.0029,"cpc":2.43},"prior":{"total_spend":720000,"impressions":110000000,"clicks":295000,"engaged_visits":68000,"ctr":0.0027,"cpc":2.44},"top_publisher":{"name":"Meta","value":420000},"dashboard":{"dashboard_name":"NOI Performance","tab_label":"Overall","other_tabs":["Awareness","Engagement","Conversion"],"tiles_on_tab":["- KPI: Spend","- KPI: CTR","- Trend: total_spend over time","- Breakdown: total_spend by publisher"]}}
     expect:
       ok: true
 

@@ -12,6 +12,8 @@ import {
 import { useDashboardFilters } from '../../lib/dashboard-filter-context';
 import { useDashboardRefresh } from '../../lib/dashboard-refresh-context';
 import { useDashboardTotals } from '../../lib/dashboard-totals-context';
+import { useDashboardEdit } from '../../lib/dashboard-edit-context';
+import { tileManifestList } from '../../lib/dashboard-context';
 import { adkApi } from '../../lib/adk-api';
 import { getCurrentUser } from '../../lib/auth';
 import TileChartShell from './TileChartShell';
@@ -44,6 +46,7 @@ export default function NarrativeTile({ title }: NarrativeTileProps) {
   const { filters } = useDashboardFilters();
   const { current, prior, loading: totalsLoading } = useDashboardTotals();
   const { version: refreshVersion } = useDashboardRefresh();
+  const editCtx = useDashboardEdit();
   const [insights, setInsights] = useState<InsightBullet[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -63,12 +66,26 @@ export default function NarrativeTile({ title }: NarrativeTileProps) {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    // Tab manifest — what the user is looking at right now. Lets the agent
+    // ground its bullets in visible tiles ("the Spend trend tile shows…")
+    // and call out angles the user might miss given the current layout.
+    const dashboardContext = editCtx
+      ? {
+          dashboard_name: editCtx.dashboardName,
+          tab_label: editCtx.activeTab.label,
+          other_tabs: editCtx.tabs
+            .filter((t) => t.id !== editCtx.activeTab.id)
+            .map((t) => t.label),
+          tiles_on_tab: tileManifestList(editCtx.activeTab.tiles),
+        }
+      : null;
     const payload = JSON.stringify({
       window: windowLabel(filters.date_from, filters.date_to),
       filters,
       current: stripNonNumeric(current),
       prior: prior ? stripNonNumeric(prior) : null,
       top_publisher: topPublisher,
+      dashboard: dashboardContext,
     });
     adkApi
       .runOneShot(INSIGHTS_AGENT, getCurrentUser().uid, payload)
@@ -85,7 +102,7 @@ export default function NarrativeTile({ title }: NarrativeTileProps) {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
     // `prior` + `topPublisher` resolve from the same upstream as `current`; omitted to dedupe.
-  }, [current, totalsLoading, refreshVersion, filters.date_from, filters.date_to, filters.campaign_phase, filters.publisher, filters.market_group, filters.creative_format, filters.kpi_goal]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [current, totalsLoading, refreshVersion, filters.date_from, filters.date_to, filters.campaign_phase, filters.publisher, filters.market_group, filters.creative_format, filters.kpi_goal, editCtx?.activeTab.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (totalsLoading || loading || insights === null) {
     return (

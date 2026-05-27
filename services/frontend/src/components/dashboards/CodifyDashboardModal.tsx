@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { mockDashboards, type Dashboard } from '../../data/mock-dashboard-data';
+import { clientDashboards, type Dashboard } from '../../data/dashboards';
 import { saveCodificationRequest, type CodifyTarget } from '../../lib/codification-requests';
 import { isClientDashboard } from '../../lib/dashboard-access';
 import { showToast } from '../../lib/toast';
@@ -38,9 +38,11 @@ export default function CodifyDashboardModal({
   dashboard: Dashboard;
   onClose: () => void;
 }) {
-  const clientDashboards = mockDashboards.filter(isClientDashboard);
+  // `clientDashboards` from the registry already excludes user dashboards;
+  // the extra filter is belt-and-braces in case a non-client ever sneaks in.
+  const codifiableTargets = clientDashboards.filter(isClientDashboard);
   const [target, setTarget] = useState<CodifyTarget>('new-client');
-  const [targetDashboardId, setTargetDashboardId] = useState(clientDashboards[0]?.id ?? '');
+  const [targetDashboardId, setTargetDashboardId] = useState(codifiableTargets[0]?.id ?? '');
   const [notes, setNotes] = useState('');
 
   const activeTarget = TARGETS.find((t) => t.value === target);
@@ -119,7 +121,7 @@ export default function CodifyDashboardModal({
                 onChange={(e) => setTargetDashboardId(e.target.value)}
                 className={inputCls}
               >
-                {clientDashboards.map((d) => (
+                {codifiableTargets.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.client}
                   </option>

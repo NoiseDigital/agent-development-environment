@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { Dashboard } from '../../data/mock-dashboard-data';
+import type { Dashboard } from '../../data/dashboards';
 import { canShareExternally, dashboardTitle } from '../../lib/dashboard-access';
 import { showToast } from '../../lib/toast';
 

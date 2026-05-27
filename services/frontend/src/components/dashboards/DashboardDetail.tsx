@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Layout } from 'react-grid-layout';
-import type { Dashboard, DashboardTile, ChartTile } from '../../data/mock-dashboard-data';
+import type { Dashboard, DashboardTile, ChartTile } from '../../data/dashboards';
 import { pinsApi, type PinnedChart } from '../../lib/pins-api';
 import { invalidateDashboardCache } from '../../lib/dashboards';
 import {
@@ -165,6 +165,31 @@ export default function DashboardDetail({
     const ov = loadDashboardOverrides(dashboard.id);
     setAccentColor(ov.accentColor ?? dashboard.accentColor);
   }, [dashboard.id, dashboard.accentColor]);
+  // The dashboard editor agent writes through `setDashboardOverride` from a
+  // GenUI Action block — listen for the broadcast so the header re-reads
+  // without a refresh.
+  useEffect(() => {
+    const onChange = (e: Event) => {
+      const ce = e as CustomEvent<{ dashboardId: string }>;
+      if (ce.detail?.dashboardId !== dashboard.id) return;
+      const ov = loadDashboardOverrides(dashboard.id);
+      setAccentColor(ov.accentColor ?? dashboard.accentColor);
+    };
+    window.addEventListener('dashboard-override-changed', onChange);
+    return () => window.removeEventListener('dashboard-override-changed', onChange);
+  }, [dashboard.id, dashboard.accentColor]);
+  // Same for rename — the agent writes through `saveUserDashboard`; we re-
+  // read the local name from the broadcast detail so the header refreshes
+  // immediately.
+  useEffect(() => {
+    const onRenamed = (e: Event) => {
+      const ce = e as CustomEvent<{ dashboardId: string; name: string }>;
+      if (ce.detail?.dashboardId !== dashboard.id) return;
+      setLocalName(ce.detail.name);
+    };
+    window.addEventListener('dashboard-renamed', onRenamed);
+    return () => window.removeEventListener('dashboard-renamed', onRenamed);
+  }, [dashboard.id]);
   const handleAccentChange = useCallback(
     (hex: string) => {
       setAccentColor(hex);
@@ -314,19 +339,30 @@ export default function DashboardDetail({
       : []),
   ];
 
-  // Provide edit context to the layout-level FloatingAssistant — when this
-  // value is non-null AND `canGenerate` is true, the chat shows a
-  // "Save to dashboard" button on every chart it renders.
-  const editContext =
-    editing && isPinnable(dashboard) && isAdmin
-      ? {
-          dashboardId: dashboard.id,
-          tabId: activeTabId,
-          tabLabel: activeTab?.label ?? '',
-          canGenerate: true,
-          onPinned: () => { void reloadPins(); },
-        }
-      : null;
+  // Provide dashboard context to the layout-level FloatingAssistant ALWAYS
+  // (not just edit mode) — the chat needs it in view mode too so the analyst
+  // can ground its answers in the tiles + cross-reference other tabs. The
+  // `canGenerate` flag still gates the editor-agent routing + save-to-
+  // dashboard affordance, so view mode stays read-only.
+  const canGenerate = editing && isPinnable(dashboard) && isAdmin;
+  const editContext = activeTab
+    ? {
+        dashboardId: dashboard.id,
+        dashboardName: dashboard.name,
+        tabId: activeTabId,
+        tabLabel: activeTab.label,
+        canGenerate,
+        tabs: dashboard.tabs,
+        activeTab: {
+          id: activeTabId,
+          label: activeTab.label,
+          // The MERGED runtime tile list (code-derived + pinned charts) — that's
+          // what the user actually sees, and that's what the agent should ground in.
+          tiles,
+        },
+        onPinned: () => { void reloadPins(); },
+      }
+    : null;
 
   return (
     <DashboardRefreshProvider value={{ version: refreshVersion }}>

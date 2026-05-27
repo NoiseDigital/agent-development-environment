@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import type { Dashboard } from '../../data/mock-dashboard-data';
+import type { Dashboard } from '../../data/dashboards';
 import { isClientDashboard } from '../../lib/dashboard-access';
 import AccentColorPicker from './AccentColorPicker';
 
@@ -108,12 +108,31 @@ export default function DashboardReportHeader({
   const isClient = isClientDashboard(dashboard);
   const subtitle = isClient ? 'Performance Report' : dashboard.client;
 
+  // In edit mode, the WHOLE banner becomes the swatch trigger. Click anywhere
+  // on the band → popover opens. No dedicated button. Open state is local so
+  // it doesn't leak into parent re-renders.
+  const [pickerOpen, setPickerOpen] = useState(false);
+
   return (
-    <div style={{ backgroundColor: accentColor }} className="shrink-0">
+    <div
+      style={{ backgroundColor: accentColor }}
+      onClick={editingAccent ? () => setPickerOpen((v) => !v) : undefined}
+      className={`relative shrink-0 ${editingAccent ? 'cursor-pointer transition-shadow hover:shadow-[inset_0_-2px_0_rgba(255,255,255,0.25)]' : ''}`}
+      title={editingAccent ? 'Click to change banner color' : undefined}
+    >
+      {editingAccent && (
+        <AccentColorPicker
+          open={pickerOpen}
+          current={accentColor}
+          defaultColor={dashboard.accentColor}
+          onSelect={onAccentChange}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
       <div className="flex items-center gap-4 px-6 py-3">
         <button
           type="button"
-          onClick={onBack}
+          onClick={(e) => { e.stopPropagation(); onBack(); }}
           aria-label="Back to dashboards"
           className="text-white/60 transition-colors hover:text-white"
         >
@@ -140,25 +159,16 @@ export default function DashboardReportHeader({
           </div>
         )}
 
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            {editableTitle ? (
-              <EditableTitle value={title} onCommit={onTitleCommit} />
-            ) : (
-              <h1 className="truncate text-base font-semibold leading-tight text-white">{title}</h1>
-            )}
-            {editingAccent && (
-              <AccentColorPicker
-                current={accentColor}
-                defaultColor={dashboard.accentColor}
-                onSelect={onAccentChange}
-              />
-            )}
-          </div>
+        <div className="min-w-0" onClick={(e) => e.stopPropagation()}>
+          {editableTitle ? (
+            <EditableTitle value={title} onCommit={onTitleCommit} />
+          ) : (
+            <h1 className="truncate text-base font-semibold leading-tight text-white">{title}</h1>
+          )}
           <p className="truncate text-xs text-white/60">{subtitle}</p>
         </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-4">
+        <div className="ml-auto flex shrink-0 items-center gap-4" onClick={(e) => e.stopPropagation()}>
           <div className="hidden text-right sm:block">
             <p className="text-[10px] font-medium uppercase tracking-wider text-white/50">
               Latest Delivery

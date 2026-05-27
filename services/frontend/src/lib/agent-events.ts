@@ -5,6 +5,7 @@
 import type { Event as AdkEvent } from './adk-api';
 import type { UIBlock } from '../types/genui';
 import { parseAgentResponse } from './agent-response';
+import { stripDashboardContext } from './dashboard-context';
 import { normalizeTimestamp } from '../utils/timestamps';
 
 /** One tool the agent invoked during a turn — name + arguments only; the SQL
@@ -123,7 +124,10 @@ export function eventsToMessages(
     if (event.author === 'user') {
       messages.push({
         id: event.id,
-        content: part.text,
+        // ADK persists the FULL text including any dashboard-context prefix
+        // we prepended for the agent. Strip it so a reloaded session shows
+        // only what the user actually typed.
+        content: stripDashboardContext(part.text),
         author: 'user',
         timestamp: normalizeTimestamp(event.timestamp),
       });

@@ -25,9 +25,6 @@ interface TrendTileProps {
   metric: TrendMetric;
   /** When present, renders a second line on a right axis. */
   secondaryMetric?: TrendMetric;
-  /** Overlay top-N campaign flight bands behind the line(s). */
-  showCampaignWindows?: boolean;
-  maxCampaignWindows?: number;
 }
 
 const METRIC_LABEL: Record<TrendMetric, string> = {
@@ -47,17 +44,23 @@ export default function TrendTile({
   title,
   metric,
   secondaryMetric,
-  showCampaignWindows = true,
-  maxCampaignWindows = 6,
 }: TrendTileProps) {
   const { series, loading } = useDashboardTotals();
   const { filters } = useDashboardFilters();
   const { version: refreshVersion } = useDashboardRefresh();
   const [windows, setWindows] = useState<CampaignWindow[]>([]);
 
-  // Only date+phase feed this — a campaign IS the campaign regardless of slice.
+  // Campaign overlay is OPT-IN now — only the campaigns the user picks in
+  // the filter bar's "Campaign" multi-select show as markers. Auto-bands
+  // were too noisy, and a 1-campaign selection adds no comparison value.
+  const selectedCampaigns = (filters.campaign ?? '')
+    .split('|')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const hasCampaignSelection = selectedCampaigns.length > 0;
+
   useEffect(() => {
-    if (!showCampaignWindows) { setWindows([]); return; }
+    if (!hasCampaignSelection) { setWindows([]); return; }
     let cancelled = false;
     dashboardData
       .campaignWindows({
@@ -65,10 +68,16 @@ export default function TrendTile({
         date_to: filters.date_to,
         campaign_phase_filter: filters.campaign_phase,
       })
-      .then((rows) => { if (!cancelled) setWindows(rows.slice(0, maxCampaignWindows)); })
+      .then((rows) => {
+        if (cancelled) return;
+        const wanted = new Set(selectedCampaigns.map((s) => s.toLowerCase()));
+        setWindows(rows.filter((w) => wanted.has(w.name.toLowerCase())));
+      })
       .catch(() => { /* overlay is non-essential — drop silently */ });
     return () => { cancelled = true; };
-  }, [showCampaignWindows, maxCampaignWindows, filters.date_from, filters.date_to, filters.campaign_phase, refreshVersion]);
+    // selectedCampaigns is derived from filters.campaign — drive the effect
+    // on that string so we don't re-fetch on every render.
+  }, [filters.campaign, filters.date_from, filters.date_to, filters.campaign_phase, refreshVersion, hasCampaignSelection]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isDual = !!secondaryMetric && secondaryMetric !== metric;
   const metricList = isDual ? [metric, secondaryMetric!] : [metric];
@@ -76,11 +85,13 @@ export default function TrendTile({
     ? `${METRIC_LABEL[metric]} (left axis) layered with ${METRIC_LABEL[secondaryMetric!]} (right axis) on independent scales. Each point is a bucket from the trend; hover any week for the crosshair tooltip.`
     : `${METRIC_LABEL[metric]} over time, one point per bucket. Hover for the exact value at any week.`;
   const notes: string[] = [];
-  if (showCampaignWindows) {
+  if (windows.length > 0) {
     notes.push(
-      windows.length > 0
-        ? `Faint emerald bands behind the line are campaign flight windows (top ${windows.length} by spend). Names + dates listed in the legend below the chart.`
-        : 'Campaign flight windows would render here as faint emerald bands; none touched this window.',
+      `${windows.length} campaign flight window${windows.length === 1 ? '' : 's'} overlaid (from the Campaign filter). Names + dates listed in the legend.`,
+    );
+  } else {
+    notes.push(
+      'Pick campaigns in the "Campaign" filter above to overlay their flight windows as comparison markers.',
     );
   }
   if (isDual) {

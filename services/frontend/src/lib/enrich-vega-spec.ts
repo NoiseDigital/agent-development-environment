@@ -92,27 +92,34 @@ function isLineChartWithoutHover(spec: Record<string, unknown>): boolean {
 }
 
 /** Wrap a flat line spec into a layered spec with a crosshair rule overlay.
- *  Same shape as `singleMetricLineSpec` in lib/vega-specs.ts. */
+ *  Same shape as `singleMetricLineSpec` in lib/vega-specs.ts — critically,
+ *  the `x` encoding is hoisted to the OUTER spec so BOTH layers inherit it.
+ *  Without that hoist the rule layer has no x channel and the hover
+ *  selection can't snap to a data point. */
 function withCrosshair(spec: Record<string, unknown>): Record<string, unknown> {
   const encoding = spec.encoding as Record<string, unknown>;
-  const xField = (encoding?.x as { field?: string })?.field ?? 'name';
+  const x = encoding?.x as { field?: string } | undefined;
+  const xField = x?.field ?? 'name';
   const tooltip = encoding?.tooltip;
-  // The line layer keeps the original encoding minus tooltip (which moves
-  // onto the crosshair rule so the hover lands at the nearest point).
-  const { tooltip: _omit, ...lineEncoding } = encoding ?? {};
-  void _omit;
-  // Strip the top-level mark + encoding — a layered Vega-Lite spec carries
-  // them inside its layers, not on the outer object. Leaving them there
-  // would also re-trigger this wrapper on a second enrich pass.
+  // Line layer keeps y/color/etc; x + tooltip move to the outer encoding
+  // (x shared by both layers, tooltip lives on the hover rule).
+  const { x: _x, tooltip: _t, ...lineLayerEncoding } = encoding ?? {};
+  void _x;
+  void _t;
+  // Strip outer mark + encoding from the original — a layered Vega-Lite
+  // spec puts marks inside layers, and we're about to set our own encoding
+  // anyway. Leaving them would also re-trigger this wrapper on a second
+  // enrich pass.
   const { mark: _m, encoding: _e, ...rest } = spec;
   void _m;
   void _e;
   return {
     ...rest,
+    encoding: x ? { x } : undefined,
     layer: [
       {
         mark: { type: 'line', point: true },
-        encoding: lineEncoding,
+        encoding: lineLayerEncoding,
       },
       {
         mark: { type: 'rule', color: '#a1a1aa', strokeWidth: 1 },

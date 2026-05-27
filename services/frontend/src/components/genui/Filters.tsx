@@ -1,11 +1,19 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type {
   FiltersProps,
   FilterField,
   ChoiceOption,
 } from '../../types/genui';
+import { loadBlockState, saveBlockState } from '../../lib/genui-state';
+
+/** What we persist for a Filters block — the working draft plus the final
+ *  applied message once the user has submitted it. */
+interface PersistedFilters {
+  draft: Record<string, string | number | undefined>;
+  submitted: string | null;
+}
 
 // A levers block — drop it next to a chart and the user can adjust the
 // inputs (metric / date / breakdown / threshold / freeform) then re-run the
@@ -35,19 +43,36 @@ function initialValue(f: FilterField): string | number | undefined {
 export default function Filters({
   props,
   onAction,
+  messageId,
+  blockIndex,
 }: {
   props: FiltersProps;
   onAction?: (text: string) => void;
+  messageId?: string;
+  blockIndex?: number;
 }) {
   const fields = useMemo(
     () => (Array.isArray(props.fields) ? props.fields : []),
     [props.fields],
   );
 
-  const [draft, setDraft] = useState<Record<string, string | number | undefined>>(
-    () => Object.fromEntries(fields.map((f) => [f.key, initialValue(f)])),
+  const restored = useMemo(
+    () => loadBlockState<PersistedFilters>(messageId, blockIndex ?? 0),
+    [messageId, blockIndex],
   );
-  const [submitted, setSubmitted] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Record<string, string | number | undefined>>(
+    () =>
+      restored?.draft ??
+      Object.fromEntries(fields.map((f) => [f.key, initialValue(f)])),
+  );
+  const [submitted, setSubmitted] = useState<string | null>(restored?.submitted ?? null);
+
+  useEffect(() => {
+    saveBlockState<PersistedFilters>(messageId, blockIndex ?? 0, {
+      draft,
+      submitted,
+    });
+  }, [draft, submitted, messageId, blockIndex]);
 
   if (fields.length === 0) return null;
 

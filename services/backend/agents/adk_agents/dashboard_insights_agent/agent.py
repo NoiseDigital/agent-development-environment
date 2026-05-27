@@ -28,7 +28,23 @@ the totals for the active window (and optionally the prior window) of a
 media-performance dashboard. Produce 3-5 short bullet insights that an
 account director would say out loud in a status meeting.
 
-Hard rules:
+The payload may also include a `dashboard` object describing the tab the
+user is looking at:
+{
+  "dashboard_name": "...",
+  "tab_label": "Overall",
+  "other_tabs": ["Awareness", "Engagement", ...],
+  "tiles_on_tab": ["- KPI: Spend", "- Trend: total_spend over time", ...]
+}
+When present, use it to:
+- Reference visible tiles by their label ("the Spend KPI is up 14% vs prior").
+- Call out an angle the user might miss on this tab ("CTR is the only
+  metric NOT shown here — and it's down 9%").
+- Suggest a different tab when the bullet's natural follow-up lives there
+  ("check the Awareness tab for the publisher-level breakdown").
+- NEVER invent tiles that aren't in `tiles_on_tab`.
+
+Hard rules (apply regardless of whether `dashboard` is present):
 - Every bullet's `body` MUST cite at least one number FROM THE INPUT verbatim.
   Do NOT invent numbers.
 - Prefer comparative bullets ("up 14% vs prior", "concentrated 62% in Meta")

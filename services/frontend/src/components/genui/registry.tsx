@@ -7,12 +7,17 @@ import type { UIBlock, UIComponent } from '../../types/genui';
 import Choices from './Choices';
 import Filters from './Filters';
 import Suggestions from './Suggestions';
+import Action from './Action';
 import ChartBlock from './ChartBlock';
 
 /** Host-provided capabilities a block renderer may use. */
 export interface RenderContext {
   /** Send a message back to the agent — used by interactive blocks. */
   onAction?: (text: string) => void;
+  /** Parent message id (stable ADK event id once the turn completes). */
+  messageId?: string;
+  /** Index of this block within its parent message's `ui` array. */
+  blockIndex?: number;
 }
 
 type Renderer<T extends UIComponent> = (
@@ -22,7 +27,24 @@ type Renderer<T extends UIComponent> = (
 
 export const registry: { [T in UIComponent]: Renderer<T> } = {
   chart: (props) => <ChartBlock spec={props} />,
-  choices: (props, ctx) => <Choices props={props} onAction={ctx.onAction} />,
-  filters: (props, ctx) => <Filters props={props} onAction={ctx.onAction} />,
+  choices: (props, ctx) => (
+    <Choices
+      props={props}
+      onAction={ctx.onAction}
+      messageId={ctx.messageId}
+      blockIndex={ctx.blockIndex}
+    />
+  ),
+  filters: (props, ctx) => (
+    <Filters
+      props={props}
+      onAction={ctx.onAction}
+      messageId={ctx.messageId}
+      blockIndex={ctx.blockIndex}
+    />
+  ),
   suggestions: (props, ctx) => <Suggestions props={props} onAction={ctx.onAction} />,
+  action: (props, ctx) => (
+    <Action props={props} messageId={ctx.messageId} blockIndex={ctx.blockIndex} />
+  ),
 };

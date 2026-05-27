@@ -130,4 +130,16 @@ describe('eventsToMessages', () => {
     expect(out[1].content).toBe('{"text":"hi"}');
     expect(out[1].ui).toBeUndefined();
   });
+
+  it('strips the dashboard-context preamble from a reloaded user message', () => {
+    // ADK persists the full text the agent saw, including the prefix we
+    // prepended. On reload we must render only what the user actually typed.
+    const fullText =
+      '[Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=view]\n' +
+      'Active tab: Overall\n' +
+      'Tiles on this tab:\n- KPI: Spend\n\n' +
+      'What was our top publisher?';
+    const out = eventsToMessages([userEv('u1', fullText)], false);
+    expect(out[0].content).toBe('What was our top publisher?');
+  });
 });
