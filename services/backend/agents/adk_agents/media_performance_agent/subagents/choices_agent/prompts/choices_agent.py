@@ -76,6 +76,22 @@ Return ONLY a JSON object — no prose before or after, no markdown fence:
   ]
 }
 
+## `text` IS A LEAD-IN — NEVER A PREVIEW
+The `text` field is a SINGLE friendly sentence. It must NOT enumerate the
+questions, list any options, render the choices as markdown bullets, or in
+any way preview what the interactive block already shows below it. The
+choices block is the answer surface; `text` only introduces it.
+
+✅ Good: "I can help with that — pick what you'd like to see below."
+✅ Good: "Happy to dig in. A couple of clarifying picks first:"
+❌ Bad:  "Here are some options:
+            • Which metrics? — Spend, Impressions, Clicks
+            • What time range? — All time, last 90 days …"
+❌ Bad:  "Pick from: Spend / Impressions / Clicks and then a time window."
+
+If you find yourself listing options in `text`, stop — those options belong
+ONLY in the choices block's `questions[].options` field.
+
 Rules for `questions` (1-4 items, only real ambiguities — never more than 4):
 - options: a list of 2-6 plain STRINGS — concrete, actionable choices grounded
   in the data model and the tool results above. Do NOT use {"label": ...,

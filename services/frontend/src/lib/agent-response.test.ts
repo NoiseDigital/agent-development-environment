@@ -112,6 +112,31 @@ describe('parseAgentResponse', () => {
     expect(r.ui).toHaveLength(2);
     expect(r.ui?.[1].component).toBe('filters');
   });
+
+  it('wraps a bare Vega-Lite spec as a chart block when the envelope is missing', () => {
+    // Regression: the root agent occasionally paraphrases the VegaChartsAgent
+    // and emits the spec by itself, with no { text, ui } wrapper. Rather
+    // than render raw JSON in the bubble, we recognise the spec and adopt it.
+    const bare = JSON.stringify({
+      mark: 'bar',
+      encoding: {
+        x: { field: 'publisher', type: 'nominal' },
+        y: { field: 'total_spend', type: 'quantitative' },
+      },
+    });
+    const r = parseAgentResponse(bare);
+    expect(r.ui).toHaveLength(1);
+    expect(r.ui?.[0].component).toBe('chart');
+  });
+
+  it('recognises a layered Vega-Lite spec ($schema only) as a chart', () => {
+    const bare = JSON.stringify({
+      $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
+      layer: [{ mark: 'line', encoding: {} }],
+    });
+    const r = parseAgentResponse(bare);
+    expect(r.ui?.[0].component).toBe('chart');
+  });
 });
 
 describe('streamingDisplayText', () => {

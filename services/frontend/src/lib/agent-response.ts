@@ -88,30 +88,65 @@ export interface ParsedAgentResponse {
  *    - `{ text, ui }` — the canonical contract
  *    - `{ ui }` alone — agent forgot the text field; caller supplies prose
  *    - `{ text, visualization }` — legacy single-chart shape
+ *    - a bare Vega-Lite spec — fallback for when the root agent paraphrases
+ *      a chart subagent's envelope and drops the wrap. Heuristic: an object
+ *      with `mark`, `layer`, `$schema`, or `vconcat`/`hconcat` is a spec.
  *  Returns null when the object can't plausibly be an envelope. */
 function tryParseAgentJson(raw: string): ParsedAgentResponse | null {
   const parsed = parseJsonLoose(raw.trim()) as
-    | { text?: unknown; ui?: unknown; visualization?: unknown }
+    | (Record<string, unknown> & {
+        text?: unknown;
+        ui?: unknown;
+        visualization?: unknown;
+      })
     | null;
   if (!parsed || typeof parsed !== 'object') return null;
   const hasText = parsed.text !== undefined;
   const hasUi = Array.isArray(parsed.ui);
   const hasViz = parsed.visualization !== undefined;
-  if (!hasText && !hasUi && !hasViz) return null;
 
-  const result: ParsedAgentResponse = {
-    content: hasText ? String(parsed.text) : '',
-  };
-
-  if (hasUi) {
-    result.ui = parsed.ui as UIBlock[];
-  } else if (hasViz) {
-    // Legacy shape: one or more charts under `visualization` → chart blocks.
-    const viz = parsed.visualization;
-    const charts: VegaSpec[] = Array.isArray(viz) ? viz : [viz as VegaSpec];
-    result.ui = charts.map((props) => ({ component: 'chart', props }));
+  if (hasText || hasUi || hasViz) {
+    const result: ParsedAgentResponse = {
+      content: hasText ? String(parsed.text) : '',
+    };
+    if (hasUi) {
+      result.ui = parsed.ui as UIBlock[];
+    } else if (hasViz) {
+      // Legacy shape: one or more charts under `visualization` → chart blocks.
+      const viz = parsed.visualization;
+      const charts: VegaSpec[] = Array.isArray(viz) ? viz : [viz as VegaSpec];
+      result.ui = charts.map((props) => ({ component: 'chart', props }));
+    }
+    return result;
   }
-  return result;
+
+  // Fallback: a bare Vega-Lite spec. The agent contract is "always wrap in
+  // { text, ui }", but the root agent occasionally paraphrases and emits
+  // the chart spec by itself. Rather than render raw JSON in the bubble,
+  // we recognise the spec shape and wrap it ourselves.
+  if (looksLikeVegaSpec(parsed)) {
+    return {
+      content: '',
+      ui: [{ component: 'chart', props: parsed as VegaSpec }],
+    };
+  }
+  return null;
+}
+
+/** Heuristic test for a Vega-Lite spec. The fields that uniquely identify
+ *  one in this codebase: `mark`, `layer`, `$schema`, `vconcat`, `hconcat`,
+ *  `repeat`, `facet`. The presence of any one (with no `text`/`ui` to
+ *  override) is enough to assume the object is a chart spec. */
+function looksLikeVegaSpec(obj: Record<string, unknown>): boolean {
+  return (
+    'mark' in obj ||
+    'layer' in obj ||
+    '$schema' in obj ||
+    'vconcat' in obj ||
+    'hconcat' in obj ||
+    'repeat' in obj ||
+    'facet' in obj
+  );
 }
 
 /** Strip a leading code fence and language tag if present (```json ... ```). */

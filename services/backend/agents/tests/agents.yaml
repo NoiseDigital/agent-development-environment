@@ -230,3 +230,31 @@ timesheet_agent:
     message: "What can you help me with?"
     expect:
       ok: true
+
+
+analyze_assistant_agent:
+  - name: interprets a top-signals preamble without inventing columns
+    # The analyze page prepends a multi-line "Analyze context" preamble; the
+    # agent should ground its reply in that and respond as plain markdown
+    # (no JSON envelope, no UI blocks).
+    message: |
+      [Analyze context]
+      source: bigquery:media_performance.media_campaign_performance_NOI
+      method: pearson
+      rows_analyzed: 49691
+      set_a: total_spend
+      set_b: impressions, clicks, completed_views, landing_page_views
+      preprocessing: none
+      alpha: 0.05
+      lag_b: 0
+      qa_warnings: (none)
+      top_signals (top 10 by |r|):
+        - A=total_spend B=impressions r=0.473 p=0.0 significant
+        - A=total_spend B=completed_views r=0.322 p=6.2e-81 significant
+        - A=total_spend B=landing_page_views r=0.236 p=2.2e-129 significant
+        - A=total_spend B=clicks r=0.224 p=8.8e-133 significant
+
+      Which of these are worth focusing on?
+    expect:
+      ok: true
+      no_ui: true

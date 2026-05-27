@@ -1,15 +1,41 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { sourcesApi } from '../../lib/sources-api';
 import { statsApi, type CorrelateResult, type QaResult, type ColumnProfile } from '../../lib/stats-api';
 import type { Upload, SourceRef, BigQueryTableRef } from '../../types/source';
 import { sourceUri, sourceLabel } from '../../types/source';
 import { heatmapSpec } from '../../lib/vega-specs';
+import { buildAnalyzeContext } from '../../lib/analyze-context';
 import VegaChart from '../../components/VegaChart';
 import InfoHint from '../../components/InfoHint';
+import AnalyzeAssistantPanel from '../../components/analyze/AnalyzeAssistantPanel';
 
-// ── Control helpers ───────────────────────────────────────────────────────────
+// ── Layout primitive — a card-shaped section used in the controls rail. ────
+
+function Section({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-3 space-y-2">
+      <header className="flex items-center justify-between">
+        <h2 className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+          {title}
+          {hint && <InfoHint text={hint} />}
+        </h2>
+      </header>
+      {children}
+    </section>
+  );
+}
+
+// ── Control helpers ────────────────────────────────────────────────────────
 
 function Slider({
   label, value, min, max, step, onChange, hint,
@@ -19,9 +45,9 @@ function Slider({
 }) {
   return (
     <div>
-      <div className="flex justify-between text-[11px] mb-1">
-        <span className="text-zinc-400 flex items-center gap-1">{label}{hint && <InfoHint text={hint} />}</span>
-        <span className="text-zinc-200 font-mono">{value}</span>
+      <div className="mb-1 flex justify-between text-[11px]">
+        <span className="flex items-center gap-1 text-zinc-400">{label}{hint && <InfoHint text={hint} />}</span>
+        <span className="font-mono text-zinc-200">{value}</span>
       </div>
       <input
         type="range"
@@ -50,9 +76,9 @@ function ColumnSelect({
   const numericNames = columns.filter((c) => c.kind === 'numeric').map((c) => c.name);
   return (
     <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-xs font-medium text-zinc-300 flex items-center gap-1">
-          {label} {hint && <span className="text-zinc-600 font-normal">{hint}</span>}
+      <div className="mb-1.5 flex items-center justify-between">
+        <span className="flex items-center gap-1 text-xs font-medium text-zinc-300">
+          {label} {hint && <span className="font-normal text-zinc-600">{hint}</span>}
           {tip && <InfoHint text={tip} />}
         </span>
         <span className="flex gap-2 text-[10px]">
@@ -60,11 +86,11 @@ function ColumnSelect({
           <button type="button" onClick={() => onChange([])} className="text-zinc-500 hover:text-white">Clear</button>
         </span>
       </div>
-      <div className="border border-zinc-800 rounded-lg bg-zinc-950 max-h-40 overflow-y-auto">
+      <div className="max-h-40 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950">
         {loading ? (
-          <p className="text-[11px] text-zinc-600 px-2.5 py-2">Profiling columns…</p>
+          <p className="px-2.5 py-2 text-[11px] text-zinc-600">Profiling columns…</p>
         ) : columns.length === 0 ? (
-          <p className="text-[11px] text-zinc-600 px-2.5 py-2">No columns</p>
+          <p className="px-2.5 py-2 text-[11px] text-zinc-600">No columns</p>
         ) : (
           columns.map((c) => {
             const numeric = c.kind === 'numeric';
@@ -74,7 +100,7 @@ function ColumnSelect({
                 key={c.name}
                 title={numeric ? undefined : `${c.kind} column — not correlatable`}
                 className={`flex items-center gap-2 px-2.5 py-1.5 text-xs ${
-                  numeric ? 'text-zinc-300 hover:bg-zinc-900 cursor-pointer' : 'text-zinc-600 cursor-not-allowed'
+                  numeric ? 'cursor-pointer text-zinc-300 hover:bg-zinc-900' : 'cursor-not-allowed text-zinc-600'
                 }`}
               >
                 <input
@@ -84,15 +110,15 @@ function ColumnSelect({
                   onChange={() => numeric && toggle(c.name)}
                   className="accent-accent-500 disabled:opacity-40"
                 />
-                <span className="truncate flex-1">{c.name}</span>
+                <span className="flex-1 truncate">{c.name}</span>
                 {numeric ? (
                   c.missing_pct >= 25 && (
-                    <span className="text-[10px] text-amber-500 shrink-0" title="High missingness">
+                    <span className="shrink-0 text-[10px] text-amber-500" title="High missingness">
                       {c.missing_pct.toFixed(0)}% null
                     </span>
                   )
                 ) : (
-                  <span className="text-[10px] uppercase text-zinc-600 shrink-0">
+                  <span className="shrink-0 text-[10px] uppercase text-zinc-600">
                     {c.kind === 'datetime' ? 'date' : 'text'}
                   </span>
                 )}
@@ -106,7 +132,7 @@ function ColumnSelect({
 }
 
 const Toggle = ({ label, checked, onChange, hint }: { label: string; checked: boolean; onChange: (v: boolean) => void; hint?: string }) => (
-  <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+  <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-300">
     <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="accent-accent-500" />
     <span className="flex items-center gap-1">{label}{hint && <InfoHint text={hint} />}</span>
   </label>
@@ -152,14 +178,19 @@ export default function AnalyzePage() {
   // ── Derived source + columns ────────────────────────────────────────────
   const selectedUpload = uploads.find((u) => u.id === uploadId) || null;
   const sheetNames = selectedUpload?.metadata.sheet_names ?? [];
-  const source: SourceRef | null =
-    sourceKind === 'upload'
-      ? selectedUpload
-        ? { kind: 'upload', id: selectedUpload.id, name: selectedUpload.name }
-        : null
-      : bqDataset && bqTable
-        ? { kind: 'bigquery', dataset: bqDataset, table: bqTable }
-        : null;
+  // Memoised so downstream hooks (the assistant context preamble) can list
+  // it as a dep without re-running on every render.
+  const source: SourceRef | null = useMemo(
+    () =>
+      sourceKind === 'upload'
+        ? selectedUpload
+          ? { kind: 'upload', id: selectedUpload.id, name: selectedUpload.name }
+          : null
+        : bqDataset && bqTable
+          ? { kind: 'bigquery', dataset: bqDataset, table: bqTable }
+          : null,
+    [sourceKind, selectedUpload, bqDataset, bqTable],
+  );
   const sourceRefUri = source ? sourceUri(source) : '';
 
   // ── Catalog loading ─────────────────────────────────────────────────────
@@ -269,173 +300,198 @@ export default function AnalyzePage() {
       })
     : null;
 
+  // Context preamble for the Analyze Assistant — rebuilt on every render so
+  // it's always current with the latest result + controls.
+  const contextPrefix = useMemo(
+    () =>
+      buildAnalyzeContext({
+        source,
+        setA,
+        setB,
+        result,
+        qa,
+        preprocessing: { winsorize, log1p, zscore, difference },
+        alpha,
+        lag,
+      }),
+    [source, setA, setB, result, qa, winsorize, log1p, zscore, difference, alpha, lag],
+  );
+
   return (
-    <div className="flex flex-col h-full bg-black">
+    <div className="flex h-full flex-col bg-black">
       {/* Header */}
-      <div className="flex items-center justify-between px-8 py-5 border-b border-zinc-800/60 shrink-0">
+      <div className="flex shrink-0 items-center justify-between border-b border-zinc-800/60 px-8 py-5">
         <div>
-          <h1 className="text-lg font-semibold text-white tracking-tight">Analyze</h1>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <h1 className="text-lg font-semibold tracking-tight text-white">Analyze</h1>
+          <p className="mt-0.5 text-xs text-zinc-500">
             Correlate drivers against KPIs across any data source.
           </p>
         </div>
-      </div>
-
-      <div className="flex flex-1 min-h-0">
-        {/* ── Controls ──────────────────────────────────────────────────── */}
-        <aside className="w-80 shrink-0 border-r border-zinc-800/60 overflow-y-auto p-4 space-y-5">
-          {/* Source */}
-          <div className="space-y-2">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Data source</h2>
-
-            <div className="flex gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-lg">
-              {(['bigquery', 'upload'] as const).map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => setSourceKind(k)}
-                  className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                    sourceKind === k ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'
-                  }`}
-                >
-                  {k === 'bigquery' ? 'BigQuery' : 'Upload'}
-                </button>
-              ))}
-            </div>
-
-            {sourceKind === 'bigquery' ? (
-              <>
-                <select
-                  value={bqDataset}
-                  onChange={(e) => pickDataset(e.target.value)}
-                  className="w-full px-2.5 py-2 text-xs bg-zinc-900 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-zinc-600"
-                >
-                  <option value="">Select dataset…</option>
-                  {bqDatasets.map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-                {bqDataset && (
-                  <select
-                    value={bqTable}
-                    onChange={(e) => setBqTable(e.target.value)}
-                    className="w-full px-2.5 py-2 text-xs bg-zinc-900 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-zinc-600"
-                  >
-                    <option value="">Select table…</option>
-                    {bqTables.map((t) => (
-                      <option key={t.table} value={t.table}>{t.table}</option>
-                    ))}
-                  </select>
-                )}
-              </>
-            ) : (
-              <>
-                <select
-                  value={uploadId}
-                  onChange={(e) => {
-                    setUploadId(e.target.value);
-                    const u = uploads.find((x) => x.id === e.target.value);
-                    setSheet(u?.metadata.sheet_names?.[0] ?? '');
-                  }}
-                  className="w-full px-2.5 py-2 text-xs bg-zinc-900 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-zinc-600"
-                >
-                  <option value="">Select an upload…</option>
-                  {uploads.map((u) => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
-                </select>
-                {sheetNames.length > 0 && (
-                  <select
-                    value={sheet}
-                    onChange={(e) => setSheet(e.target.value)}
-                    className="w-full px-2.5 py-2 text-xs bg-zinc-900 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-zinc-600"
-                  >
-                    {sheetNames.map((s) => (
-                      <option key={s} value={s}>Sheet: {s}</option>
-                    ))}
-                  </select>
-                )}
-                <input
-                  ref={fileInput}
-                  type="file"
-                  accept=".csv,.txt,.xlsx,.xls,.xlsb"
-                  onChange={handleUpload}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInput.current?.click()}
-                  disabled={uploading}
-                  className="w-full px-3 py-1.5 text-[11px] font-medium text-zinc-300 bg-zinc-900 border border-zinc-800 rounded-lg hover:border-zinc-700 hover:text-white disabled:opacity-50 transition-colors"
-                >
-                  {uploading ? 'Uploading…' : 'Upload a file'}
-                </button>
-              </>
+        {source && (
+          <div className="hidden items-center gap-2 text-[11px] text-zinc-500 md:flex">
+            <span className="rounded-full bg-zinc-900 px-2 py-0.5 text-zinc-400">
+              {sourceLabel(source)}
+            </span>
+            {qa && (
+              <span className="text-zinc-600">
+                {qa.row_count.toLocaleString()} rows · {qa.column_count} cols
+              </span>
             )}
           </div>
+        )}
+      </div>
 
-          {/* Column sets */}
-          <div className="space-y-3">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Columns</h2>
-            <ColumnSelect label="Set A" hint="drivers" tip="Variables you think influence the outcome — e.g. spend, impressions. Only numeric columns can be correlated." columns={columnProfiles} selected={setA} onChange={setSetA} loading={describing} />
-            <ColumnSelect label="Set B" hint="KPIs · optional" tip="Outcomes to test Set A against. Leave empty to correlate Set A against itself." columns={columnProfiles} selected={setB} onChange={setSetB} loading={describing} />
+      <div className="flex min-h-0 flex-1">
+        {/* ── Controls rail ────────────────────────────────────────────── */}
+        <aside className="flex w-[300px] shrink-0 flex-col border-r border-zinc-800/60">
+          <div className="flex-1 space-y-3 overflow-y-auto p-3">
+            {/* Source */}
+            <Section title="Data source">
+              <div className="flex gap-1 rounded-lg border border-zinc-800 bg-zinc-900 p-1">
+                {(['bigquery', 'upload'] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setSourceKind(k)}
+                    className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                      sourceKind === k ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    {k === 'bigquery' ? 'BigQuery' : 'Upload'}
+                  </button>
+                ))}
+              </div>
+
+              {sourceKind === 'bigquery' ? (
+                <>
+                  <select
+                    value={bqDataset}
+                    onChange={(e) => pickDataset(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-xs text-white focus:border-zinc-600 focus:outline-none"
+                  >
+                    <option value="">Select dataset…</option>
+                    {bqDatasets.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                  {bqDataset && (
+                    <select
+                      value={bqTable}
+                      onChange={(e) => setBqTable(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-xs text-white focus:border-zinc-600 focus:outline-none"
+                    >
+                      <option value="">Select table…</option>
+                      {bqTables.map((t) => (
+                        <option key={t.table} value={t.table}>{t.table}</option>
+                      ))}
+                    </select>
+                  )}
+                </>
+              ) : (
+                <>
+                  <select
+                    value={uploadId}
+                    onChange={(e) => {
+                      setUploadId(e.target.value);
+                      const u = uploads.find((x) => x.id === e.target.value);
+                      setSheet(u?.metadata.sheet_names?.[0] ?? '');
+                    }}
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-xs text-white focus:border-zinc-600 focus:outline-none"
+                  >
+                    <option value="">Select an upload…</option>
+                    {uploads.map((u) => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
+                  {sheetNames.length > 0 && (
+                    <select
+                      value={sheet}
+                      onChange={(e) => setSheet(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-xs text-white focus:border-zinc-600 focus:outline-none"
+                    >
+                      {sheetNames.map((s) => (
+                        <option key={s} value={s}>Sheet: {s}</option>
+                      ))}
+                    </select>
+                  )}
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    accept=".csv,.txt,.xlsx,.xls,.xlsb"
+                    onChange={handleUpload}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInput.current?.click()}
+                    disabled={uploading}
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white disabled:opacity-50"
+                  >
+                    {uploading ? 'Uploading…' : 'Upload a file'}
+                  </button>
+                </>
+              )}
+            </Section>
+
+            {/* Columns */}
+            <Section title="Columns">
+              <ColumnSelect label="Set A" hint="drivers" tip="Variables you think influence the outcome — e.g. spend, impressions. Only numeric columns can be correlated." columns={columnProfiles} selected={setA} onChange={setSetA} loading={describing} />
+              <ColumnSelect label="Set B" hint="KPIs · optional" tip="Outcomes to test Set A against. Leave empty to correlate Set A against itself." columns={columnProfiles} selected={setB} onChange={setSetB} loading={describing} />
+            </Section>
+
+            {/* Method */}
+            <Section title="Method" hint="Pearson measures linear correlation; Spearman measures rank (monotonic) correlation — more robust to outliers and non-linear-but-ordered trends.">
+              <div className="flex gap-1 rounded-lg border border-zinc-800 bg-zinc-900 p-1">
+                {(['pearson', 'spearman'] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setMethod(m)}
+                    className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium capitalize transition-colors ${
+                      method === m ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </Section>
+
+            {/* Preprocessing */}
+            <Section title="Preprocessing">
+              <div className="grid grid-cols-2 gap-2">
+                <Toggle label="Winsorize" checked={winsorize} onChange={setWinsorize} hint="Clip extreme outliers to a percentile range before correlating." />
+                <Toggle label="Log1p" checked={log1p} onChange={setLog1p} hint="Apply log(1 + x) — compresses skewed, heavy-tailed values." />
+                <Toggle label="Z-Score" checked={zscore} onChange={setZscore} hint="Standardize each column to mean 0, standard deviation 1." />
+                <Toggle label="Difference" checked={difference} onChange={setDifference} hint="Correlate period-over-period change instead of absolute values — removes shared trends." />
+              </div>
+            </Section>
+
+            {/* Settings */}
+            <Section title="Settings">
+              <Slider label="Alpha" value={alpha} min={0.001} max={0.2} step={0.001} onChange={setAlpha} hint="Significance threshold. Correlations with a p-value above alpha are dimmed as not significant." />
+              <Slider label="Lag B" value={lag} min={-12} max={12} step={1} onChange={setLag} hint="Shift Set B by N periods to test lead/lag — e.g. does spend predict next-week clicks." />
+              <Slider label="Top N" value={topN} min={5} max={200} step={5} onChange={setTopN} hint="How many of the strongest correlations to list under Top signals." />
+            </Section>
           </div>
 
-          {/* Method */}
-          <div className="space-y-2">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
-              Method
-              <InfoHint text="Pearson measures linear correlation; Spearman measures rank (monotonic) correlation — more robust to outliers and non-linear-but-ordered trends." />
-            </h2>
-            <div className="flex gap-1 p-1 bg-zinc-900 border border-zinc-800 rounded-lg">
-              {(['pearson', 'spearman'] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setMethod(m)}
-                  className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-md capitalize transition-colors ${
-                    method === m ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'
-                  }`}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
+          {/* Run button — pinned to the bottom of the rail so it's always reachable. */}
+          <div className="shrink-0 border-t border-zinc-800/60 p-3">
+            <button
+              type="button"
+              onClick={run}
+              disabled={!source || running}
+              className="w-full rounded-lg bg-white px-3 py-2.5 text-xs font-semibold text-black transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {running ? 'Running…' : 'Run analysis'}
+            </button>
           </div>
-
-          {/* Preprocessing */}
-          <div className="space-y-2">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Preprocessing</h2>
-            <div className="grid grid-cols-2 gap-2">
-              <Toggle label="Winsorize" checked={winsorize} onChange={setWinsorize} hint="Clip extreme outliers to a percentile range before correlating." />
-              <Toggle label="Log1p" checked={log1p} onChange={setLog1p} hint="Apply log(1 + x) — compresses skewed, heavy-tailed values." />
-              <Toggle label="Z-Score" checked={zscore} onChange={setZscore} hint="Standardize each column to mean 0, standard deviation 1." />
-              <Toggle label="Difference" checked={difference} onChange={setDifference} hint="Correlate period-over-period change instead of absolute values — removes shared trends." />
-            </div>
-          </div>
-
-          {/* Sliders */}
-          <div className="space-y-3">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Settings</h2>
-            <Slider label="Alpha" value={alpha} min={0.001} max={0.2} step={0.001} onChange={setAlpha} hint="Significance threshold. Correlations with a p-value above alpha are dimmed as not significant." />
-            <Slider label="Lag B" value={lag} min={-12} max={12} step={1} onChange={setLag} hint="Shift Set B by N periods to test lead/lag — e.g. does spend predict next-week clicks." />
-            <Slider label="Top N" value={topN} min={5} max={200} step={5} onChange={setTopN} hint="How many of the strongest correlations to list under Top signals." />
-          </div>
-
-          <button
-            type="button"
-            onClick={run}
-            disabled={!source || running}
-            className="w-full px-3 py-2.5 text-xs font-semibold text-black bg-white rounded-lg hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            {running ? 'Running…' : 'Run analysis'}
-          </button>
         </aside>
 
         {/* ── Results ───────────────────────────────────────────────────── */}
         <main className="flex-1 overflow-y-auto p-6">
           {error && (
-            <div className="mb-4 px-3 py-2 text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg">
+            <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
               {error}
             </div>
           )}
@@ -447,10 +503,10 @@ export default function AnalyzePage() {
             const other = qa.warnings.filter((w) => !/missing/i.test(w));
             return (
               <div
-                className={`mb-4 px-3 py-2 text-xs rounded-lg border ${
+                className={`mb-4 rounded-lg border px-3 py-2 text-xs ${
                   qa.ok
-                    ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
-                    : 'text-amber-400 bg-amber-500/10 border-amber-500/30'
+                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                    : 'border-amber-500/30 bg-amber-500/10 text-amber-400'
                 }`}
               >
                 <span className="font-medium">
@@ -461,7 +517,7 @@ export default function AnalyzePage() {
                   <span>{' '}{missing.length} column{missing.length === 1 ? '' : 's'} with high missingness — see the % null tags in the column list.</span>
                 )}
                 {other.length > 0 && (
-                  <ul className="mt-1 list-disc list-inside space-y-0.5">
+                  <ul className="mt-1 list-inside list-disc space-y-0.5">
                     {other.map((w, i) => (
                       <li key={i}>{w}</li>
                     ))}
@@ -472,54 +528,181 @@ export default function AnalyzePage() {
           })()}
 
           {!result ? (
-            <div className="flex flex-col items-center justify-center h-72 text-center">
-              <p className="text-zinc-500 text-sm">
-                {source ? 'Configure the analysis and click Run.' : 'Select a data source to begin.'}
-              </p>
-            </div>
+            <EmptyResults source={source} running={running} />
           ) : (
-            <div className="space-y-6 max-w-4xl">
-              {heatmapChart && <VegaChart spec={heatmapChart} saveable />}
+            <div className="max-w-4xl space-y-6">
+              {/* Heatmap */}
+              {heatmapChart && (
+                <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-3">
+                  <VegaChart spec={heatmapChart} saveable />
+                </div>
+              )}
 
               {/* Top signals */}
-              <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4">
-                <h3 className="text-white font-medium text-sm mb-3">Top signals</h3>
-                {result.top_signals.length === 0 ? (
-                  <p className="text-xs text-zinc-500">No signals.</p>
-                ) : (
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-zinc-500 text-left border-b border-zinc-800/60">
-                        <th className="py-1.5 font-medium">A</th>
-                        <th className="py-1.5 font-medium">B</th>
-                        <th className="py-1.5 font-medium text-right">r</th>
-                        <th className="py-1.5 font-medium text-right">p-value</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.top_signals.map((s, i) => (
-                        <tr key={i} className="border-b border-zinc-800/60 last:border-0">
-                          <td className="py-1.5 text-zinc-300 truncate">{s.a}</td>
-                          <td className="py-1.5 text-zinc-300 truncate">{s.b}</td>
-                          <td
-                            className="py-1.5 text-right font-mono tabular-nums"
-                            style={{ color: s.r >= 0 ? '#f87171' : '#60a5fa' }}
-                          >
-                            {s.r.toFixed(3)}
-                          </td>
-                          <td className="py-1.5 text-right font-mono tabular-nums text-zinc-500">
-                            {s.p < 0.001 ? s.p.toExponential(1) : s.p.toFixed(3)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+              <TopSignalsTable
+                signals={result.top_signals}
+                alpha={alpha}
+              />
             </div>
           )}
         </main>
+
+        {/* ── Analyze Assistant (pinned right rail) ─────────────────────── */}
+        <AnalyzeAssistantPanel contextPrefix={contextPrefix} />
       </div>
     </div>
+  );
+}
+
+// ── Empty state ──────────────────────────────────────────────────────────────
+
+function EmptyResults({ source, running }: { source: SourceRef | null; running: boolean }) {
+  return (
+    <div className="flex h-72 flex-col items-center justify-center rounded-xl border border-dashed border-zinc-800 bg-zinc-950/40 text-center">
+      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900">
+        <svg className="h-5 w-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+            d="M9 19V6l-3 1.5M15 5v13l3-1.5M9 6l6 -1M9 19l6 -1" />
+        </svg>
+      </div>
+      <p className="text-sm font-semibold text-white">
+        {running ? 'Running analysis…' : source ? 'Ready to analyze' : 'Pick a data source'}
+      </p>
+      <p className="mt-1 max-w-sm text-xs leading-relaxed text-zinc-500">
+        {running
+          ? 'Crunching correlations across your selected columns.'
+          : source
+            ? 'Pick driver columns (Set A), optionally choose KPIs (Set B), then click Run analysis.'
+            : 'Choose a BigQuery table or upload a file in the rail on the left to begin.'}
+      </p>
+    </div>
+  );
+}
+
+// ── Top signals — sortable, with magnitude bars + significance markers ────────
+
+function TopSignalsTable({
+  signals,
+  alpha,
+}: {
+  signals: CorrelateResult['top_signals'];
+  alpha: number;
+}) {
+  const [sortKey, setSortKey] = useState<'r' | 'p'>('r');
+
+  const sorted = useMemo(() => {
+    const arr = [...signals];
+    if (sortKey === 'r') arr.sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
+    else arr.sort((a, b) => a.p - b.p);
+    return arr;
+  }, [signals, sortKey]);
+
+  if (signals.length === 0) {
+    return (
+      <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-4">
+        <h3 className="text-sm font-medium text-white">Top signals</h3>
+        <p className="mt-2 text-xs text-zinc-500">No signals returned.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/40">
+      <div className="flex items-center justify-between border-b border-zinc-800/60 px-4 py-2.5">
+        <h3 className="text-sm font-medium text-white">Top signals</h3>
+        <div className="flex gap-1 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
+          {(['r', 'p'] as const).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setSortKey(k)}
+              className={`rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider transition-colors ${
+                sortKey === k ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              {k === 'r' ? '|r|' : 'p'}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-zinc-800/60 text-left text-zinc-500">
+              <Th>A</Th>
+              <Th>B</Th>
+              <Th align="right">r</Th>
+              <Th>Magnitude</Th>
+              <Th align="right">p-value</Th>
+              <Th align="right" className="w-12">Sig?</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((s, i) => {
+              const sig = s.p < alpha;
+              const tone = s.r >= 0 ? 'text-rose-300' : 'text-sky-300';
+              const bar = s.r >= 0 ? 'bg-rose-400/70' : 'bg-sky-400/70';
+              const mag = Math.min(1, Math.abs(s.r));
+              return (
+                <tr
+                  key={i}
+                  className="border-b border-zinc-800/60 transition-colors last:border-0 hover:bg-zinc-900/30"
+                >
+                  <Td><span className="text-zinc-300">{s.a}</span></Td>
+                  <Td><span className="text-zinc-300">{s.b}</span></Td>
+                  <Td align="right" className={`tabular-nums ${tone}`}>{s.r.toFixed(3)}</Td>
+                  <Td>
+                    <div className="relative h-2 w-full overflow-hidden rounded bg-zinc-900">
+                      <div
+                        className={`absolute inset-y-0 left-0 rounded ${bar}`}
+                        style={{ width: `${mag * 100}%` }}
+                      />
+                    </div>
+                  </Td>
+                  <Td align="right" className="tabular-nums text-zinc-500">
+                    {s.p < 0.001 ? s.p.toExponential(1) : s.p.toFixed(3)}
+                  </Td>
+                  <Td align="right">
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                        sig
+                          ? 'border border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+                          : 'border border-zinc-700/60 bg-zinc-800/40 text-zinc-500'
+                      }`}
+                      title={sig ? `p < α (${alpha})` : `p ≥ α (${alpha}) — not significant`}
+                    >
+                      {sig ? '✓' : '—'}
+                    </span>
+                  </Td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function Th({
+  children, align = 'left', className = '',
+}: { children: React.ReactNode; align?: 'left' | 'right'; className?: string }) {
+  return (
+    <th
+      className={`px-3 py-2 text-[10px] font-medium uppercase tracking-wider ${className}`}
+      style={{ textAlign: align }}
+    >
+      {children}
+    </th>
+  );
+}
+
+function Td({
+  children, align = 'left', className = '',
+}: { children: React.ReactNode; align?: 'left' | 'right'; className?: string }) {
+  return (
+    <td className={`px-3 py-2 ${className}`} style={{ textAlign: align }}>
+      {children}
+    </td>
   );
 }

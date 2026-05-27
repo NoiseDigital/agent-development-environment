@@ -75,6 +75,17 @@ export const agentConfigurations: Record<string, AgentConfig> = {
     hidden: true,
     icon: React.createElement('svg', { className: 'w-8 h-8', key: 'internal-editor' }),
   },
+  'analyze_assistant_agent': {
+    name: 'analyze_assistant_agent',
+    displayName: 'Analyze Assistant (internal)',
+    description: 'Reads the current correlation result + top signals and explains what to focus on.',
+    url: process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'http://localhost:8080',
+    // Plain markdown replies — no chart envelopes here; the chart it discusses
+    // is rendered by the page, not by the agent.
+    supportsVisualization: false,
+    hidden: true,
+    icon: React.createElement('svg', { className: 'w-8 h-8', key: 'internal-analyze' }),
+  },
   'timesheet_agent': {
     name: 'timesheet_agent',
     displayName: 'Timesheet Agent',
