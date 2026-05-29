@@ -67,18 +67,23 @@ media_performance_agent:
       ui: chart
       tools: [VegaChartsAgent]
 
-  # ── Chart branch (the data path) ───────────────────────────────────────────
-  - name: weekly trend → chart block + suggestions follow-ups
+  # ── Chart branch — TEMPLATED FAST PATH (no VegaChartsAgent) ──────────────
+  # Common shapes go through the templated_chart envelope: one LLM call
+  # total. We pin `forbidden_tools: [VegaChartsAgent]` so a regression that
+  # silently re-routes through the subagent costs both ~1.5-2s AND the test.
+  - name: weekly trend uses templated_chart fast path
     message: "Plot weekly spend in 2024 as a line chart."
     expect:
-      ui: [chart, suggestions]
-      tools: [performance_trend, VegaChartsAgent]
+      ui: [templated_chart, suggestions]
+      tools: [performance_trend]
+      forbidden_tools: [VegaChartsAgent]
 
-  - name: publisher breakdown → chart block + suggestions follow-ups
+  - name: publisher breakdown uses templated_chart fast path
     message: "Show spend by publisher as a bar chart."
     expect:
-      ui: [chart, suggestions]
-      tools: [publisher_spend_breakdown, VegaChartsAgent]
+      ui: [templated_chart, suggestions]
+      tools: [publisher_spend_breakdown]
+      forbidden_tools: [VegaChartsAgent]
 
   # ── Scalar / text-only branch ──────────────────────────────────────────────
   - name: capability question returns text only

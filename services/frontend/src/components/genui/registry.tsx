@@ -9,6 +9,7 @@ import Filters from './Filters';
 import Suggestions from './Suggestions';
 import Action from './Action';
 import ChartBlock from './ChartBlock';
+import TemplatedChartBlock from './TemplatedChartBlock';
 
 /** Host-provided capabilities a block renderer may use. */
 export interface RenderContext {
@@ -27,6 +28,7 @@ type Renderer<T extends UIComponent> = (
 
 export const registry: { [T in UIComponent]: Renderer<T> } = {
   chart: (props) => <ChartBlock spec={props} />,
+  templated_chart: (props) => <TemplatedChartBlock props={props} />,
   choices: (props, ctx) => (
     <Choices
       props={props}

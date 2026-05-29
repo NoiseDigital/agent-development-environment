@@ -9,6 +9,12 @@ description = "ADK Agent Development Environment"
 readme = "README.md"
 requires-python = "==3.13.*"
 dependencies = [
+    # ADK is pinned EXACT (not >=) because we depend on the experimental
+    # `ContextCacheConfig` feature (see media_performance_agent/agent.py and
+    # dashboard_editor_agent/agent.py). ADK marks it `@experimental` so its
+    # shape can move between minor versions — when bumping, re-verify the
+    # cache config still loads and the `static_instruction → cache` plumbing
+    # is intact. Don't relax the pin without re-testing both agent paths.
     "google-adk==1.32.0",
     "fastapi>=0.116.0",
     "uvicorn>=0.35.0",

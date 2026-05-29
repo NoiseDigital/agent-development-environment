@@ -6,12 +6,18 @@ import VegaChart from '../VegaChart';
 import { useDashboardEdit } from '../../lib/dashboard-edit-context';
 import { pinsApi } from '../../lib/pins-api';
 import { enrichAgentSpec } from '../../lib/enrich-vega-spec';
+import SaveToDashboardMenu from '../chat/SaveToDashboardMenu';
 
-// One `chart` GenUI block. Wraps VegaChart with a conditional
-// "Save to dashboard" affordance — visible only when the dashboard-edit
-// context is active (i.e. the chat is rendering inside a dashboard that is
-// in admin edit mode). Outside that context the wrapper renders an ordinary
-// chart and the wrapper is invisible.
+// One `chart` GenUI block. Wraps VegaChart with a "Save to dashboard"
+// affordance. Two flavours, picked by context:
+//
+//   1. INSIDE a dashboard edit-mode context — the target tab is already
+//      implied by where the user is, so we keep the one-click "Save to
+//      <tab>" button.
+//   2. OUTSIDE that context (normal chat surface, AnalyzeAssistantPanel,
+//      etc.) — we show SaveToDashboardMenu, a dropdown that lists the
+//      user's personal reports and includes a "Create new personal report"
+//      affordance. Same hierarchy as the dashboards listing page.
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -35,10 +41,22 @@ export default function ChartBlock({ spec }: { spec: VegaSpec }) {
     }
   };
 
+  // ── Path 2: chat-only context (most agent-generated charts) ───────────
+  // Show the dashboard-picker menu — pick any personal report or create
+  // a fresh one inline. No dashboard-edit context needed.
   if (!editCtx?.canGenerate) {
-    return <VegaChart spec={enriched} saveable />;
+    return (
+      <div className="space-y-1.5">
+        <VegaChart spec={enriched} saveable />
+        <div className="flex justify-end">
+          <SaveToDashboardMenu spec={spec} />
+        </div>
+      </div>
+    );
   }
 
+  // ── Path 1: inside a dashboard in edit mode ──────────────────────────
+  // Target tab is implied; keep the one-click flow.
   const label =
     state === 'saving' ? 'Saving…'
     : state === 'saved' ? `Saved to ${editCtx.tabLabel}`

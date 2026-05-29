@@ -1,1 +1,1 @@
-from .agent import root_agent  # noqa: F401
+from .agent import app, root_agent  # noqa: F401

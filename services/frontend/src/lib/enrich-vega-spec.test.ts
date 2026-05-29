@@ -104,4 +104,21 @@ describe('enrichAgentSpec', () => {
     expect(y.axis?.format).toBe('.2f');
     expect(y.axis?.formatType).toBe('compactNum');
   });
+
+  it('preserves the agent\'s mark.color when wrapping a temporal line in a crosshair', () => {
+    // Regression: "make the line green" round-trip — the agent emits
+    // mark.color = "green", the crosshair wrapper used to hardcode the
+    // mark and lose the colour, and the chart rendered blue anyway.
+    const enriched = enrichAgentSpec({
+      mark: { type: 'line', color: 'green' },
+      encoding: {
+        x: { field: 'name', type: 'temporal' },
+        y: { field: 'value', type: 'quantitative' },
+      },
+    }) as Record<string, unknown>;
+    const layers = enriched.layer as Array<{ mark?: { color?: string; type?: string; point?: boolean } }>;
+    expect(layers[0].mark?.color).toBe('green');
+    expect(layers[0].mark?.type).toBe('line');
+    expect(layers[0].mark?.point).toBe(true);
+  });
 });

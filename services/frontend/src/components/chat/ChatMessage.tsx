@@ -3,6 +3,7 @@
 import type { Ref } from 'react';
 import ReactMarkdown from 'react-markdown';
 import GenUIRenderer from '../genui/GenUIRenderer';
+import ChartSkeleton from './ChartSkeleton';
 import ToolQueries from './ToolQueries';
 import { formatMessageTime } from '../../utils/timestamps';
 import { isAdmin } from '../../lib/auth';
@@ -111,7 +112,14 @@ export default function ChatMessage({
 
             {showUiLoader && (
               <div className={v.uiGap}>
-                <LoadingRow label={uiLoaderLabel} v={v} />
+                {message.uiKind === 'chart' ? (
+                  // Render a chart-shaped placeholder in the slot the real
+                  // chart will land in, so the page doesn't jump when the
+                  // spec arrives. Cuts perceived latency on chart turns.
+                  <ChartSkeleton variant={variant} />
+                ) : (
+                  <LoadingRow label={uiLoaderLabel} v={v} />
+                )}
               </div>
             )}
 

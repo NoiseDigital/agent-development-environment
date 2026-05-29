@@ -106,6 +106,15 @@ function withCrosshair(spec: Record<string, unknown>): Record<string, unknown> {
   const { x: _x, tooltip: _t, ...lineLayerEncoding } = encoding ?? {};
   void _x;
   void _t;
+  // Preserve the agent's mark properties (color, strokeWidth, opacity, …)
+  // when wrapping. We force `type: "line"` and `point: true` for the
+  // crosshair UX, but anything else the agent set — most importantly
+  // `color` for a "make the line green" turn — survives.
+  const originalMark = spec.mark;
+  const baseMark =
+    originalMark && typeof originalMark === 'object'
+      ? (originalMark as Record<string, unknown>)
+      : {};
   // Strip outer mark + encoding from the original — a layered Vega-Lite
   // spec puts marks inside layers, and we're about to set our own encoding
   // anyway. Leaving them would also re-trigger this wrapper on a second
@@ -118,7 +127,7 @@ function withCrosshair(spec: Record<string, unknown>): Record<string, unknown> {
     encoding: x ? { x } : undefined,
     layer: [
       {
-        mark: { type: 'line', point: true },
+        mark: { ...baseMark, type: 'line', point: true },
         encoding: lineLayerEncoding,
       },
       {

@@ -14,6 +14,14 @@ Architecture (peer subagents):
 Why peer subagents (vs. one mega-agent): each subagent owns ONE response
 shape, so its prompt is short and its output stays clean. The root never has
 to remember "should I emit text-only or wrap a chart?" — it picks a subagent.
+
+Context caching (ADK-native):
+The static prompt (~5K tokens) lives on `static_instruction` so Gemini's
+explicit context cache covers it. The cache is wired at the App level via
+`ContextCacheConfig`; ADK manages create / refresh / TTL automatically. The
+ADK loader looks for `app` before `root_agent`, so exporting `app` here is
+what flips caching on. We also keep `root_agent` exported for the
+dashboard_editor_agent which AgentTool-wraps this agent.
 """
 
 import logging
@@ -21,6 +29,8 @@ import os
 from datetime import date
 
 from google.adk.agents import LlmAgent
+from google.adk.agents.context_cache_config import ContextCacheConfig
+from google.adk.apps.app import App
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.mcp_tool import McpToolset, SseConnectionParams
 
@@ -62,9 +72,36 @@ def _build_root_agent() -> LlmAgent:
             "subagent (ChoicesAgent for ambiguity, VegaChartsAgent for "
             "visualised answers); answers text-only questions directly."
         ),
-        instruction=get_root_agent_prompt(),
+        # The whole router prompt is STATIC across turns — no placeholders,
+        # no per-session interpolation. Move it onto `static_instruction`
+        # so Gemini's explicit context cache covers it (paired with the
+        # `App.context_cache_config` below). Leaving `instruction` blank
+        # is intentional: per the LlmAgent docs, when `static_instruction`
+        # is set, anything in `instruction` becomes USER content — not
+        # what we want.
+        static_instruction=get_root_agent_prompt(),
         tools=tools,
     )
 
 
 root_agent = _build_root_agent()
+
+# App-level container that ADK's loader picks up before `root_agent`. The
+# context cache covers the static_instruction + tool defs (~5K tokens), well
+# above Flash's 4096-token minimum. ADK rotates the underlying cache every
+# `cache_intervals` invocations and lets it expire after `ttl_seconds`, so
+# a prompt edit propagates within at most one TTL.
+app = App(
+    name="media_performance_agent",
+    root_agent=root_agent,
+    context_cache_config=ContextCacheConfig(
+        # Refresh the cache every 10 invocations — bounds staleness against
+        # tool catalog churn without thrashing on the cache.
+        cache_intervals=10,
+        # 30-minute TTL. A bumped prompt rolls out on the next cache miss.
+        ttl_seconds=1800,
+        # Skip caching for tiny requests where the cache overhead would
+        # exceed the savings. 4096 is Flash's minimum cacheable size.
+        min_tokens=4096,
+    ),
+)

@@ -106,8 +106,18 @@ export interface FiltersProps {
 /** One renderable block. Discriminated on `component`; `props` is that
  *  component's typed payload. `id` is the handle interactive blocks use to
  *  route events back to the agent. */
+/** Templated chart payload — the agent emits this for common shapes
+ *  (weekly_trend, bar_by_dim, pareto) and the frontend applies a
+ *  deterministic Vega-Lite template at render time. Skips the
+ *  VegaChartsAgent subagent's LLM call entirely. See `lib/vega-templates.ts`.
+ *
+ *  Kept as `Record<string, unknown>` here so the type module stays free of
+ *  vega-template imports; the consumer narrows via `coerceTemplatedChartProps`. */
+export type TemplatedChartProps = Record<string, unknown>;
+
 export type UIBlock =
   | { component: 'chart'; props: VegaSpec; id?: string }
+  | { component: 'templated_chart'; props: TemplatedChartProps; id?: string }
   | { component: 'choices'; props: ChoicesProps; id?: string }
   | { component: 'filters'; props: FiltersProps; id?: string }
   | { component: 'suggestions'; props: SuggestionsProps; id?: string }
