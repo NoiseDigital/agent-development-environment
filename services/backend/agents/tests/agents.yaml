@@ -3,28 +3,39 @@
 # adding an entry here, no Python needed.
 #
 # expect keys:
-#   ok:     reply is non-empty and error-free (default: true)
-#   ui:     name (or list of names) of UI components the run must emit. The
-#           harness scans every event in the turn — so a subagent's choices /
-#           chart block counts even if the root agent paraphrases its text.
-#   no_ui:  true to assert the reply contains NO UI blocks (text-only).
-#   tools:  true to require at least one tool call, or a list of names that
-#           must all be present in the run's tool calls.
+#   ok:              reply is non-empty and error-free (default: true)
+#   ui:              name (or list) of UI components the run must emit. The
+#                    harness scans every event in the turn — so a subagent's
+#                    choices / chart block counts even if the root agent
+#                    paraphrases its text.
+#   no_ui:           true to assert the reply contains NO UI blocks.
+#   forbidden_ui:    name (or list) of UI components that must NOT appear
+#                    while others are allowed (less strict than no_ui).
+#   tools:           true to require at least one tool call, or a list of
+#                    names that must all be present in the run's tool calls.
+#   forbidden_tools: names that must NOT be called — pins "this path skips X"
+#                    contracts (e.g. greeting fast-path must not call
+#                    ChoicesAgent; modify-previous-chart must not call
+#                    VegaChartsAgent).
 # A case may also set `xfail: "reason"` to mark a known-failing behaviour.
 
 
 media_performance_agent:
-  # ── Greeting branch ────────────────────────────────────────────────────────
-  - name: bare greeting surfaces clickable starter choices
+  # ── Greeting branch (FAST PATH — no ChoicesAgent round-trip) ────────────
+  # The agent emits the welcome envelope directly, so a "hey" finishes in
+  # one LLM turn instead of two. We assert the UI shape but explicitly
+  # FORBID the ChoicesAgent tool to pin the fast-path contract.
+  - name: bare greeting surfaces clickable starter choices (no subagent)
     message: "hey"
     expect:
       ui: choices
-      tools: [ChoicesAgent]
+      forbidden_tools: [ChoicesAgent]
 
   - name: capability question greets via choices block, not static markdown
     message: "what can you do?"
     expect:
       ui: choices
+      forbidden_tools: [ChoicesAgent]
 
   # ── Ambiguous-request branch ───────────────────────────────────────────────
   - name: vague "how did we do" delegates to ChoicesAgent
@@ -76,16 +87,23 @@ media_performance_agent:
       ok: true
       no_ui: true
 
-  # Time-windowed totals belong in branch 2 (chart). The user almost always
-  # wants visual context for "how did <metric> look over <window>" even when
-  # the question is phrased as a single number.
-  - name: time-windowed total produces a trend chart (not a scalar)
+  # A time-windowed scalar question phrased as a scalar STAYS a scalar.
+  # The user wants the number, not a 30s chart of it. They can ask for a
+  # chart explicitly when they want one — see the next case.
+  - name: time-windowed scalar question returns text only (no chart)
     message: "What was our total spend in 2024?"
+    expect:
+      no_ui: true
+      tools: true   # data tool to ground the number is fine
+
+  # The same time window, asked WITH a chart-trigger word, DOES get a chart.
+  - name: chart-trigger word on a time window promotes to branch 2
+    message: "Show me weekly spend in 2024."
     expect:
       ui: chart
       tools: [VegaChartsAgent]
 
-  # An EXPLICIT scalar suppression should still go scalar.
+  # An EXPLICIT scalar suppression stays scalar (unchanged).
   - name: user explicitly requests only the number → scalar
     message: "Give me just the total spend number for 2024, no chart."
     expect:

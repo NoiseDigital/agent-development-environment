@@ -318,7 +318,7 @@ export default function AnalyzePage() {
   );
 
   return (
-    <div className="flex h-full flex-col bg-black">
+    <div className="flex h-full flex-col">
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between border-b border-zinc-800/60 px-8 py-5">
         <div>

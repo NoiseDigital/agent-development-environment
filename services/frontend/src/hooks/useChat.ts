@@ -48,6 +48,126 @@ function cleanName(text: string): string {
   return text.replace(/^["'`]+|["'`]+$/g, '').trim().slice(0, 50);
 }
 
+/** Snapshot of the agent's final reply once the SSE has ended. Lives on
+ *  the in-flight stream so the bubble is guaranteed to show even if the
+ *  post-SSE session refetch is slow, races persistence, or fails. */
+interface CompletedReply {
+  content: string;
+  ui?: UIBlock[];
+  toolCalls?: ToolCall[];
+  /** Real ADK event id once available; used to dedupe against the session's
+   *  committed events when the refetch eventually picks them up. */
+  eventId: string | null;
+}
+
+/** State for a stream the agent is still producing. Tracked per-session so
+ *  switching sessions mid-stream doesn't lose the in-flight reply — the
+ *  streaming bubble re-projects the moment the user navigates back. */
+interface InFlightStream {
+  /** Synthetic id for the user's bubble (replaced by the ADK event id once
+   *  the server's `getSession` refetch picks it up). */
+  userMessageId: string;
+  userContent: string;
+  /** The placeholder id used for the agent's streaming bubble. */
+  streamingId: string;
+  /** Accumulated text the agent has emitted so far (raw — runs through
+   *  `streamingDisplayText` before display). */
+  accumulated: string;
+  agentAuthor: string;
+  /** Process-step label shown by the spinner before any text arrives. */
+  working: string;
+  /** Hint that a chart / choices block is on the way — drives the more
+   *  specific label shown after text begins streaming. */
+  uiKind?: 'chart' | 'choices' | 'filters';
+  /** Tool calls the agent made — surfaced under the reply for admins. */
+  toolCalls: ToolCall[];
+  /** Recovered subagent UI in case the root paraphrases away its block. */
+  fallbackUi?: UIBlock[];
+  startedAt: number;
+  /** Snapshot of the parsed final reply once SSE finishes. Set BEFORE we
+   *  attempt the post-stream refetch so the bubble is never lost to a
+   *  race between turnComplete and ADK's event persistence. */
+  completed?: CompletedReply;
+  /** When the SSE throws, mark `failed` so the projection renders the
+   *  bubble as a non-streaming final message instead of a perpetual spinner. */
+  failed?: string;
+}
+
+/** Derive the visible message list for the active session: committed events
+ *  from the server, plus the in-flight stream (if any) re-projected as
+ *  user + agent bubbles. Pure — drives `messages` from the useEffect below. */
+function deriveMessages(
+  session: Session | null,
+  stream: InFlightStream | undefined,
+  supportsVisualization: boolean,
+): ChatMessage[] {
+  const committed = session
+    ? eventsToMessages(session.events, supportsVisualization)
+    : [];
+  if (!stream) return committed;
+
+  // Don't double-render the user's bubble: if the server already echoed it
+  // back as a persisted event (it lands at SSE start), the user message is
+  // in `committed`. Match on id OR on (content + recent timestamp) since the
+  // server-assigned id differs from our synthetic one.
+  const userAlreadyIn = committed.some(
+    (m) =>
+      m.id === stream.userMessageId ||
+      (m.author === 'user' &&
+        m.content === stream.userContent &&
+        m.timestamp >= stream.startedAt - 5_000),
+  );
+
+  const out = [...committed];
+  if (!userAlreadyIn) {
+    out.push({
+      id: stream.userMessageId,
+      content: stream.userContent,
+      author: 'user',
+      timestamp: stream.startedAt,
+    });
+  }
+  if (stream.failed) {
+    out.push({
+      id: stream.streamingId,
+      content: stream.failed,
+      author: stream.agentAuthor,
+      timestamp: stream.startedAt,
+    });
+  } else if (stream.completed) {
+    // The SSE has ended successfully — render the parsed reply. Skip if the
+    // committed events already include the matching event id (the session
+    // refetch picked it up); avoids briefly double-rendering during the
+    // window between snapshot and stream-cleanup.
+    const eid = stream.completed.eventId;
+    const alreadyCommitted = !!eid && committed.some((m) => m.id === eid);
+    if (!alreadyCommitted) {
+      out.push({
+        id: eid ?? stream.streamingId,
+        content: stream.completed.content,
+        author: stream.agentAuthor,
+        timestamp: stream.startedAt,
+        ui: stream.completed.ui,
+        toolCalls: stream.completed.toolCalls,
+      });
+    }
+  } else {
+    const display = supportsVisualization
+      ? streamingDisplayText(stream.accumulated)
+      : stream.accumulated;
+    out.push({
+      id: stream.streamingId,
+      content: display,
+      author: stream.agentAuthor,
+      timestamp: stream.startedAt,
+      isStreaming: true,
+      status: stream.working || undefined,
+      uiKind: stream.uiKind,
+    });
+  }
+  return out;
+}
+
 // Identity comes from the auth seam (lib/auth) — a fixed dev user today, the
 // Firebase user once auth is live. Callers may still override `userId` for tests.
 export function useChat(initialApp?: string, userId: string = getCurrentUser().uid) {
@@ -68,9 +188,14 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
   const [hiddenSessions, setHiddenSessions] = useState<Set<string>>(new Set());
   // Per-message thumb ratings for the active session, keyed by ADK event id.
   const [feedback, setFeedback] = useState<Record<string, Rating>>({});
-  // Prevent the currentSession useEffect from overwriting messages that were
-  // just parsed correctly by sendMessage (the session sync happens right after).
-  const skipNextSessionSync = useRef(false);
+  // Per-session in-flight stream state. Keyed by sessionId so an SSE that's
+  // still running when the user navigates away can keep accumulating, and
+  // the streaming bubble re-appears the moment they navigate back. The
+  // displayed `messages` array is *derived* from
+  //   committed events (from currentSession.events)  +
+  //   inFlightStreams[currentSession.id]
+  // so the bubble follows the session, not the in-memory React state.
+  const [inFlightStreams, setInFlightStreams] = useState<Record<string, InFlightStream>>({});
   // Auto-cleanup ledger — sessions we CREATED in this tab and which have NOT
   // yet had a message sent through them. Only ids in this set are ever
   // eligible to be auto-deleted on the next "new chat" click. We can't trust
@@ -96,8 +221,13 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
         setSessionNames(meta.names);
         setHiddenSessions(new Set(meta.hidden));
       })
-      .catch(() => {
+      .catch(err => {
         if (cancelled) return;
+        // We still clear local state so the UI doesn't show stale data from
+        // a previous app, but we log the failure so a regression in the
+        // session-names endpoint surfaces in the console instead of just
+        // looking like "no saved names yet".
+        console.warn('[useChat] failed to load session names for', selectedApp, err);
         setSessionNames({});
         setHiddenSessions(new Set());
       });
@@ -108,7 +238,11 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
   const saveSessionName = (sessionId: string, name: string) => {
     setSessionNames(prev => ({ ...prev, [sessionId]: name }));
     if (selectedApp) {
-      sessionNamesApi.set(selectedApp, sessionId, name, userId).catch(() => {});
+      sessionNamesApi.set(selectedApp, sessionId, name, userId).catch(err => {
+        // Optimistic — the local rename still stands, but log so we notice
+        // when the server-side persistence quietly stops working.
+        console.warn('[useChat] failed to persist session name', sessionId, err);
+      });
     }
   };
 
@@ -175,8 +309,11 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
                 await adkApi.deleteSession(selectedApp, userId, s.id);
                 prunedIds.push(s.id);
               }
-            } catch {
-              /* best-effort — leave the session alone on any failure */
+            } catch (err) {
+              // Best-effort — leave the session intact on failure (the prune
+              // is housekeeping, not load-bearing), but log so a regression
+              // in getSession/deleteSession doesn't go silent.
+              console.warn('[useChat.startup-prune] check failed for', s.id, err);
             }
           }),
         );
@@ -201,18 +338,20 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
   // never shows them, while the backing rows survive for potential restore.
   const sessions = allSessions.filter(s => !hiddenSessions.has(s.id));
 
-  // Update messages when current session changes (e.g. navigating to a session)
-  // Skip the sync when sendMessage just updated messages — it already parsed correctly.
+  // Derive the visible messages array whenever the active session OR its
+  // in-flight stream changes. The user's send-bubble + the agent's streaming
+  // bubble both come from `inFlightStreams[currentSession.id]`, not from
+  // direct setMessages calls — so leaving the session and returning re-
+  // projects the in-flight bubble seamlessly.
   useEffect(() => {
-    if (currentSession) {
-      if (skipNextSessionSync.current) {
-        skipNextSessionSync.current = false;
-        return;
-      }
-      const chatMessages = eventsToMessages(currentSession.events, supportsVisualization);
-      setMessages(chatMessages);
-    }
-  }, [currentSession]); // eslint-disable-line react-hooks/exhaustive-deps
+    setMessages(
+      deriveMessages(
+        currentSession,
+        currentSession ? inFlightStreams[currentSession.id] : undefined,
+        supportsVisualization,
+      ),
+    );
+  }, [currentSession, inFlightStreams, supportsVisualization]);
 
   // Load per-message feedback whenever the active session changes.
   useEffect(() => {
@@ -221,10 +360,15 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
       return;
     }
     let cancelled = false;
+    const sessionId = currentSession.id;
     feedbackApi
-      .listForSession(selectedApp, currentSession.id, userId)
+      .listForSession(selectedApp, sessionId, userId)
       .then(map => { if (!cancelled) setFeedback(map); })
-      .catch(() => { if (!cancelled) setFeedback({}); });
+      .catch(err => {
+        if (cancelled) return;
+        console.warn('[useChat] failed to load feedback for session', sessionId, err);
+        setFeedback({});
+      });
     return () => { cancelled = true; };
   }, [selectedApp, currentSession?.id, userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -241,7 +385,11 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
     });
     try {
       await feedbackApi.setRating(selectedApp, currentSession.id, eventId, rating, userId);
-    } catch {
+    } catch (err) {
+      // The optimistic rating update gets reverted below — log so a
+      // regression in the feedback endpoint is visible while the user just
+      // sees the rating revert.
+      console.warn('[useChat.rateMessage] failed for event', eventId, err);
       setFeedback(prev => {
         const next = { ...prev };
         if (previous) next[eventId] = previous;
@@ -300,10 +448,18 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
       ids.map(async id => {
         try {
           await adkApi.deleteSession(app, userId, id);
-          sessionNamesApi.remove(app, id, userId).catch(() => {});
-          feedbackApi.clearSession(app, id, userId).catch(() => {});
-        } catch {
-          /* best-effort — don't block the new chat */
+          // Best-effort companion cleanups — log per-id so a regression
+          // doesn't silently leak session-names / feedback rows over time.
+          sessionNamesApi.remove(app, id, userId).catch(err =>
+            console.warn('[useChat.prune] session-name cleanup failed for', id, err),
+          );
+          feedbackApi.clearSession(app, id, userId).catch(err =>
+            console.warn('[useChat.prune] feedback cleanup failed for', id, err),
+          );
+        } catch (err) {
+          // The session itself failed to delete — keep the loop going so a
+          // single bad id doesn't block the new-chat flow, but surface it.
+          console.warn('[useChat.prune] session delete failed for', id, err);
         }
       }),
     );
@@ -346,29 +502,22 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
   // sources manifest) but is not shown in the user's displayed message.
   const sendMessage = async (content: string, agentPrefix?: string) => {
     if (!currentSession || !content.trim() || !selectedApp) return;
+    // Pin the origin session id at send-time so every stream-state write
+    // targets the originating session regardless of where the user has
+    // navigated since. The SSE drains on its own; ADK persists the reply
+    // server-side; returning to the origin session re-projects the bubble.
+    const originSessionId = currentSession.id;
 
     setIsLoading(true);
     setNeuralThinking(true);
     setError(null);
     // The moment a message is sent, this session has content — pull it off
     // the auto-cleanup ledger so the next "new chat" click can't touch it.
-    localFreshSessions.current.delete(currentSession.id);
+    localFreshSessions.current.delete(originSessionId);
 
-    const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
-      content: content.trim(),
-      author: 'user',
-      timestamp: Date.now(),
-    };
-
+    const userMessageId = `user-${Date.now()}`;
     const streamingId = `streaming-${Date.now()}`;
-    const streamingPlaceholder: ChatMessage = {
-      id: streamingId,
-      content: '',
-      author: 'agent',
-      timestamp: Date.now(),
-      isStreaming: true,
-    };
+    const startedAt = Date.now();
 
     // Capture agent message count before this exchange (for auto-naming every N messages)
     const AUTO_RENAME_EVERY = 10;
@@ -376,7 +525,34 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
     const newAgentCount = agentMsgCountBefore + 1;
     const shouldAutoRename = newAgentCount === 1 || newAgentCount % AUTO_RENAME_EVERY === 0;
 
-    setMessages(prev => [...prev, userMessage, streamingPlaceholder]);
+    // Seed the in-flight stream. The projection effect re-derives messages
+    // from this immediately, so the user's bubble + the streaming placeholder
+    // appear on the active session.
+    setInFlightStreams(prev => ({
+      ...prev,
+      [originSessionId]: {
+        userMessageId,
+        userContent: content.trim(),
+        streamingId,
+        accumulated: '',
+        agentAuthor: 'agent',
+        working: '',
+        uiKind: undefined,
+        toolCalls: [],
+        startedAt,
+      },
+    }));
+
+    /** Patch the in-flight stream in place. No-op if the stream entry was
+     *  already removed (e.g. the user reset the session) — defensive but not
+     *  silent: we leave the prev value unchanged so React skips a re-render. */
+    const patchStream = (patch: Partial<InFlightStream>) => {
+      setInFlightStreams(prev => {
+        const cur = prev[originSessionId];
+        if (!cur) return prev;
+        return { ...prev, [originSessionId]: { ...cur, ...patch } };
+      });
+    };
 
     try {
       const agentText = agentPrefix
@@ -469,15 +645,10 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
           }
         }
 
-        // Show partial `text` only — never the raw JSON envelope mid-stream.
-        const display = supportsVisualization ? streamingDisplayText(accumulated) : accumulated;
-        setMessages(prev =>
-          prev.map(m =>
-            m.id === streamingId
-              ? { ...m, content: display, author: agentAuthor, status: working || undefined, uiKind }
-              : m
-          )
-        );
+        // Stream this event's accumulated state into the in-flight entry.
+        // The projection effect derives the bubble from it — the user sees
+        // the same stream whether they stayed on origin or navigated back.
+        patchStream({ accumulated, agentAuthor, working, uiKind, toolCalls: [...toolCalls], fallbackUi });
 
         if (event.turnComplete) break;
       }
@@ -488,11 +659,18 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
         : { content: accumulated, ui: undefined };
       // Final safety net: if parsing failed (case 3) and we're STILL holding a
       // raw `{ "text": ..., "ui": ... }` envelope as content, surface only the
-      // text via the streaming extractor so a user never sees raw JSON.
+      // text via the streaming extractor so a user never sees raw JSON. Hitting
+      // this branch means parseAgentResponse couldn't recognise the agent's
+      // output — log it loudly so a regression in the agent's envelope shape
+      // is visible instead of just looking like a slightly-off bubble.
       const looksLikeEnvelope =
         supportsVisualization &&
         /^\s*\{[\s\S]*"text"\s*:/.test(parsed.content);
       if (looksLikeEnvelope) {
+        console.warn(
+          '[useChat] envelope parser fell through to text; agent likely returned a malformed JSON envelope',
+          { sample: parsed.content.slice(0, 200) },
+        );
         parsed.content = streamingDisplayText(parsed.content);
       }
       // If the root agent paraphrased away a subagent's UI block, recover it
@@ -502,29 +680,61 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
       }
       // A blank reply with nothing to render → a graceful fallback message.
       const finalText = parsed.content.trim() || (parsed.ui?.length ? '' : FALLBACK_REPLY);
-      // Adopt the real ADK event id so feedback (keyed by event id) survives a reload.
-      setMessages(prev =>
-        prev.map(m =>
-          m.id === streamingId
-            ? {
-                ...m,
-                id: finalEventId ?? streamingId,
-                content: finalText,
-                ui: parsed.ui,
-                isStreaming: false,
-                status: undefined,
-                uiKind: undefined,
-                toolCalls: toolCalls.length ? dedupeToolCalls(toolCalls) : undefined,
-              }
-            : m
-        )
-      );
 
-      // Sync session state — skip the currentSession useEffect message overwrite
-      // since we've already parsed and set messages correctly above.
-      skipNextSessionSync.current = true;
-      const updatedSession = await adkApi.getSession(selectedApp, userId, currentSession.id);
-      setCurrentSession(updatedSession);
+      // Snapshot the parsed reply onto the in-flight stream FIRST. This is
+      // what guarantees the bubble shows up: even if the session refetch
+      // below is slow, fails, or races ADK's event persistence, the
+      // projection still renders this completed snapshot. Previously we
+      // relied on the refetch alone, which dropped replies whenever
+      // `turnComplete` arrived before the event was persisted.
+      const dedupedTools = toolCalls.length ? dedupeToolCalls(toolCalls) : undefined;
+      patchStream({
+        completed: {
+          content: finalText,
+          ui: parsed.ui,
+          eventId: finalEventId,
+          toolCalls: dedupedTools,
+        },
+      });
+
+      // Refetch the session — by now ADK has usually persisted the agent's
+      // reply event. We swap the session in regardless of whether it has
+      // the new event yet (eventsToMessages handles partial states); the
+      // stream's `completed` snapshot stays visible until the committed
+      // events confirm the event id, at which point `deriveMessages`
+      // dedupes it out and we clear the stream entry.
+      let updatedSession: Session | null = null;
+      try {
+        updatedSession = await adkApi.getSession(selectedApp, userId, originSessionId);
+      } catch (err) {
+        console.warn(
+          '[useChat] session refetch failed; in-flight snapshot is still visible',
+          originSessionId,
+          err,
+        );
+      }
+      if (updatedSession) {
+        setAllSessions(prev =>
+          prev.map(s => (s.id === originSessionId ? updatedSession! : s)),
+        );
+        if (currentSession?.id === originSessionId) {
+          setCurrentSession(updatedSession);
+        }
+        const hasAgentEvent =
+          !!finalEventId &&
+          updatedSession.events.some((e) => e.id === finalEventId);
+        if (hasAgentEvent) {
+          setInFlightStreams(prev => {
+            const next = { ...prev };
+            delete next[originSessionId];
+            return next;
+          });
+        }
+        // Else: the refetch raced persistence and didn't include the event.
+        // We leave the stream's `completed` snapshot in place — the user
+        // sees the reply, and a follow-up message will trigger another
+        // refetch that picks up the persisted event.
+      }
 
       // Auto-rename the session at message 1, 10, 20, 30… Empty replies
       // (Gemini occasionally truncates a 2-6 word title to nothing) get ONE
@@ -543,9 +753,11 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
           let name = await tryRename();
           if (!name || name.length < 2) name = await tryRename();
           if (name) {
-            saveSessionName(currentSession.id, name);
+            // Bind to the origin session so a mid-flight session switch can't
+            // misattribute the new title to whichever session is now active.
+            saveSessionName(originSessionId, name);
             setAllSessions(prev =>
-              prev.map(s => s.id === currentSession.id ? { ...s } : s)
+              prev.map(s => s.id === originSessionId ? { ...s } : s)
             );
           } else {
             console.warn('[session-naming] agent returned empty after retry');
@@ -556,10 +768,8 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
       }
 
     } catch (err) {
-      console.error('Failed to send message:', err);
-      // Keep the user's message; turn the streaming placeholder into a fallback
-      // reply rather than dropping the exchange entirely. Surface the specific
-      // failure when we know what it is — a 429 quota error reads very
+      console.error('[useChat.sendMessage] stream failed for session', originSessionId, err);
+      // Build a specific fallback message — a 429 quota error reads very
       // differently from a generic "something went wrong" message, and the
       // user needs to know whether to retry or wait.
       const msg = err instanceof Error ? err.message : '';
@@ -574,14 +784,13 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
       } else if (msg) {
         fallback = `${FALLBACK_REPLY}\n\n_Error: ${msg.slice(0, 200)}_`;
       }
-      setMessages(prev =>
-        prev.map(m =>
-          m.id === streamingId
-            ? { ...m, content: fallback, isStreaming: false, status: undefined, uiKind: undefined }
-            : m
-        )
-      );
+      // Mark the in-flight stream as failed — the projection effect renders
+      // the bubble as a non-streaming final message. Stays visible whether
+      // the user is on origin or navigates back, just like a real reply.
+      patchStream({ failed: fallback, working: '', uiKind: undefined });
     } finally {
+      // The thinking pulse + isLoading are GLOBAL to the chat surface, so
+      // they should clear regardless of which session the user is on now.
       setIsLoading(false);
       setNeuralThinking(false);
     }
@@ -599,8 +808,11 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
         try {
           const fullSession = await adkApi.getSession(selectedApp, userId, sessionId);
           sourceEvents = fullSession.events ?? [];
-        } catch {
-          // Fallback to whatever is already loaded below.
+        } catch (err) {
+          // Best-effort enrichment for the naming agent. Falls back to the
+          // in-memory rendered messages below, but log so a regression in
+          // getSession isn't invisible.
+          console.warn('[useChat.renameSession] failed to fetch full session', sessionId, err);
         }
       }
 

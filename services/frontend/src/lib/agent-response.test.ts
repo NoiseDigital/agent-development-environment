@@ -137,6 +137,121 @@ describe('parseAgentResponse', () => {
     const r = parseAgentResponse(bare);
     expect(r.ui?.[0].component).toBe('chart');
   });
+
+  it('scrubs a nested envelope copy the agent embedded in its own text field', () => {
+    // Regression: the agent occasionally puts the narrative AND a fenced
+    // JSON copy of the whole envelope inside its `text` field, which then
+    // renders both the prose AND the raw JSON in the chat bubble.
+    const inner = JSON.stringify({
+      text: '**Spend trended up** through Q2.',
+      ui: [{ component: 'chart', props: { mark: 'line' } }],
+    });
+    const envelope = JSON.stringify({
+      text: `**Spend trended up** through Q2.\n\n\`\`\`json\n${inner}\n\`\`\``,
+      ui: [{ component: 'chart', props: { mark: 'line' } }],
+    });
+    const r = parseAgentResponse(envelope);
+    expect(r.content).toBe('**Spend trended up** through Q2.');
+    expect(r.content).not.toContain('"ui"');
+    expect(r.content).not.toContain('```');
+    expect(r.ui?.[0].component).toBe('chart');
+  });
+
+  it('keeps non-envelope code blocks (e.g. a SQL snippet) inside the narrative', () => {
+    const envelope = JSON.stringify({
+      text: 'Here is the SQL I ran:\n\n```sql\nSELECT 1\n```',
+      ui: [],
+    });
+    const r = parseAgentResponse(envelope);
+    expect(r.content).toContain('SELECT 1');
+  });
+
+  it('scrubs an UNFENCED envelope copy the agent dumped into its own text field', () => {
+    // The variant seen on the "make the line green" turn: no markdown fence,
+    // just a raw JSON object pasted into the text field. The bubble shows
+    // a code-block-shaped wall of JSON when this leaks through.
+    const inner =
+      '{"text": "Spend trend line is now green.", "ui": [{"component":"chart","props":{"mark":"line"}}]}';
+    const envelope = JSON.stringify({
+      text: `Sure! ${inner}`,
+      ui: [{ component: 'chart', props: { mark: 'line' } }],
+    });
+    const r = parseAgentResponse(envelope);
+    // The raw JSON brace pile is gone; the recovered prose remains.
+    expect(r.content).not.toContain('"component"');
+    expect(r.content).not.toContain('"ui"');
+    expect(r.content).toContain('Spend trend line is now green.');
+    expect(r.ui?.[0].component).toBe('chart');
+  });
+
+  it('strips a bare JSON data array the agent dumped into its text field', () => {
+    // The "Spend over all time" regression: VegaChartsAgent put the chart's
+    // row array directly into the `text` field. The bubble rendered a wall
+    // of `[{"name":..., "value":...}]` above the chart.
+    const dataDump =
+      '[{"name":"2023-07-10","value":145892.4555274},{"name":"2023-07-28","value":257363.5636091},{"name":"2023-08-15","value":288553.2416061}]';
+    const envelope = JSON.stringify({
+      text: dataDump,
+      ui: [{ component: 'chart', props: { mark: 'line' } }],
+    });
+    const r = parseAgentResponse(envelope);
+    expect(r.content).not.toContain('"name"');
+    expect(r.content).not.toContain('"value"');
+    expect(r.ui?.[0].component).toBe('chart');
+  });
+
+  it('strips a bare JSON data dump even when surrounded by prose', () => {
+    const dataDump =
+      '[{"name":"Meta","value":48000},{"name":"YouTube","value":41000},{"name":"Google","value":33000},{"name":"X","value":12000}]';
+    const envelope = JSON.stringify({
+      text: `Here are the rows I plotted: ${dataDump}. Spend was concentrated in Meta and YouTube.`,
+      ui: [{ component: 'chart', props: { mark: 'bar' } }],
+    });
+    const r = parseAgentResponse(envelope);
+    expect(r.content).toContain('Spend was concentrated');
+    expect(r.content).not.toContain('"value"');
+  });
+
+  it('keeps an inline small JSON example the analyst meant to share', () => {
+    // Below the 60-char threshold, so the scrub leaves it alone.
+    const envelope = JSON.stringify({
+      text: 'The schema is `{"a": 1}` — a single numeric field.',
+      ui: [],
+    });
+    const r = parseAgentResponse(envelope);
+    expect(r.content).toContain('{"a": 1}');
+  });
+
+  it('recovers from a malformed envelope (trailing comma) by parsing it loosely', () => {
+    // Models occasionally emit trailing commas — invalid JSON but a common
+    // mistake. `parseJsonLoose` strips them before the second-pass parse.
+    const malformed = '{"text":"Spend trend line is now green.","ui":[{"component":"chart","props":{"mark":"line",}},]}';
+    const r = parseAgentResponse(malformed);
+    expect(r.content).toBe('Spend trend line is now green.');
+    expect(r.ui?.[0].component).toBe('chart');
+  });
+
+  it('regex-recovers the text when the envelope JSON is too broken to parse', () => {
+    // Simulate the modify-chart turn the user reported: an envelope-shaped
+    // string the JSON parser rejects (e.g. a smart quote inside the spec).
+    // The bubble should at least show the analyst's prose instead of raw JSON.
+    const broken = '{\n  "text": "Spend trend line is now green.",\n  "ui": [{ this is not valid JSON at all }]\n}';
+    const r = parseAgentResponse(broken);
+    expect(r.content).toContain('Spend trend line is now green');
+    // UI isn't recoverable here — accepted degradation, the alternative is
+    // dumping raw JSON into the chat which is far worse.
+  });
+
+  it('tolerates inline `~~~` fences around a self-envelope dump', () => {
+    const inner = '{"text":"x","ui":[{"component":"chart","props":{}}]}';
+    const envelope = JSON.stringify({
+      text: `done!\n~~~${inner}~~~`,
+      ui: [{ component: 'chart', props: { mark: 'bar' } }],
+    });
+    const r = parseAgentResponse(envelope);
+    expect(r.content).not.toContain('~~~');
+    expect(r.content).not.toContain('"ui"');
+  });
 });
 
 describe('streamingDisplayText', () => {

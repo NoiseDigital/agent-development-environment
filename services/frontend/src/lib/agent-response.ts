@@ -64,7 +64,35 @@ export function normalizePythonJson(s: string): string {
   return out;
 }
 
-/** JSON.parse, retried once with Python literals normalised to JSON. */
+/** Strip trailing commas before `}` or `]` — a common LLM JSON mistake.
+ *  Conservative: only acts outside string literals. */
+function stripTrailingCommas(s: string): string {
+  let out = '';
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escape) { out += ch; escape = false; continue; }
+    if (inString) {
+      out += ch;
+      if (ch === '\\') escape = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') { out += ch; inString = true; continue; }
+    if (ch === ',') {
+      // Look ahead past whitespace for the next non-space char.
+      let j = i + 1;
+      while (j < s.length && /\s/.test(s[j])) j++;
+      if (s[j] === '}' || s[j] === ']') continue; // drop the comma
+    }
+    out += ch;
+  }
+  return out;
+}
+
+/** JSON.parse, retried with progressively looser cleanups for common LLM
+ *  mistakes: Python literals (True/False/None) and trailing commas. */
 export function parseJsonLoose(s: string): unknown {
   try {
     return JSON.parse(s);
@@ -73,6 +101,11 @@ export function parseJsonLoose(s: string): unknown {
   }
   try {
     return JSON.parse(normalizePythonJson(s));
+  } catch {
+    /* still malformed — try one more cleanup */
+  }
+  try {
+    return JSON.parse(stripTrailingCommas(normalizePythonJson(s)));
   } catch {
     return null;
   }
@@ -152,8 +185,137 @@ function looksLikeVegaSpec(obj: Record<string, unknown>): boolean {
 /** Strip a leading code fence and language tag if present (```json ... ```). */
 function stripCodeFence(s: string): string {
   const trimmed = s.trim();
-  const fence = /^```(?:json)?\s*\n([\s\S]*?)\n```$/i.exec(trimmed);
-  return fence ? fence[1] : trimmed;
+  // Tolerant of variations the model actually emits: ```json``` or ```...```,
+  // with or without an interior newline, with `~~~` instead of backticks,
+  // and trailing whitespace after the closing fence.
+  const fence = /^(?:```|~~~)\s*[A-Za-z0-9_-]*\s*\n?([\s\S]*?)\n?\s*(?:```|~~~)\s*$/i.exec(trimmed);
+  return fence ? fence[1].trim() : trimmed;
+}
+
+/** The agent occasionally self-documents — its `text` field includes the
+ *  narrative AND a markdown-fenced JSON envelope copy of itself ("look, here
+ *  is the envelope I returned!"). ReactMarkdown then renders both the
+ *  narrative + the raw JSON code block, which is exactly the leak the
+ *  user reports. Strip any embedded code-fenced envelope from the text so
+ *  the bubble shows only the analyst's prose. */
+function scrubNestedEnvelope(content: string): string {
+  if (!content) return content;
+  // Match ```json ... ``` (or bare ``` ... ```) where the body contains a
+  // top-level `"text"` key — the giveaway that this is the envelope itself,
+  // not just any code block the analyst meant to share.
+  // 1) Fenced — tolerant of inline fences and `~~~` fences.
+  const fenceRe = /(?:```|~~~)\s*[A-Za-z0-9_-]*\s*\n?([\s\S]*?)\n?\s*(?:```|~~~)/gi;
+  let out = content.replace(fenceRe, (match, body: string) => {
+    // Keep code blocks that AREN'T self-envelope dumps (e.g. a SQL snippet
+    // the analyst chose to share).
+    return /"text"\s*:/i.test(body) && /"ui"\s*:/i.test(body) ? '' : match;
+  });
+
+  // 2) Unfenced envelope — the model pasted the envelope as raw JSON into
+  //    its own text field. Detect by shape (has `text` AND `ui` keys),
+  //    carve it out, and replace it with the real `text` field so the
+  //    bubble still gets the analyst's prose if there is any.
+  if (/\{[\s\S]*?"text"\s*:[\s\S]*?"ui"\s*:/.test(out)) {
+    const objStr = extractFirstJsonObject(out);
+    if (objStr) {
+      const parsed = parseJsonLoose(objStr) as { text?: unknown } | null;
+      const realText =
+        parsed && typeof parsed.text === 'string' ? parsed.text : '';
+      out = out.replace(objStr, realText);
+    }
+  }
+
+  // 3) Bare data dump — the model pasted the chart's row array (or a single
+  //    record-shaped object) directly into the text field. No envelope keys,
+  //    just `[{...}, {...}, ...]`. The analyst never has a reason to put a
+  //    JSON array in their prose — strip any chunk that looks like one and
+  //    parses cleanly. Conservative: only strip well-formed arrays/objects
+  //    that don't contain markdown structure.
+  out = stripBareJsonDumps(out);
+
+  return out.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** Find and drop any standalone JSON array or object dump from the text.
+ *  Conservative on what counts as a "dump":
+ *    - Must parse as JSON.
+ *    - Must be at least 60 chars (skips tiny inline snippets).
+ *    - Must look data-shaped (an array of objects, or an object with
+ *      data-key-ish field names like `name`/`value`/`label`/`series`).
+ *  Keeps small inline JSON (e.g. a one-line `{"a": 1}` the analyst chose
+ *  to share as an example) intact. */
+function stripBareJsonDumps(text: string): string {
+  let out = text;
+  // Walk the text looking for `[` or `{` at the start of a logical chunk.
+  // We use the existing depth-aware extractor to find balanced spans.
+  let cursor = 0;
+  while (cursor < out.length) {
+    const arrAt = out.indexOf('[', cursor);
+    const objAt = out.indexOf('{', cursor);
+    const candidates = [arrAt, objAt].filter((i) => i >= 0);
+    if (candidates.length === 0) break;
+    const start = Math.min(...candidates);
+    const span = out[start] === '['
+      ? extractFirstJsonArray(out.slice(start))
+      : extractFirstJsonObject(out.slice(start));
+    if (!span) {
+      cursor = start + 1;
+      continue;
+    }
+    if (span.length < 60) {
+      cursor = start + span.length;
+      continue;
+    }
+    const parsed = parseJsonLoose(span);
+    if (!isLikelyDataDump(parsed)) {
+      cursor = start + span.length;
+      continue;
+    }
+    // Strip the dump (plus any leading punctuation like ": ") from `out`,
+    // then restart the scan because indices shifted.
+    out = out.slice(0, start) + out.slice(start + span.length);
+    cursor = start;
+  }
+  return out;
+}
+
+/** Same depth-aware extractor as `extractFirstJsonObject`, for arrays. */
+function extractFirstJsonArray(text: string): string | null {
+  const start = text.indexOf('[');
+  if (start === -1) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '[') depth++;
+    else if (ch === ']') {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+/** Heuristic: is the parsed JSON shaped like a data dump the analyst
+ *  shouldn't have included? Look for an array of objects, or an object
+ *  whose keys read like data fields (name, value, label, series, etc.). */
+function isLikelyDataDump(parsed: unknown): boolean {
+  if (Array.isArray(parsed)) {
+    if (parsed.length === 0) return false;
+    return parsed.every((it) => it && typeof it === 'object' && !Array.isArray(it));
+  }
+  if (parsed && typeof parsed === 'object') {
+    const keys = Object.keys(parsed as object);
+    if (keys.length === 0) return false;
+    const DATA_KEYS = new Set(['name', 'value', 'label', 'series', 'rows', 'data', 'values']);
+    return keys.some((k) => DATA_KEYS.has(k.toLowerCase()));
+  }
+  return false;
 }
 
 /** Lenient parse of a completed agent response.
@@ -175,7 +337,10 @@ export function parseAgentResponse(text: string): ParsedAgentResponse {
 
   // Case 1: the whole thing parses cleanly.
   const whole = tryParseAgentJson(stripped);
-  if (whole) return whole;
+  if (whole) {
+    whole.content = scrubNestedEnvelope(whole.content);
+    return whole;
+  }
 
   // Case 2: an envelope is embedded somewhere in the reply.
   const jsonStr = extractFirstJsonObject(stripped);
@@ -190,11 +355,32 @@ export function parseAgentResponse(text: string): ParsedAgentResponse {
         const lead = at > 0 ? stripped.slice(0, at).trim() : '';
         if (lead) embedded.content = lead;
       }
+      embedded.content = scrubNestedEnvelope(embedded.content);
       return embedded;
+    }
+    // Found a `{...}` substring but couldn't parse it. If it LOOKS like an
+    // envelope (has the `text` and `ui` keys), fall through to the regex
+    // recovery below. Log so the regression is visible instead of just
+    // looking like a stale bubble.
+    if (/"text"\s*:/.test(jsonStr) && /"ui"\s*:/.test(jsonStr)) {
+      console.warn(
+        '[parseAgentResponse] envelope-shaped JSON failed to parse; using regex recovery',
+        { sample: jsonStr.slice(0, 240) },
+      );
     }
   }
 
-  // Case 3: no envelope — treat the whole reply as plain text.
+  // Case 3: parse-clean extraction failed. If the raw text still LOOKS like
+  // an envelope (has both `text` and `ui` keys), recover the analyst's prose
+  // via `streamingDisplayText` so the bubble never shows a wall of raw JSON.
+  // We can't recover the UI block here (the spec was malformed), so the
+  // chart drops — but a clean text bubble degrades far better than raw JSON.
+  if (/^\s*[`~]{0,3}[\w]*\s*\{[\s\S]*"text"\s*:[\s\S]*"ui"\s*:/.test(stripped)) {
+    const recovered = streamingDisplayText(stripped).trim();
+    if (recovered) return { content: recovered };
+  }
+
+  // True fallback — treat the whole reply as plain text.
   return { content: text };
 }
 

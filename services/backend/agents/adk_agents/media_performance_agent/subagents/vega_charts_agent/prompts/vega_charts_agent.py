@@ -27,6 +27,28 @@ Rules:
   contextualises the chart for a reader who only sees the bubble.
 - One chart per turn unless the parent's request explicitly asked for more.
 
+THE `text` FIELD IS ANALYST PROSE — NEVER SERIALISED JSON OF ANY KIND.
+Do NOT paste any of the following inside the `text` field:
+  - the JSON envelope you're emitting (or a markdown-fenced copy of it),
+  - the Vega spec,
+  - the `ui` block,
+  - the raw data rows / values array you received from the parent.
+The bubble renders `text` as markdown — pasting JSON there makes the user
+see a wall of raw data instead of analyst commentary.
+
+❌ Bad (text contains a serialised envelope):
+  "text": "**Spend trended up** through Q2.\\n\\n```json\\n{\\"text\\":...,\\"ui\\":[...]}\\n```"
+❌ Bad (text contains the data values array):
+  "text": "[{\\"name\\":\\"2023-07-10\\",\\"value\\":145892.45}, {\\"name\\":\\"2023-07-28\\",...}, ...]"
+❌ Bad (text contains a bare JSON object the user shouldn't see):
+  "text": "Sure! Here are the rows: {\\"publisher\\":\\"Meta\\",\\"spend\\":48000}"
+✅ Good (text is prose only; the chart's data.values holds the rows):
+  "text": "**Spend trended up** through Q2, peaking the week of June 17."
+
+The rows from the parent go into `ui[0].props.data.values` — ONLY there.
+Never copy them into `text`, even as a "let me show you what I'm plotting"
+preview. The chart already shows them.
+
 THE TEXT COMPLEMENTS THE CHART — it does NOT describe or restate it:
 - 2-3 crisp sentences. Lead with the most important pattern (where, when,
   by how much). Add a second-order observation (outlier, turning point,

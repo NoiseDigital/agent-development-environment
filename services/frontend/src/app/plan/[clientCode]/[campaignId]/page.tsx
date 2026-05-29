@@ -27,7 +27,7 @@ export default function CampaignPlanPage() {
 
   if (!plan) {
     return (
-      <div className="flex h-full items-center justify-center bg-black">
+      <div className="flex h-full items-center justify-center">
         <div className="text-center">
           <p className="text-sm text-zinc-300">Unknown client &ldquo;{clientCode}&rdquo;.</p>
           <button
@@ -45,7 +45,7 @@ export default function CampaignPlanPage() {
   const campaign = plan.campaigns.find((c) => c.id === campaignId);
   if (!campaign) {
     return (
-      <div className="flex h-full items-center justify-center bg-black">
+      <div className="flex h-full items-center justify-center">
         <div className="text-center">
           <p className="text-sm text-zinc-300">
             Campaign &ldquo;{campaignId}&rdquo; not found for {plan.clientName}.
@@ -66,7 +66,7 @@ export default function CampaignPlanPage() {
   const creativeCount = campaign.lines.reduce((s, l) => s + l.creatives.length, 0);
 
   return (
-    <div className="flex h-full flex-col bg-black">
+    <div className="flex h-full flex-col">
       {/* Header — breadcrumb + headline + summary stats */}
       <div className="shrink-0 border-b border-zinc-800/60 px-8 py-5">
         <div className="flex items-baseline gap-2 text-[11px] text-zinc-500">

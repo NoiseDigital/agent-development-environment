@@ -159,12 +159,15 @@ services:
              exec uv run uvicorn main:app --host 0.0.0.0 --port ${GATEWAY_PORT:-8080} --reload"
     # Healthcheck flips green only once both migrations finished and uvicorn
     # is serving /healthz. `start_period` gives the migration step room on a
-    # cold image build (~30s) before the failing probes start counting.
+    # cold image build (~30s) before the failing probes start counting; once
+    # boot is past, a 15s steady-state interval is plenty (this only matters
+    # for restart detection, not boot — `start_period` owns boot). The old 3s
+    # interval flooded the agent log with ~20 probes/min for no benefit.
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:${GATEWAY_PORT:-8080}/healthz || exit 1"]
-      interval: 3s
+      interval: 15s
       timeout: 3s
-      retries: 30
+      retries: 5
       start_period: 30s
 
   frontend:

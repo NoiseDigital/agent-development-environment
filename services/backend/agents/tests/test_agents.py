@@ -94,3 +94,16 @@ async def test_agent_behaviour(harness, agent, case):
             assert names, (
                 f"expected at least one tool call; got none\nreply: {run.text[:200]}"
             )
+
+    # `forbidden_tools`: names that must NOT appear in the turn's tool calls.
+    # Use to pin "this path skips X" — e.g. greeting fast-path must not call
+    # ChoicesAgent; modify-previous-chart must not call VegaChartsAgent.
+    if "forbidden_tools" in expect:
+        banned = expect["forbidden_tools"]
+        if isinstance(banned, str):
+            banned = [banned]
+        names = run.tool_names()
+        present = [t for t in banned if t in names]
+        assert not present, (
+            f"forbidden tool calls present: {present}; got {names or 'none'}"
+        )

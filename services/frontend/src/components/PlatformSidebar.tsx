@@ -67,9 +67,23 @@ export default function PlatformSidebar() {
   const [collapsed, setCollapsed] = useSidebarCollapsed('platform');
   const [onlineAgents, setOnlineAgents] = useState<Set<string>>(new Set());
 
-  // Fetch which agents are live
+  // Which agents are live — poll every 15s so the green dot reflects reality
+  // without a page refresh. A single GET /list-apps is cheap (it's a static
+  // list on the ADK side), and 15s is short enough that flipping an agent on
+  // or off feels live without flooding logs.
   useEffect(() => {
-    adkApi.listApps().then((apps) => setOnlineAgents(new Set(apps))).catch(() => {});
+    let cancelled = false;
+    const tick = () =>
+      adkApi
+        .listApps()
+        .then((apps) => { if (!cancelled) setOnlineAgents(new Set(apps)); })
+        .catch(() => {});
+    tick();
+    const id = window.setInterval(tick, 15_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
   }, []);
 
   const visibleAgents = Object.values(agentConfigurations).filter(

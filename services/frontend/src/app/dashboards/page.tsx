@@ -228,7 +228,7 @@ export default function DashboardsPage() {
   });
 
   return (
-    <div className="flex h-full flex-col bg-black">
+    <div className="flex h-full flex-col">
       {/* Page header */}
       <div className="flex shrink-0 items-center justify-between border-b border-zinc-800/60 px-8 py-5">
         <h1 className="text-lg font-semibold tracking-tight text-white">Dashboards</h1>
