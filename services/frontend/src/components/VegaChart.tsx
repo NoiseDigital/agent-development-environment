@@ -54,9 +54,12 @@ interface VegaChartProps {
   fill?: boolean;
   /** Render the chart-actions menu (save to dashboard, export). */
   saveable?: boolean;
+  /** Edit-mode dashboard tiles pass this so the kebab gets a "Delete visual"
+   *  item. Replaces the standalone X button on the tile. */
+  onDelete?: () => void;
 }
 
-export default function VegaChart({ spec, fill = false, saveable = false }: VegaChartProps) {
+export default function VegaChart({ spec, fill = false, saveable = false, onDelete }: VegaChartProps) {
   const [error, setError] = useState<string | null>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -113,7 +116,12 @@ export default function VegaChart({ spec, fill = false, saveable = false }: Vega
       {saveable && !error && (
         <div className="absolute right-1 top-1 z-10">
           {/* Dashboard tiles (fill) show export-only — they're already on a dashboard. */}
-          <ChartActions chart={spec} captureRef={containerRef} exportsOnly={fill} />
+          <ChartActions
+            chart={spec}
+            captureRef={containerRef}
+            exportsOnly={fill}
+            onDelete={onDelete}
+          />
         </div>
       )}
     </div>

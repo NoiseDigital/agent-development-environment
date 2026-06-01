@@ -36,9 +36,37 @@ export interface GridPos {
   minH?: number;
 }
 
+/** Per-dashboard presentation overrides — the way a dashboard customizes
+ *  shared tile components without forking them.
+ *
+ *  Set these on either:
+ *    • One tile via `tile.presentation` — overrides apply to just that tile.
+ *    • The whole dashboard via `Dashboard.defaults` — applied as fallbacks
+ *      to every tile on the dashboard.
+ *  Per-tile wins per-dashboard (merge happens in DashboardCanvas).
+ *
+ *  Renderers read these first, then fall back to the tile's own fields
+ *  (e.g., `overrides.title ?? tile.title`). Add a new override field by
+ *  extending this interface AND threading it through the renderer in
+ *  `components/dashboards/tiles/index.tsx`. */
+export interface PresentationOverrides {
+  /** Override the tile's display title. */
+  title?: string;
+  /** Optional secondary line below the title. */
+  subtitle?: string;
+  /** Long-form description shown in the kebab "info" affordance. */
+  description?: string;
+  /** Number / axis format token, e.g. `'usd'`, `'compact'`, `'%'`. */
+  valueFormat?: string;
+  /** CSS color for the primary accent (bar fill, line stroke). */
+  accent?: string;
+}
+
 interface BaseTile {
   id: string;
   layout: GridPos;
+  /** Per-tile presentation overrides — see {@link PresentationOverrides}. */
+  presentation?: PresentationOverrides;
 }
 
 // ── Per-tile specs ───────────────────────────────────────────────────────────
@@ -223,6 +251,11 @@ export interface Dashboard {
    *  interface so the existing seeds still type-check until a future cleanup. */
   campaignId: string;
   tabs: DashboardTab[];
+  /** Presentation overrides applied to EVERY tile on this dashboard as
+   *  fallbacks. Per-tile `presentation` wins where both are set. Use this
+   *  for cross-dashboard theming (e.g., a client report that wants compact
+   *  number formatting everywhere) without touching shared tile code. */
+  defaults?: PresentationOverrides;
 }
 
 /** Goal-tab kinds — the four canonical tab archetypes a client report covers

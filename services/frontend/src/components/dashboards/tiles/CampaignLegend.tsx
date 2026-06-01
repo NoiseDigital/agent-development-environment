@@ -4,7 +4,7 @@
 // chart. Sits below the chart so the in-plot area stays clean (labels were
 // colliding for campaigns with overlapping windows).
 
-import type { CampaignWindow } from '../../lib/dashboards';
+import type { CampaignWindow } from '../../../lib/dashboards';
 
 interface CampaignLegendProps {
   windows: readonly CampaignWindow[];

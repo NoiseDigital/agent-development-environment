@@ -483,6 +483,7 @@ export default function DashboardDetail({
         <DashboardCanvas
           tiles={tiles}
           editing={editing}
+          dashboardDefaults={dashboard.defaults}
           onLayoutChange={handleLayoutChange}
           onTextChange={handleTextChange}
           onRemoveTile={handleRemoveTile}

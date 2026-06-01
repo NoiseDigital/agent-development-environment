@@ -8,11 +8,11 @@ import {
   type MetricFilter,
   type MetricKey,
   type NamedValue,
-} from '../../lib/dashboards';
-import { useDashboardFilters } from '../../lib/dashboards/filter-context';
-import { useDashboardRefresh } from '../../lib/dashboards/refresh-context';
-import { barSpec } from '../../lib/charts/specs';
-import VegaChart from '../VegaChart';
+} from '../../../lib/dashboards';
+import { useDashboardFilters } from '../../../lib/dashboards/filter-context';
+import { useDashboardRefresh } from '../../../lib/dashboards/refresh-context';
+import { barSpec } from '../../../lib/charts/specs';
+import VegaChart from '../../VegaChart';
 import TileChartShell from './TileChartShell';
 
 /** Maps 1:1 to a toolbox tool. Add a member here when adding a tool. */
@@ -138,7 +138,7 @@ export default function BreakdownTile({
   const fmt = valueFormat ?? (source === 'platform_ctr' ? '.2%' : '$,.2s');
   return (
     <TileChartShell title={title} info={info}>
-      <VegaChart spec={barSpec({ title: '', data: rows, valueFormat: fmt })} fill saveable />
+      <VegaChart spec={barSpec({ title: '', data: rows, valueFormat: fmt })} fill />
     </TileChartShell>
   );
 }

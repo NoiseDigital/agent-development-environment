@@ -8,11 +8,11 @@ import {
   type MetricFilter,
   type MetricKey,
   type NamedValue,
-} from '../../lib/dashboards';
-import { useDashboardFilters } from '../../lib/dashboards/filter-context';
-import { useDashboardRefresh } from '../../lib/dashboards/refresh-context';
-import { paretoSpec } from '../../lib/charts/specs';
-import VegaChart from '../VegaChart';
+} from '../../../lib/dashboards';
+import { useDashboardFilters } from '../../../lib/dashboards/filter-context';
+import { useDashboardRefresh } from '../../../lib/dashboards/refresh-context';
+import { paretoSpec } from '../../../lib/charts/specs';
+import VegaChart from '../../VegaChart';
 import TileChartShell from './TileChartShell';
 import type { BqBreakdownSource } from './BreakdownTile';
 
@@ -129,7 +129,7 @@ export default function ParetoTile({ title, source, metric, valueFormat, topN }:
   const fmt = valueFormat ?? (source === 'platform_ctr' ? '.2%' : '$,.2s');
   return (
     <TileChartShell title={title} info={info}>
-      <VegaChart spec={paretoSpec({ data, valueFormat: fmt })} fill saveable />
+      <VegaChart spec={paretoSpec({ data, valueFormat: fmt })} fill />
     </TileChartShell>
   );
 }

@@ -8,14 +8,14 @@ import {
   dashboardData,
   type MetricTotalsRow,
   type NamedValue,
-} from '../../lib/dashboards';
-import { useDashboardFilters } from '../../lib/dashboards/filter-context';
-import { useDashboardRefresh } from '../../lib/dashboards/refresh-context';
-import { useDashboardTotals } from '../../lib/dashboards/totals-context';
-import { useDashboardEdit } from '../../lib/dashboards/edit-context';
-import { tileManifestList } from '../../lib/dashboards/context';
-import { adkApi } from '../../lib/agent/adk-api';
-import { getCurrentUser } from '../../lib/auth';
+} from '../../../lib/dashboards';
+import { useDashboardFilters } from '../../../lib/dashboards/filter-context';
+import { useDashboardRefresh } from '../../../lib/dashboards/refresh-context';
+import { useDashboardTotals } from '../../../lib/dashboards/totals-context';
+import { useDashboardEdit } from '../../../lib/dashboards/edit-context';
+import { tileManifestList } from '../../../lib/dashboards/context';
+import { adkApi } from '../../../lib/agent/adk-api';
+import { getCurrentUser } from '../../../lib/auth';
 import TileChartShell from './TileChartShell';
 
 interface NarrativeTileProps {

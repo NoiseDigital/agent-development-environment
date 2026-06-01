@@ -4,10 +4,10 @@
 // the weekly series already in TotalsProvider (no extra BQ call).
 
 import { useMemo } from 'react';
-import { useDashboardTotals } from '../../lib/dashboards/totals-context';
-import type { MetricSeriesRow } from '../../lib/dashboards';
-import { heatmapSpec } from '../../lib/charts/specs';
-import VegaChart from '../VegaChart';
+import { useDashboardTotals } from '../../../lib/dashboards/totals-context';
+import type { MetricSeriesRow } from '../../../lib/dashboards';
+import { heatmapSpec } from '../../../lib/charts/specs';
+import VegaChart from '../../VegaChart';
 import TileChartShell from './TileChartShell';
 
 interface CorrelationHeatmapTileProps {
@@ -91,7 +91,6 @@ export default function CorrelationHeatmapTile({ title }: CorrelationHeatmapTile
           matrix,
         })}
         fill
-        saveable
       />
     </TileChartShell>
   );

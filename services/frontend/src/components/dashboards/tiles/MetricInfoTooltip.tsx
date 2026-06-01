@@ -2,7 +2,7 @@
 
 // Single-metric (i) badge — used by KpiTile + Pivot column headers.
 
-import { getMetricDefinition, type MetricDefinition } from '../../lib/metric-semantics';
+import { getMetricDefinition, type MetricDefinition } from '../../../lib/metric-semantics';
 import InfoTooltip from './InfoTooltip';
 import MetricDefinitionBlock from './MetricDefinitionBlock';
 

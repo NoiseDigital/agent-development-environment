@@ -16,6 +16,13 @@ import type { Rating } from '../../lib/agent/feedback-api';
 
 type Variant = 'panel' | 'floating';
 
+// Characters that render as NOTHING visible but survive String.trim():
+// standard whitespace, zero-width chars, bidi marks, line/paragraph separators,
+// narrow no-break space, byte order mark. Used by the "has visible content"
+// guard so an agent reply that's effectively just one of these doesn't draw
+// an empty bubble.
+const INVISIBLE_RE = new RegExp('[\\s\u200B-\u200F\u202A-\u202F\u2060\uFEFF]', 'g');
+
 interface ChatMessageProps {
   message: ChatMessageData;
   variant?: Variant;
@@ -80,10 +87,12 @@ export default function ChatMessage({
 }: ChatMessageProps) {
   const v = VARIANT[variant];
   const isAgent = message.author !== 'user';
-  // Treat whitespace-only content as empty — the parser sometimes scrubs an
-  // envelope-dump down to a stray space/newline, and we don't want that to
-  // render as a thin "ghost" bubble with just a streaming cursor inside.
-  const hasContent = message.content.trim() !== '';
+  // "Has visible content" — `.trim()` alone isn't enough: zero-width chars
+  // (U+200B–U+200F, U+2060), bidi marks, BOM, and narrow no-break space all
+  // survive trim() but render as nothing in ReactMarkdown. Without this
+  // stricter test, a stray `​` from an LLM JSON-escape pipeline left a
+  // ghost bubble + streaming cursor floating between the prose and the chart.
+  const hasContent = message.content.replace(INVISIBLE_RE, '') !== '';
   const isThinking = !!message.isStreaming && !hasContent;
   const blocks = showUi ? message.ui ?? [] : [];
   // A non-streaming agent message with no prose AND no UI blocks has nothing

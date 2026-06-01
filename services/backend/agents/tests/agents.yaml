@@ -37,22 +37,37 @@ media_performance_agent:
       ui: choices
       forbidden_tools: [ChoicesAgent]
 
-  # ── Ambiguous-request branch ───────────────────────────────────────────────
-  - name: vague "how did we do" delegates to ChoicesAgent
+  # ── Ambiguous-request branch (TEMPLATED FAST PATH — no ChoicesAgent) ──────
+  # Common ambiguous asks now emit a fixed metric/timeframe/visualization
+  # clarification envelope INLINE — saves the 8-15s ChoicesAgent round-trip.
+  # We forbid ChoicesAgent to pin the fast-path contract: a regression that
+  # silently re-routes through the subagent fails the test.
+  - name: vague "how did we do" uses templated clarification
     message: "How did we do?"
     expect:
       ui: choices
-      tools: [ChoicesAgent]
+      forbidden_tools: [ChoicesAgent]
 
-  - name: vague performance summary delegates to ChoicesAgent
+  - name: vague performance summary uses templated clarification
     message: "Give me a performance summary"
     expect:
       ui: choices
+      forbidden_tools: [ChoicesAgent]
 
-  - name: vague overview delegates to ChoicesAgent
+  - name: vague overview uses templated clarification
     message: "Just give me an overview"
     expect:
       ui: choices
+      forbidden_tools: [ChoicesAgent]
+
+  - name: "'show me what's trending' uses templated clarification"
+    # Specific regression: the starter-prompt-click path. With ChoicesAgent
+    # the second clarification took ~15s; with the templated path it's one LLM
+    # turn — the root emits the choices envelope itself.
+    message: "Show me what's trending"
+    expect:
+      ui: choices
+      forbidden_tools: [ChoicesAgent]
 
   # The ChoicesAgent must NOT offer a "scalar trap" option. Every option
   # the user sees should yield a chart — otherwise picking "overall totals"

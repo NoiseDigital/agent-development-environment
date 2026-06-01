@@ -34,6 +34,7 @@ export type {
   PacingTileSpec,
   ParetoTileSpec,
   PivotTileSpec,
+  PresentationOverrides,
   QuadrantTileSpec,
   TabKind,
   TextTile,

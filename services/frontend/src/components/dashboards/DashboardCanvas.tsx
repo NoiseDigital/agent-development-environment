@@ -1,21 +1,14 @@
 'use client';
 
+import { useRef } from 'react';
 import { GridLayout, useContainerWidth, type Layout } from 'react-grid-layout';
 import { GridBackground } from 'react-grid-layout/extras';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
-import type { DashboardTile } from '../../data/dashboards';
-import VegaChart from '../VegaChart';
-import TextTile from './TextTile';
-import TrendTile from './TrendTile';
-import KpiTile from './KpiTile';
-import BreakdownTile from './BreakdownTile';
-import PivotTile from './PivotTile';
-import QuadrantTile from './QuadrantTile';
-import ParetoTile from './ParetoTile';
-import PacingTile from './PacingTile';
-import CorrelationHeatmapTile from './CorrelationHeatmapTile';
-import NarrativeTile from './NarrativeTile';
+import type { DashboardTile, PresentationOverrides } from '../../data/dashboards';
+import type { VegaSpec } from '../../types/genui';
+import ChartActions from '../ChartActions';
+import { renderTile, mergeOverrides } from './tiles';
 
 // Shared grid metrics — must stay in sync between the layout and its background.
 const COLS = 12;
@@ -25,6 +18,9 @@ const MARGIN: [number, number] = [16, 16];
 interface DashboardCanvasProps {
   tiles: DashboardTile[];
   editing: boolean;
+  /** Dashboard-level presentation defaults applied to every tile as a
+   *  fallback. Per-tile `presentation` wins where both are set. */
+  dashboardDefaults?: PresentationOverrides;
   onLayoutChange: (layout: Layout) => void;
   onTextChange: (id: string, text: string) => void;
   onRemoveTile: (id: string) => void;
@@ -33,6 +29,7 @@ interface DashboardCanvasProps {
 export default function DashboardCanvas({
   tiles,
   editing,
+  dashboardDefaults,
   onLayoutChange,
   onTextChange,
   onRemoveTile,
@@ -77,91 +74,20 @@ export default function DashboardCanvas({
             dragConfig={{ enabled: editing, cancel: '.no-drag' }}
             resizeConfig={{ enabled: editing, handles: ['se'] }}
           >
+            {/* IMPORTANT — react-grid-layout positions its IMMEDIATE child via
+                cloneElement(style/className). The literal `<div key={tile.id}>`
+                MUST be that immediate child, or the grid silently drops its
+                positioning and every tile collapses to 0 height. Don't extract
+                this <div> into a component — keep the body inside `TileBody`. */}
             {tiles.map((tile) => (
-              <div key={tile.id} className="group/tile">
-                <div
-                  className={`h-full rounded-xl border bg-zinc-900 p-3 overflow-hidden transition-colors ${
-                    editing ? 'border-zinc-700 cursor-move' : 'border-zinc-800'
-                  }`}
-                >
-                  {tile.type === 'chart' ? (
-                    <VegaChart spec={tile.chart} fill saveable />
-                  ) : tile.type === 'trend' ? (
-                    <TrendTile
-                      title={tile.title}
-                      metric={tile.metric}
-                      secondaryMetric={tile.secondaryMetric}
-                    />
-                  ) : tile.type === 'kpi' ? (
-                    <KpiTile
-                      label={tile.label}
-                      metric={tile.metric}
-                      format={tile.format}
-                      betterLower={tile.betterLower}
-                    />
-                  ) : tile.type === 'breakdown' ? (
-                    <BreakdownTile
-                      title={tile.title}
-                      source={tile.source}
-                      metric={tile.metric}
-                      valueFormat={tile.valueFormat}
-                    />
-                  ) : tile.type === 'pivot' ? (
-                    <PivotTile
-                      title={tile.title}
-                      outerDim={tile.outerDim}
-                      innerDim={tile.innerDim}
-                      rowHeader={tile.rowHeader}
-                      columns={tile.columns}
-                    />
-                  ) : tile.type === 'quadrant' ? (
-                    <QuadrantTile
-                      title={tile.title}
-                      dim={tile.dim}
-                      xMetric={tile.xMetric}
-                      yMetric={tile.yMetric}
-                      sizeMetric={tile.sizeMetric}
-                    />
-                  ) : tile.type === 'pareto' ? (
-                    <ParetoTile
-                      title={tile.title}
-                      source={tile.source}
-                      metric={tile.metric}
-                      valueFormat={tile.valueFormat}
-                      topN={tile.topN}
-                    />
-                  ) : tile.type === 'pacing' ? (
-                    <PacingTile
-                      title={tile.title}
-                      expectedShare={tile.expectedShare}
-                    />
-                  ) : tile.type === 'heatmap' ? (
-                    <CorrelationHeatmapTile title={tile.title} />
-                  ) : tile.type === 'narrative' ? (
-                    <NarrativeTile title={tile.title} />
-                  ) : (
-                    <TextTile
-                      text={tile.text}
-                      editing={editing}
-                      onChange={(text) => onTextChange(tile.id, text)}
-                    />
-                  )}
-                </div>
-
-                {editing && (
-                  <button
-                    type="button"
-                    onClick={() => onRemoveTile(tile.id)}
-                    // Sits to the LEFT of the chart's own ⋯ action menu so the
-                    // two buttons stay side-by-side rather than overlapping.
-                    className="no-drag absolute top-1.5 right-9 z-20 flex h-6 w-6 items-center justify-center rounded-md border border-zinc-700 bg-zinc-800 text-zinc-400 opacity-0 transition group-hover/tile:opacity-100 hover:border-red-500/40 hover:bg-red-500/20 hover:text-red-400"
-                    aria-label="Remove tile"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
+              <div key={tile.id} className="group/tile relative">
+                <TileBody
+                  tile={tile}
+                  editing={editing}
+                  dashboardDefaults={dashboardDefaults}
+                  onRemoveTile={onRemoveTile}
+                  onTextChange={onTextChange}
+                />
               </div>
             ))}
           </GridLayout>
@@ -169,4 +95,65 @@ export default function DashboardCanvas({
       )}
     </div>
   );
+}
+
+interface TileBodyProps {
+  tile: DashboardTile;
+  editing: boolean;
+  dashboardDefaults?: PresentationOverrides;
+  onRemoveTile: (id: string) => void;
+  onTextChange: (id: string, text: string) => void;
+}
+
+/** Per-tile body + the unified kebab. Rendered INSIDE the
+ *  `<div key={tile.id}>` that react-grid-layout positions — not as a
+ *  replacement for it (see the IMPORTANT note above).
+ *
+ *  Dispatch goes through the tile registry in `./tiles`. Every tile type
+ *  receives merged presentation overrides (dashboard defaults ← per-tile
+ *  presentation). The kebab in the top-right corner is the SAME pixel slot
+ *  on every tile and its menu adapts to what the tile supports. */
+function TileBody({
+  tile,
+  editing,
+  dashboardDefaults,
+  onRemoveTile,
+  onTextChange,
+}: TileBodyProps) {
+  const tileRef = useRef<HTMLDivElement | null>(null);
+  const chartSpec: VegaSpec | undefined = tile.type === 'chart' ? tile.chart : undefined;
+  const overrides = mergeOverrides(dashboardDefaults, tile.presentation);
+  const fallbackTitle = overrides.title ?? tileTitle(tile);
+  return (
+    <>
+      <div
+        ref={tileRef}
+        className={`h-full rounded-xl border bg-zinc-900 p-3 overflow-hidden transition-colors ${
+          editing ? 'border-zinc-700 cursor-move' : 'border-zinc-800'
+        }`}
+      >
+        {renderTile(tile, { editing, overrides, onTextChange })}
+      </div>
+
+      {/* Unified kebab: same pixel position on every tile type. */}
+      <div className="no-drag absolute right-1.5 top-1.5 z-20 opacity-0 transition group-hover/tile:opacity-100">
+        <ChartActions
+          captureRef={tileRef}
+          chart={chartSpec}
+          fallbackTitle={fallbackTitle}
+          exportsOnly
+          onDelete={editing ? () => onRemoveTile(tile.id) : undefined}
+        />
+      </div>
+    </>
+  );
+}
+
+/** PNG filename + flag-dialog label for any tile type when no presentation
+ *  override supplies one. Reaches for the tile's own title / label first. */
+function tileTitle(tile: DashboardTile): string {
+  if ('title' in tile && typeof tile.title === 'string' && tile.title) return tile.title;
+  if (tile.type === 'kpi') return tile.label;
+  if (tile.type === 'text') return 'note';
+  return 'visual';
 }

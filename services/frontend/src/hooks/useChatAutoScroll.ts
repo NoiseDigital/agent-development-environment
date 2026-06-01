@@ -50,6 +50,27 @@ const PIN_THRESHOLD_PX = 120;
  *  a chance to settle (a chart that's still measuring would move under us). */
 const FINISH_SCROLL_DELAY_MS = 300;
 
+/** Pixel buffer kept around a "fitting" message so a near-viewport-height
+ *  reply doesn't sit jammed against the top/bottom edges. */
+const FIT_PADDING_PX = 24;
+
+/** The one place we decide WHERE to land a finished reply.
+ *    - Fits in the viewport → block:'end' (whole reply visible at bottom).
+ *    - Overflows the viewport → block:'start' (top visible, scrollable down).
+ *  Used by both the "reply just finished" effect and the resize observer
+ *  that catches late chart sizing. */
+function smartScrollLastMsg(
+  lastMsgRef: RefObject<HTMLElement | null> | undefined,
+  containerRef: RefObject<HTMLElement | null>,
+) {
+  const node = lastMsgRef?.current;
+  const container = containerRef.current;
+  if (!node) return;
+  const viewportH = container?.clientHeight ?? window.innerHeight;
+  const fits = node.offsetHeight + FIT_PADDING_PX <= viewportH;
+  node.scrollIntoView({ behavior: 'smooth', block: fits ? 'end' : 'start' });
+}
+
 export function useChatAutoScroll({
   containerRef,
   endRef,
@@ -71,48 +92,58 @@ export function useChatAutoScroll({
   }, [messages, endRef]);
 
   // 2) Reply finished → smooth-scroll so the reader lands at the right spot.
-  //    • Reply has a UI block (chart / choices / filters) → scroll the BOTTOM
-  //      of the message to the bottom of the viewport. The visual is the
-  //      payoff of the reply; keeping it on-screen matters more than seeing
-  //      the prose lead. The user can still scroll up to re-read.
-  //    • Text-only reply → scroll its TOP to the top so the reader starts
-  //      at the beginning. block:'start' is browser-clamped so short replies
-  //      just sit fully visible.
+  //    Single rule applied across every reply (text, chart, choices, mixed):
+  //      • If the whole message FITS the viewport → bottom of message at
+  //        bottom of viewport. Reader sees the entire reply in one frame.
+  //      • If the message OVERFLOWS → top of message at top of viewport.
+  //        Reader starts at the beginning and can scroll down — nothing
+  //        is cut off behind the fold.
+  //    Why this rule: scrolling to `end` on a too-tall reply pushes the
+  //    intro / chart title above the viewport; scrolling to `start` on
+  //    a short reply leaves wasted space below. One rule, the right
+  //    answer in both cases.
   useEffect(() => {
     if (!lastMsgRef) return;
     const streaming = messages.some((m) => m.isStreaming);
     const justFinished = wasStreamingRef.current && !streaming;
     wasStreamingRef.current = streaming;
     if (!justFinished) return;
-    const last = messages[messages.length - 1];
-    const hasUi = !!last?.ui?.length;
-    const id = setTimeout(() => {
-      lastMsgRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: hasUi ? 'end' : 'start',
-      });
-    }, FINISH_SCROLL_DELAY_MS);
+    const id = setTimeout(() => smartScrollLastMsg(lastMsgRef, containerRef), FINISH_SCROLL_DELAY_MS);
     return () => clearTimeout(id);
-  }, [messages, lastMsgRef]);
+  }, [messages, lastMsgRef, containerRef]);
 
-  // 2b) UI block arrived AFTER the prose was already visible (e.g. the chart
-  //     skeleton swap to the real chart, or a templated_chart envelope
-  //     finishing). Smooth-scroll the bottom of the reply into view so the
-  //     visual is on-screen — only when the user is still pinned, so we
-  //     don't yank a reader who scrolled up.
-  const prevLastUiCountRef = useRef(0);
+  // 2b) Late UI sizing — a single ResizeObserver on the last message row
+  //     catches every height-growth event AFTER streaming ends:
+  //       • templated_chart envelope finishing assembly (sub-frame growth)
+  //       • Vega taking 500-1500ms to do its first layout
+  //       • crosshair / brush layers adding height on first paint
+  //       • suggestions / follow-up pills rendering after the chart
+  //     Re-applies the same fit-vs-overflow rule whenever the row grows
+  //     AND the user is still pinned near the bottom (followStreamRef).
+  //     Without this, the initial 300ms scroll fires before Vega has
+  //     measured the SVG — the row "ends" before the chart is visible.
   useEffect(() => {
     if (!lastMsgRef) return;
-    const last = messages[messages.length - 1];
-    const uiCount = last?.ui?.length ?? 0;
-    const grew = uiCount > prevLastUiCountRef.current;
-    prevLastUiCountRef.current = uiCount;
-    if (!grew || !followStreamRef.current) return;
-    const id = setTimeout(() => {
-      lastMsgRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }, FINISH_SCROLL_DELAY_MS);
-    return () => clearTimeout(id);
-  }, [messages, lastMsgRef]);
+    const lastId = messages[messages.length - 1]?.id ?? null;
+    const node = lastMsgRef.current;
+    if (!node || !lastId) return;
+    let prevHeight = node.offsetHeight;
+    const obs = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const next = entry.contentRect.height;
+      const grew = next > prevHeight + 4; // ignore sub-pixel jitter
+      prevHeight = next;
+      if (!grew || !followStreamRef.current) return;
+      smartScrollLastMsg(lastMsgRef, containerRef);
+    });
+    obs.observe(node);
+    return () => obs.disconnect();
+    // Re-attach when the LAST message id changes — that's a new reply to
+    // observe. Within one reply, the same observer keeps watching as the
+    // chart finishes sizing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages[messages.length - 1]?.id, lastMsgRef, containerRef]);
 
   // 3) User just sent → smooth scroll to bottom.
   useEffect(() => {

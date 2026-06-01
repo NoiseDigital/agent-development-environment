@@ -7,11 +7,11 @@ import {
   dashboardData,
   type NestedDim,
   type NestedTotalsRow,
-} from '../../lib/dashboards';
-import { useDashboardFilters } from '../../lib/dashboards/filter-context';
-import { useDashboardRefresh } from '../../lib/dashboards/refresh-context';
-import { quadrantScatterSpec } from '../../lib/charts/specs';
-import VegaChart from '../VegaChart';
+} from '../../../lib/dashboards';
+import { useDashboardFilters } from '../../../lib/dashboards/filter-context';
+import { useDashboardRefresh } from '../../../lib/dashboards/refresh-context';
+import { quadrantScatterSpec } from '../../../lib/charts/specs';
+import VegaChart from '../../VegaChart';
 import TileChartShell from './TileChartShell';
 
 type RateMetric = 'ctr' | 'cvr' | 'cpm' | 'cpc' | 'cpa' | 'vcr';
@@ -168,7 +168,6 @@ export default function QuadrantTile({
           yMedian,
         })}
         fill
-        saveable
       />
     </TileChartShell>
   );

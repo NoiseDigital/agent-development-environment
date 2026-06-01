@@ -7,12 +7,12 @@ import { useEffect, useState } from 'react';
 import {
   singleMetricLineSpec,
   dualMetricLineSpec,
-} from '../../lib/charts/specs';
-import { useDashboardTotals } from '../../lib/dashboards/totals-context';
-import { useDashboardFilters } from '../../lib/dashboards/filter-context';
-import { useDashboardRefresh } from '../../lib/dashboards/refresh-context';
-import { dashboardData, type CampaignWindow, type MetricSeriesRow } from '../../lib/dashboards';
-import VegaChart from '../VegaChart';
+} from '../../../lib/charts/specs';
+import { useDashboardTotals } from '../../../lib/dashboards/totals-context';
+import { useDashboardFilters } from '../../../lib/dashboards/filter-context';
+import { useDashboardRefresh } from '../../../lib/dashboards/refresh-context';
+import { dashboardData, type CampaignWindow, type MetricSeriesRow } from '../../../lib/dashboards';
+import VegaChart from '../../VegaChart';
 import TileChartShell from './TileChartShell';
 import CampaignLegend from './CampaignLegend';
 
@@ -128,7 +128,6 @@ export default function TrendTile({
             <VegaChart
               spec={singleMetricLineSpec({ data, valueFormat: fmtFor(metric), windows })}
               fill
-              saveable
             />
           </div>
           <CampaignLegend windows={windows} />
@@ -157,7 +156,6 @@ export default function TrendTile({
               windows,
             })}
             fill
-            saveable
           />
         </div>
         <CampaignLegend windows={windows} />

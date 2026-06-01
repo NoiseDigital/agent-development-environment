@@ -3,10 +3,10 @@
 // Budget pacing — filled bar of spent / budget with on-pace / hot / cold hint.
 
 import { useEffect, useState } from 'react';
-import { dashboardData } from '../../lib/dashboards';
-import { useDashboardFilters } from '../../lib/dashboards/filter-context';
-import { useDashboardRefresh } from '../../lib/dashboards/refresh-context';
-import { usdCompact } from '../../lib/format';
+import { dashboardData } from '../../../lib/dashboards';
+import { useDashboardFilters } from '../../../lib/dashboards/filter-context';
+import { useDashboardRefresh } from '../../../lib/dashboards/refresh-context';
+import { usdCompact } from '../../../lib/format';
 import TileChartShell from './TileChartShell';
 
 interface PacingTileProps {

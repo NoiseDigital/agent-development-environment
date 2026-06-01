@@ -13,11 +13,11 @@ import {
   dashboardData,
   type NestedDim,
   type NestedTotalsRow,
-} from '../../lib/dashboards';
-import { useDashboardFilters } from '../../lib/dashboards/filter-context';
-import { useDashboardRefresh } from '../../lib/dashboards/refresh-context';
-import { useDashboardTotals } from '../../lib/dashboards/totals-context';
-import { formatByKey, type FormatKey } from '../../lib/format';
+} from '../../../lib/dashboards';
+import { useDashboardFilters } from '../../../lib/dashboards/filter-context';
+import { useDashboardRefresh } from '../../../lib/dashboards/refresh-context';
+import { useDashboardTotals } from '../../../lib/dashboards/totals-context';
+import { formatByKey, type FormatKey } from '../../../lib/format';
 import MetricInfoTooltip from './MetricInfoTooltip';
 import TileChartShell from './TileChartShell';
 
