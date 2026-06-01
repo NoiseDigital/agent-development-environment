@@ -6,7 +6,7 @@
 // shared `neural-pulse` signal — so the surface visibly "thinks" with you.
 
 import { usePathname } from 'next/navigation';
-import { useNeuralThinking } from '../lib/neural-pulse';
+import { useNeuralThinking } from '../lib/agent/neural-pulse';
 
 const DASHBOARD_DETAIL_RE = /^\/dashboards\/[^/]+/;
 

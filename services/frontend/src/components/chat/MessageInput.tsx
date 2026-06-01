@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Session } from '../../lib/adk-api';
+import { Session } from '../../lib/agent/adk-api';
 
 // Borderless centred input. Sits in a soft, faded gradient at the page
 // bottom so the input area reads as part of the chat surface — no visible

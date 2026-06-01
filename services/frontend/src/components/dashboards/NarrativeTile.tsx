@@ -9,12 +9,12 @@ import {
   type MetricTotalsRow,
   type NamedValue,
 } from '../../lib/dashboards';
-import { useDashboardFilters } from '../../lib/dashboard-filter-context';
-import { useDashboardRefresh } from '../../lib/dashboard-refresh-context';
-import { useDashboardTotals } from '../../lib/dashboard-totals-context';
-import { useDashboardEdit } from '../../lib/dashboard-edit-context';
-import { tileManifestList } from '../../lib/dashboard-context';
-import { adkApi } from '../../lib/adk-api';
+import { useDashboardFilters } from '../../lib/dashboards/filter-context';
+import { useDashboardRefresh } from '../../lib/dashboards/refresh-context';
+import { useDashboardTotals } from '../../lib/dashboards/totals-context';
+import { useDashboardEdit } from '../../lib/dashboards/edit-context';
+import { tileManifestList } from '../../lib/dashboards/context';
+import { adkApi } from '../../lib/agent/adk-api';
 import { getCurrentUser } from '../../lib/auth';
 import TileChartShell from './TileChartShell';
 

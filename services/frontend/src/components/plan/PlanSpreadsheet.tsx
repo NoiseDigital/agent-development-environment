@@ -13,7 +13,7 @@
 //   • Performance columns are read-only.
 //
 // Persistence:
-//   • Overrides + history live in localStorage today (see lib/user-plans.ts).
+//   • Overrides + history live in localStorage today (see lib/dashboards/user-plans.ts).
 //   • The seam is shaped so swapping to /api/plans is one file change.
 
 import { useCallback, useMemo, useState } from 'react';
@@ -29,7 +29,7 @@ import {
   loadLineHistory,
   saveLineEdit,
   type EditableLineField,
-} from '../../lib/user-plans';
+} from '../../lib/dashboards/user-plans';
 import { linePerformance } from '../../lib/plan-performance';
 import { usdCompact, pct } from '../../lib/format';
 import { getCurrentUser } from '../../lib/auth';

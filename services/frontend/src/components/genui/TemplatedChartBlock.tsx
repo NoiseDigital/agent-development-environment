@@ -14,7 +14,7 @@ import type { TemplatedChartProps } from '../../types/genui';
 import {
   applyTemplate,
   coerceTemplatedChartProps,
-} from '../../lib/vega-templates';
+} from '../../lib/charts/templates';
 import ChartBlock from './ChartBlock';
 
 export default function TemplatedChartBlock({ props }: { props: TemplatedChartProps }) {
@@ -23,10 +23,18 @@ export default function TemplatedChartBlock({ props }: { props: TemplatedChartPr
   // a malformed turn shouldn't take down the whole chat bubble.
   const spec = useMemo(() => {
     const coerced = coerceTemplatedChartProps(props);
-    if (!coerced) return null;
+    if (!coerced) {
+      console.warn('[TemplatedChartBlock] payload failed coercion', { props });
+      return null;
+    }
     try {
       return applyTemplate(coerced);
-    } catch {
+    } catch (err) {
+      // Log loudly: a malformed template here means the agent emitted
+      // a shape we recognise but can't realise (bad rows, unknown shape
+      // after coercion, etc.). Silent fallback used to mask this — surface
+      // it so the regression is visible during dev/QA.
+      console.warn('[TemplatedChartBlock] applyTemplate threw', { shape: coerced.shape, err });
       return null;
     }
   }, [props]);

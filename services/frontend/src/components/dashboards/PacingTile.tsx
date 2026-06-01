@@ -4,8 +4,8 @@
 
 import { useEffect, useState } from 'react';
 import { dashboardData } from '../../lib/dashboards';
-import { useDashboardFilters } from '../../lib/dashboard-filter-context';
-import { useDashboardRefresh } from '../../lib/dashboard-refresh-context';
+import { useDashboardFilters } from '../../lib/dashboards/filter-context';
+import { useDashboardRefresh } from '../../lib/dashboards/refresh-context';
 import { usdCompact } from '../../lib/format';
 import TileChartShell from './TileChartShell';
 

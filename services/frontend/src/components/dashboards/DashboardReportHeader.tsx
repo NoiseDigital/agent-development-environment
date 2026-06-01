@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import type { Dashboard } from '../../data/dashboards';
-import { isClientDashboard } from '../../lib/dashboard-access';
+import { isClientDashboard } from '../../lib/dashboards/access';
 import AccentColorPicker from './AccentColorPicker';
 
 // The branded report header band — client logo, report title, latest delivery
@@ -13,7 +13,7 @@ import AccentColorPicker from './AccentColorPicker';
 //
 // `deliveryDate` is a fully-formatted display string ("Just now", "5 min ago",
 // or an absolute date for older timestamps) — caller-prepared by
-// `lib/dashboard-refresh.formatRefreshTime`. Do NOT re-parse it as a date
+// `lib/dashboards/refresh.formatRefreshTime`. Do NOT re-parse it as a date
 // here: that's how we ended up with "Invalid Date" when the value was a
 // relative-time string.
 

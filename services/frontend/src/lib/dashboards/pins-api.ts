@@ -3,8 +3,8 @@
 // server-side means they survive across devices, reloads, and incognito
 // sessions, the same as session metadata and event ratings.
 
-import { apiRequest } from './http';
-import type { VegaSpec } from '../types/genui';
+import { apiRequest } from '../http';
+import type { VegaSpec } from '../../types/genui';
 
 const BASE_URL = process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'http://localhost:8080';
 

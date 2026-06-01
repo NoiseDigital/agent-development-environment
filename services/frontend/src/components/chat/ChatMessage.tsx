@@ -8,7 +8,7 @@ import ToolQueries from './ToolQueries';
 import { formatMessageTime } from '../../utils/timestamps';
 import { isAdmin } from '../../lib/auth';
 import type { ChatMessage as ChatMessageData } from '../../hooks/useChat';
-import type { Rating } from '../../lib/feedback-api';
+import type { Rating } from '../../lib/agent/feedback-api';
 
 // One chat message row — shared by the full chat panel (MessageList) and the
 // floating assistant. The two contexts differ only in spacing/sizing, captured

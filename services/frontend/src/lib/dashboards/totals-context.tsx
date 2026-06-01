@@ -21,9 +21,9 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { dashboardData, type MetricTotalsRow, type MetricSeriesRow } from './dashboards';
-import { useDashboardFilters } from './dashboard-filter-context';
-import { useDashboardRefresh } from './dashboard-refresh-context';
+import { dashboardData, type MetricTotalsRow, type MetricSeriesRow } from '.';
+import { useDashboardFilters } from './filter-context';
+import { useDashboardRefresh } from './refresh-context';
 
 interface WindowPair {
   current: { date_from: string; date_to: string };

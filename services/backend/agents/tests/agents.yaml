@@ -59,13 +59,17 @@ media_performance_agent:
   # forces a single-number reply when an analytical chart would be far more
   # useful. Asserted via the next case (multi-turn replay).
   - name: choices follow-up still produces a chart, not a scalar
+    # Single-metric weekly trend — goes through the templated fast path,
+    # not VegaChartsAgent. We assert templated_chart + forbid VegaChartsAgent
+    # so a regression that re-routes through the subagent (~1.5-2s LLM call)
+    # is caught here, not in production.
     message: |
       Which metric(s) are you interested in? → Spend
       What time range? → All time (2023-07-10 to 2025-11-01)
       How would you like to see it? → Trend over time
     expect:
-      ui: chart
-      tools: [VegaChartsAgent]
+      ui: templated_chart
+      forbidden_tools: [VegaChartsAgent]
 
   # ── Chart branch — TEMPLATED FAST PATH (no VegaChartsAgent) ──────────────
   # Common shapes go through the templated_chart envelope: one LLM call
@@ -101,12 +105,14 @@ media_performance_agent:
       no_ui: true
       tools: true   # data tool to ground the number is fine
 
-  # The same time window, asked WITH a chart-trigger word, DOES get a chart.
-  - name: chart-trigger word on a time window promotes to branch 2
+  # The same time window, asked WITH a chart-trigger word, DOES get a chart —
+  # via the templated fast path, not VegaChartsAgent.
+  - name: chart-trigger word on a time window promotes to branch 2 (templated)
     message: "Show me weekly spend in 2024."
     expect:
-      ui: chart
-      tools: [VegaChartsAgent]
+      ui: templated_chart
+      tools: [performance_trend]
+      forbidden_tools: [VegaChartsAgent]
 
   # An EXPLICIT scalar suppression stays scalar (unchanged).
   - name: user explicitly requests only the number → scalar
@@ -128,6 +134,9 @@ media_performance_agent:
   #   - not refuse, not echo the preamble back.
 
   - name: dashboard context preamble is tolerated, not echoed
+    # Identical chart request to the templated case above, just with the
+    # floating-assistant preamble prepended. The agent must IGNORE the
+    # preamble (no echo) and still route through the templated fast path.
     message: |
       [Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=view]
       Active tab: Overall
@@ -140,8 +149,8 @@ media_performance_agent:
 
       Plot weekly spend in 2024 as a line chart.
     expect:
-      ui: chart
-      tools: [VegaChartsAgent]
+      ui: templated_chart
+      forbidden_tools: [VegaChartsAgent]
 
   - name: dashboard context with scalar request still goes scalar
     message: |

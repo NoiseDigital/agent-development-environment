@@ -4,7 +4,7 @@
 // consistent. Theming (colors, axes, fonts) comes from vega-theme via VegaChart;
 // these builders only describe data + marks + encoding.
 
-import type { VegaSpec } from '../types/genui';
+import type { VegaSpec } from '../../types/genui';
 
 type Row = Record<string, string | number>;
 

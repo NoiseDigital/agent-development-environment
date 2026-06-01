@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useChatContext } from '../../../contexts/ChatContext';
-import type { Session } from '../../../lib/adk-api';
+import type { Session } from '../../../lib/agent/adk-api';
 
 /**
  * /chat/[agentId] — picks a session for the agent:

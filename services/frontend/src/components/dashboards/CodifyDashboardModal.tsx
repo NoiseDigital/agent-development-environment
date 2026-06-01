@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { clientDashboards, type Dashboard } from '../../data/dashboards';
 import { saveCodificationRequest, type CodifyTarget } from '../../lib/codification-requests';
-import { isClientDashboard } from '../../lib/dashboard-access';
+import { isClientDashboard } from '../../lib/dashboards/access';
 import { showToast } from '../../lib/toast';
 
 // "Submit for codification" — a media-team user hands an internal dashboard to

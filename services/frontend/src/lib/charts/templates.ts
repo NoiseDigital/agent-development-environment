@@ -27,8 +27,8 @@ import {
   barSpec,
   paretoSpec,
   singleMetricLineSpec,
-} from './vega-specs';
-import type { VegaSpec } from '../types/genui';
+} from './specs';
+import type { VegaSpec } from '../../types/genui';
 
 export type TemplatedShape = 'weekly_trend' | 'bar_by_dim' | 'pareto';
 
@@ -99,14 +99,31 @@ export function coerceTemplatedChartProps(input: unknown): TemplatedChartProps |
     return null;
   }
   if (!Array.isArray(p.rows)) return null;
+  // Coerce common variants the agent might pass through:
+  //   - value as a numeric string (BigQuery sometimes serialises NUMERIC /
+  //     INT64 as a string when forwarded through the JSON envelope) — was a
+  //     real "chart disappears on refetch" bug because every row was rejected.
+  //   - name as a Date or number — stringify so the temporal/nominal axis
+  //     gets a plain string.
   const cleanRows = p.rows
-    .filter(
-      (r): r is { name: string; value: number } =>
-        !!r &&
-        typeof r === 'object' &&
-        typeof (r as { name?: unknown }).name === 'string' &&
-        typeof (r as { value?: unknown }).value === 'number',
-    );
+    .map((r): { name: string; value: number } | null => {
+      if (!r || typeof r !== 'object') return null;
+      const rawName = (r as { name?: unknown }).name;
+      const rawValue = (r as { value?: unknown }).value;
+      const name =
+        typeof rawName === 'string' ? rawName
+        : typeof rawName === 'number' ? String(rawName)
+        : rawName instanceof Date ? rawName.toISOString().slice(0, 10)
+        : null;
+      const value =
+        typeof rawValue === 'number' ? rawValue
+        : typeof rawValue === 'string' && rawValue.trim() !== '' && !Number.isNaN(Number(rawValue))
+          ? Number(rawValue)
+        : null;
+      if (name === null || value === null || !Number.isFinite(value)) return null;
+      return { name, value };
+    })
+    .filter((r): r is { name: string; value: number } => r !== null);
   if (cleanRows.length === 0) return null;
   return {
     shape: p.shape,

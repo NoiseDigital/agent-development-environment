@@ -4,7 +4,7 @@
 // data you widen or narrow without touching a renderer. Every spec passes
 // through checkVegaSpec before it reaches the screen (see VegaChart).
 
-import type { VegaSpec } from '../types/genui';
+import type { VegaSpec } from '../../types/genui';
 
 /** Mark types the agent is permitted to use. Narrow this to lock things down
  *  (e.g. just bar/line/area to mirror today's charts); widen it to open up. */

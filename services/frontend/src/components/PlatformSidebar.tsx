@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, type ReactNode } from 'react';
 import Image from 'next/image';
 import { agentConfigurations } from '../config/agent-config';
-import { adkApi } from '../lib/adk-api';
+import { adkApi } from '../lib/agent/adk-api';
 import { useResizable } from '../hooks/useResizable';
 import { useSidebarCollapsed } from '../contexts/SidebarContext';
 import ResizeHandle from './ResizeHandle';

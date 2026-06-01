@@ -5,8 +5,8 @@ import {
   isPinnable,
   canShareExternally,
   dashboardTitle,
-} from './dashboard-access';
-import type { Dashboard } from '../data/dashboards';
+} from './access';
+import type { Dashboard } from '../../data/dashboards';
 
 // Minimal Dashboard fixture — the predicates only inspect `ownership`,
 // `client`, and `name`, so everything else is shaped-but-unused.

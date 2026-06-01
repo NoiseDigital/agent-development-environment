@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkVegaSpec } from './vega-guard';
+import { checkVegaSpec } from './guard';
 
 describe('vega-guard.checkVegaSpec', () => {
   it('allows a simple allow-listed bar chart', () => {

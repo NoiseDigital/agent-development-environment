@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   applyTemplate,
   coerceTemplatedChartProps,
-} from './vega-templates';
+} from './templates';
 
 describe('applyTemplate', () => {
   const rows = [
@@ -71,5 +71,49 @@ describe('coerceTemplatedChartProps', () => {
   it('rejects a non-object payload', () => {
     expect(coerceTemplatedChartProps(null)).toBeNull();
     expect(coerceTemplatedChartProps('hi')).toBeNull();
+  });
+
+  // Real-world refetch regression: BigQuery NUMERIC / INT64 columns sometimes
+  // get serialised as strings when the agent forwards them through the JSON
+  // envelope. The strict-number filter dropped EVERY row → coerce returned
+  // null → TemplatedChartBlock rendered the malformed placeholder → "chart
+  // disappeared when I came back to the chat". Tolerate numeric strings.
+  it('coerces numeric-string values (BigQuery → JSON round-trip)', () => {
+    const r = coerceTemplatedChartProps({
+      shape: 'bar_by_dim',
+      rows: [
+        { name: 'Meta', value: '48000' },
+        { name: 'YouTube', value: '41000.5' },
+      ],
+    });
+    expect(r?.rows).toEqual([
+      { name: 'Meta', value: 48000 },
+      { name: 'YouTube', value: 41000.5 },
+    ]);
+  });
+
+  it('drops rows whose value is unparseable but keeps the parseable ones', () => {
+    const r = coerceTemplatedChartProps({
+      shape: 'bar_by_dim',
+      rows: [
+        { name: 'A', value: 10 },
+        { name: 'B', value: 'not a number' },
+        { name: 'C', value: '' },
+        { name: 'D', value: null },
+        { name: 'E', value: 20 },
+      ],
+    });
+    expect(r?.rows).toEqual([
+      { name: 'A', value: 10 },
+      { name: 'E', value: 20 },
+    ]);
+  });
+
+  it('rejects values that parse to Infinity / NaN (e.g. "Infinity")', () => {
+    const r = coerceTemplatedChartProps({
+      shape: 'bar_by_dim',
+      rows: [{ name: 'X', value: 'Infinity' }, { name: 'Y', value: 'NaN' }],
+    });
+    expect(r).toBeNull();
   });
 });

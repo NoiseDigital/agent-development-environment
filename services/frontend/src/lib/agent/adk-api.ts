@@ -1,5 +1,5 @@
 // API client for ADK server
-import { getAgentEndpoints } from '../config/agent-config';
+import { getAgentEndpoints } from '../../config/agent-config';
 
 // Agent endpoint configuration (imported from centralized config)
 export interface AgentEndpoint {
@@ -176,21 +176,10 @@ export class ADKApiClient {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6).trim();
-          if (!data || data === '[DONE]') continue;
-          try {
-            yield JSON.parse(data) as Event;
-          } catch {
-            // skip malformed SSE lines
-          }
-        }
+        const chunk = decoder.decode(value, { stream: true });
+        const parsed = parseSseChunk(buffer, chunk);
+        buffer = parsed.buffer;
+        for (const event of parsed.events) yield event;
       }
     } finally {
       reader.releaseLock();
@@ -243,3 +232,39 @@ export class ADKApiClient {
 }
 
 export const adkApi = new ADKApiClient();
+
+/** Parse one fetch-stream chunk into the events it carries, plus the
+ *  trailing buffer (last unterminated line) for the next call.
+ *
+ *  ADK's `/run_sse` emits Server-Sent Events lines of the form
+ *    data: {...JSON event...}\n
+ *    data: [DONE]\n
+ *  The fetch stream delivers arbitrary-size chunks — a single event JSON
+ *  may be split across two chunks. We accumulate until we see a `\n`,
+ *  then parse each completed `data: ...` line. Pure so SSE handling is
+ *  unit-testable (no network) — the streamSSE generator just glues it
+ *  to the fetch reader. */
+export function parseSseChunk(
+  carryBuffer: string,
+  chunk: string,
+): { events: Event[]; buffer: string } {
+  const merged = carryBuffer + chunk;
+  const lines = merged.split('\n');
+  // Final element is the partial trailing line (or '' if the chunk ended
+  // on a newline) — carry it into the next call.
+  const buffer = lines.pop() ?? '';
+  const events: Event[] = [];
+  for (const line of lines) {
+    if (!line.startsWith('data: ')) continue;
+    const data = line.slice(6).trim();
+    if (!data || data === '[DONE]') continue;
+    try {
+      events.push(JSON.parse(data) as Event);
+    } catch (err) {
+      // Surface malformed lines instead of swallowing — a server-side
+      // serialization regression should be visible in the console.
+      console.warn('[adk-api] dropped malformed SSE line', { line, err });
+    }
+  }
+  return { events, buffer };
+}

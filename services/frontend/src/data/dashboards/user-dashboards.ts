@@ -9,7 +9,7 @@
 // "owned"), not by a client, and they always use the standard tab set.
 
 import { clientBySlug } from '../clients';
-import type { UserDashboardSpec } from '../../lib/user-dashboards';
+import type { UserDashboardSpec } from '../../lib/dashboards/user-dashboards';
 import type { Dashboard } from './types';
 import { buildStandardTabs } from './tabs';
 

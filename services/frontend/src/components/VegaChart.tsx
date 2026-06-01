@@ -11,8 +11,8 @@
 import dynamic from 'next/dynamic';
 import { useState, useRef, useEffect, type ComponentType } from 'react';
 import type { VegaSpec } from '../types/genui';
-import { vegaDarkTheme } from '../lib/vega-theme';
-import { checkVegaSpec } from '../lib/vega-guard';
+import { vegaDarkTheme } from '../lib/charts/theme';
+import { checkVegaSpec } from '../lib/charts/guard';
 import { compactNum } from '../lib/compact-num';
 import ChartActions from './ChartActions';
 

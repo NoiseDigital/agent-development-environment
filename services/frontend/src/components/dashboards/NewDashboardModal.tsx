@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { saveUserDashboard } from '../../lib/user-dashboards';
+import { saveUserDashboard } from '../../lib/dashboards/user-dashboards';
 import { newId } from '../../lib/id';
 import { listClients, clientBySlug, type Client } from '../../data/clients';
 import { dashboardData, type NamedValue } from '../../lib/dashboards';

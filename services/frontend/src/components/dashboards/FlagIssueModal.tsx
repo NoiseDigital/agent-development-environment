@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { Dashboard } from '../../data/dashboards';
 import { saveIssueReport, type IssueArea } from '../../lib/issue-reports';
-import { dashboardTitle } from '../../lib/dashboard-access';
+import { dashboardTitle } from '../../lib/dashboards/access';
 import { showToast } from '../../lib/toast';
 
 // "Flag an issue" — a user reports a problem with a dashboard (wrong data, a

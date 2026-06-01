@@ -9,9 +9,9 @@ import {
   type MetricKey,
   type NamedValue,
 } from '../../lib/dashboards';
-import { useDashboardFilters } from '../../lib/dashboard-filter-context';
-import { useDashboardRefresh } from '../../lib/dashboard-refresh-context';
-import { paretoSpec } from '../../lib/vega-specs';
+import { useDashboardFilters } from '../../lib/dashboards/filter-context';
+import { useDashboardRefresh } from '../../lib/dashboards/refresh-context';
+import { paretoSpec } from '../../lib/charts/specs';
 import VegaChart from '../VegaChart';
 import TileChartShell from './TileChartShell';
 import type { BqBreakdownSource } from './BreakdownTile';

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { enrichAgentSpec } from './enrich-vega-spec';
+import { enrichAgentSpec } from './enrich-spec';
 
 describe('enrichAgentSpec', () => {
   it('adds compactNum + $ format to a currency quantitative y axis', () => {

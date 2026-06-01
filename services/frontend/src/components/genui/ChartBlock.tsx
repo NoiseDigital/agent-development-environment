@@ -3,21 +3,18 @@
 import { useMemo, useState } from 'react';
 import type { VegaSpec } from '../../types/genui';
 import VegaChart from '../VegaChart';
-import { useDashboardEdit } from '../../lib/dashboard-edit-context';
-import { pinsApi } from '../../lib/pins-api';
-import { enrichAgentSpec } from '../../lib/enrich-vega-spec';
-import SaveToDashboardMenu from '../chat/SaveToDashboardMenu';
+import { useDashboardEdit } from '../../lib/dashboards/edit-context';
+import { pinsApi } from '../../lib/dashboards/pins-api';
+import { enrichAgentSpec } from '../../lib/charts/enrich-spec';
 
-// One `chart` GenUI block. Wraps VegaChart with a "Save to dashboard"
-// affordance. Two flavours, picked by context:
+// One `chart` GenUI block. Wraps VegaChart with a save affordance.
 //
-//   1. INSIDE a dashboard edit-mode context — the target tab is already
-//      implied by where the user is, so we keep the one-click "Save to
-//      <tab>" button.
-//   2. OUTSIDE that context (normal chat surface, AnalyzeAssistantPanel,
-//      etc.) — we show SaveToDashboardMenu, a dropdown that lists the
-//      user's personal reports and includes a "Create new personal report"
-//      affordance. Same hierarchy as the dashboards listing page.
+//   • INSIDE a dashboard edit-mode context, the target tab is implied by
+//     where the user is, so we render a one-click "Save to <tab>" button.
+//   • OUTSIDE that context (normal chat, AnalyzeAssistantPanel, etc.) we
+//     rely on the kebab inside the chart card (ChartActions, surfaced via
+//     `saveable`) — it already handles dashboard + tab picking AND has a
+//     "Create new personal report" affordance. No second button needed.
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -36,27 +33,21 @@ export default function ChartBlock({ spec }: { spec: VegaSpec }) {
       await pinsApi.create(editCtx.dashboardId, editCtx.tabId, spec);
       setState('saved');
       editCtx.onPinned();
-    } catch {
+    } catch (err) {
+      console.warn('[ChartBlock] quick-save pin failed', editCtx.dashboardId, editCtx.tabId, err);
       setState('error');
     }
   };
 
-  // ── Path 2: chat-only context (most agent-generated charts) ───────────
-  // Show the dashboard-picker menu — pick any personal report or create
-  // a fresh one inline. No dashboard-edit context needed.
+  // Chat-only path — the in-card kebab (`saveable`) carries the full
+  // save-to-dashboard + create-new flow, no extra button needed.
   if (!editCtx?.canGenerate) {
-    return (
-      <div className="space-y-1.5">
-        <VegaChart spec={enriched} saveable />
-        <div className="flex justify-end">
-          <SaveToDashboardMenu spec={spec} />
-        </div>
-      </div>
-    );
+    return <VegaChart spec={enriched} saveable />;
   }
 
-  // ── Path 1: inside a dashboard in edit mode ──────────────────────────
-  // Target tab is implied; keep the one-click flow.
+  // Inside a dashboard in edit mode — target tab is implied; keep the
+  // one-click flow. The kebab still works as a secondary path (pick a
+  // different dashboard, export, etc.).
   const label =
     state === 'saving' ? 'Saving…'
     : state === 'saved' ? `Saved to ${editCtx.tabLabel}`

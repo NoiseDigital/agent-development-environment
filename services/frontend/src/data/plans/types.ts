@@ -10,7 +10,7 @@
 // plan IS the join key — no second mapping table required.
 //
 // Nothing in this file knows about persistence or any specific client —
-// it's pure structure. The localStorage shim lives in `lib/user-plans.ts`;
+// it's pure structure. The localStorage shim lives in `lib/dashboards/user-plans.ts`;
 // the per-client seed lives in `clients/<code>.ts`.
 
 /** Phase of a campaign's lifecycle — must match `campaign_phase` values in BQ. */

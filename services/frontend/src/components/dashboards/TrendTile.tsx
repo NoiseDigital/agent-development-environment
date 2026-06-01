@@ -7,10 +7,10 @@ import { useEffect, useState } from 'react';
 import {
   singleMetricLineSpec,
   dualMetricLineSpec,
-} from '../../lib/vega-specs';
-import { useDashboardTotals } from '../../lib/dashboard-totals-context';
-import { useDashboardFilters } from '../../lib/dashboard-filter-context';
-import { useDashboardRefresh } from '../../lib/dashboard-refresh-context';
+} from '../../lib/charts/specs';
+import { useDashboardTotals } from '../../lib/dashboards/totals-context';
+import { useDashboardFilters } from '../../lib/dashboards/filter-context';
+import { useDashboardRefresh } from '../../lib/dashboards/refresh-context';
 import { dashboardData, type CampaignWindow, type MetricSeriesRow } from '../../lib/dashboards';
 import VegaChart from '../VegaChart';
 import TileChartShell from './TileChartShell';

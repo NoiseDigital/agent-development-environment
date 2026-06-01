@@ -9,8 +9,8 @@
 // keeping them named means a future rule (e.g. view-only shares) is a one-line
 // change here rather than a hunt across call sites.
 
-import type { Dashboard } from '../data/dashboards';
-import { getCurrentUser } from './auth';
+import type { Dashboard } from '../../data/dashboards';
+import { getCurrentUser } from '../auth';
 
 /** A client dashboard is defined in code and delivered to the end client. */
 export const isClientDashboard = (d: Dashboard): boolean => d.ownership === 'client';

@@ -5,7 +5,7 @@ import {
   parseJsonLoose,
   parseAgentResponse,
   streamingDisplayText,
-} from './agent-response';
+} from './response';
 
 describe('extractFirstJsonObject', () => {
   it('returns null when no object is present', () => {
@@ -242,6 +242,48 @@ describe('parseAgentResponse', () => {
     // dumping raw JSON into the chat which is far worse.
   });
 
+  // ── PROSE + TRAILING ENVELOPE DUMP — the screenshot regression ──────
+  // These reproduce the exact failure shown in the chat screenshot:
+  // the agent emits real prose first, then a *literal copy* of an
+  // envelope-shaped JSON block AFTER the prose. The dump itself may be
+  // malformed (truncated, missing quotes, missing closing braces). The
+  // bubble must show ONLY the prose — no `{`, `"text":`, `"ui":` leakage.
+
+  it('strips a trailing envelope dump that follows prose', () => {
+    const dump = '{\n  "text": "Both spend and impressions...",\n  "ui": [{"component":"chart","props":{"mark":"line"}}]\n}';
+    const raw = `Both spend and impressions show a pronounced seasonal trend, growing from $791K to $941K.\n\n${dump}`;
+    const r = parseAgentResponse(raw);
+    expect(r.content).toContain('Both spend and impressions show');
+    expect(r.content).not.toContain('"text"');
+    expect(r.content).not.toContain('"ui"');
+    expect(r.content).not.toContain('"component"');
+  });
+
+  it('strips a TRUNCATED envelope dump that follows prose (screenshot variant)', () => {
+    // Exact pattern from the user's screenshot: prose followed by a JSON
+    // block whose inner `text` field is cut off with no closing quote
+    // and no closing braces. extractFirstJsonObject can't recover it.
+    const truncated = '{\n  "text": "Both spend and impressions show a pronounced seasonal trend, consistently peaking to\n  "ui": [\n    {\n      "component": "chart",\n      "props": {\n        "title": "Spend and Impressions Over Time",';
+    const raw = `Both spend and impressions show a pronounced seasonal trend, growing from a peak of $791K in late 2023 to $941K in late 2024.\n\n${truncated}`;
+    const r = parseAgentResponse(raw);
+    expect(r.content).toContain('Both spend and impressions show');
+    expect(r.content).toContain('$941K');
+    expect(r.content).not.toContain('"text"');
+    expect(r.content).not.toContain('"ui"');
+    expect(r.content).not.toContain('"component"');
+    expect(r.content).not.toContain('"props"');
+  });
+
+  it('strips an envelope dump even with no leading prose (no real envelope wrapper)', () => {
+    // No prose lead AND no outer envelope — just a malformed envelope-
+    // shaped string. Should fall back to streamingDisplayText to at least
+    // surface the inner text field, not a wall of JSON.
+    const raw = '{\n  "text": "Spend grew steadily across 2024.",\n  "ui": [{ malformed }]\n}';
+    const r = parseAgentResponse(raw);
+    expect(r.content).toContain('Spend grew steadily');
+    expect(r.content).not.toContain('"ui"');
+  });
+
   it('tolerates inline `~~~` fences around a self-envelope dump', () => {
     const inner = '{"text":"x","ui":[{"component":"chart","props":{}}]}';
     const envelope = JSON.stringify({
@@ -288,5 +330,55 @@ describe('streamingDisplayText', () => {
     // saw as a stray bracket in the chat bubble.
     expect(streamingDisplayText('[\n  {"name":"2024-01-01"')).toBe('');
     expect(streamingDisplayText('intro [partial')).toBe('intro');
+  });
+
+  // ── SSE CHUNK BOUNDARY CASES — envelope split across deltas ───────────
+  // The agent's reply arrives as a sequence of `accumulated` snapshots
+  // (each delta appended). Every intermediate snapshot must extract a
+  // sane display string — no raw JSON, no half-escapes, no stray braces.
+
+  it('progresses cleanly through every prefix of a streamed envelope', () => {
+    // Simulate the SSE building up the envelope char-by-char. At NO point
+    // along the way should the bubble show raw JSON braces.
+    const full = '{"text":"Spend grew steadily through 2024.","ui":[{"component":"chart","props":{"mark":"line"}}]}';
+    const seen: string[] = [];
+    for (let i = 1; i <= full.length; i++) {
+      seen.push(streamingDisplayText(full.slice(0, i)));
+    }
+    // No prefix should leak a `{` or `}` into the displayed text.
+    for (const frame of seen) {
+      expect(frame, `frame leaked structural char: ${JSON.stringify(frame)}`)
+        .not.toMatch(/[{}]/);
+    }
+    // The final frame must equal the completed text field.
+    expect(seen[seen.length - 1]).toBe('Spend grew steadily through 2024.');
+  });
+
+  it('handles an envelope whose text field arrives split mid-escape sequence', () => {
+    // An SSE chunk boundary in the middle of a `\n` escape used to consume
+    // past the buffer. We must NOT emit a trailing `\` or eat the next char.
+    expect(streamingDisplayText('{"text":"line one\\')).toBe('line one');
+    expect(streamingDisplayText('{"text":"line one\\n')).toBe('line one\n');
+    expect(streamingDisplayText('{"text":"line one\\nline two')).toBe('line one\nline two');
+  });
+
+  it('handles a unicode escape arriving across chunk boundaries', () => {
+    // `\u00xx` requires 4 hex digits — if the chunk arrives with only 2,
+    // we must wait, not crash and not emit garbage.
+    expect(streamingDisplayText('{"text":"em\\u20')).toBe('em');
+    expect(streamingDisplayText('{"text":"em\\u2014 dash')).toBe('em— dash');
+  });
+
+  it('survives a chunked self-envelope-dump scenario without leaking JSON mid-stream', () => {
+    // The agent emits prose then accidentally begins dumping its own
+    // envelope. Every intermediate frame should show ONLY the prose lead;
+    // the start of the dump must never leak as raw braces.
+    const full = 'Spend grew steadily.\n\n{"text":"Spend grew steadily.","ui":[]}';
+    for (let i = 1; i <= full.length; i++) {
+      const frame = streamingDisplayText(full.slice(0, i));
+      // Plain string check — avoids the /s regex flag (es2018+).
+      expect(frame, `frame leaked JSON open-brace: ${JSON.stringify(frame)}`)
+        .not.toContain('{');
+    }
   });
 });

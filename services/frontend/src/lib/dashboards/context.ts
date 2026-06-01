@@ -22,7 +22,7 @@
 import type {
   DashboardTile,
   DashboardTab,
-} from '../data/dashboards';
+} from '../../data/dashboards';
 
 export type DashboardMode = 'view' | 'edit';
 

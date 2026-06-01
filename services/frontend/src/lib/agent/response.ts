@@ -6,7 +6,7 @@
 // Python literals (True / None) when paraphrasing tool output. These helpers
 // recover the envelope leniently so the UI never sees raw JSON in a bubble.
 
-import type { UIBlock, VegaSpec } from '../types/genui';
+import type { UIBlock, VegaSpec } from '../../types/genui';
 
 /** Extract the first complete, balanced JSON object from a string. Skips
  *  braces/brackets inside JSON string literals so a `"text": "{"` inside the
@@ -318,6 +318,24 @@ function isLikelyDataDump(parsed: unknown): boolean {
   return false;
 }
 
+/** Find the byte offset of the first `{` that opens an envelope-shaped
+ *  block — i.e., one whose forward span contains both `"text"` and `"ui"`
+ *  keys before any closing brace at the same depth. Lenient: matches even
+ *  when the envelope is malformed or truncated (no closing braces), which
+ *  is exactly the case `extractFirstJsonObject` can't recover. */
+function findEnvelopeStart(text: string): number {
+  const m = /\{[\s\S]*?"text"\s*:[\s\S]*?"ui"\s*:/.exec(text);
+  return m ? m.index : -1;
+}
+
+/** Threshold below which a prose lead before an embedded envelope is
+ *  treated as accidental noise (e.g. `Sure! {"text":"<answer>",...}`).
+ *  Above the threshold, the lead is treated as the agent's REAL message
+ *  and the envelope's `text` field is presumed to be a self-dump leak.
+ *  80 chars chosen by inspection: a real one-paragraph analyst response
+ *  is always longer; preamble like "Sure!" / "Here's the data:" is shorter. */
+const PROSE_LEAD_THRESHOLD = 80;
+
 /** Lenient parse of a completed agent response.
  *
  *  The agent's contract is "JSON only," but model output is never perfectly
@@ -329,9 +347,13 @@ function isLikelyDataDump(parsed: unknown): boolean {
  *
  *  Resolution order:
  *    1. The whole reply IS the envelope (after fence stripping).
- *    2. An envelope is embedded inside prose — use the envelope, with the
- *       prose BEFORE it as the text when the envelope omits its own.
- *    3. No envelope found — return the reply as plain text. */
+ *    2. An envelope is embedded inside prose — use the envelope, but if the
+ *       prose BEFORE it is substantial (>= PROSE_LEAD_THRESHOLD chars),
+ *       treat the envelope's `text` as a self-dump leak and keep the prose.
+ *    3. The reply LOOKS envelope-shaped but can't be parsed (malformed /
+ *       truncated). Salvage any prose lead; otherwise recover the inner
+ *       `text` value via `streamingDisplayText`.
+ *    4. No envelope shape at all — return the reply as plain text. */
 export function parseAgentResponse(text: string): ParsedAgentResponse {
   const stripped = stripCodeFence(text);
 
@@ -347,21 +369,24 @@ export function parseAgentResponse(text: string): ParsedAgentResponse {
   if (jsonStr) {
     const embedded = tryParseAgentJson(jsonStr);
     if (embedded) {
-      // The envelope wins. If it has no `text` field of its own, salvage any
-      // prose the agent wrote BEFORE the envelope and use that as text so the
-      // user gets a coherent narrative instead of an empty bubble.
-      if (!embedded.content) {
-        const at = stripped.indexOf(jsonStr);
-        const lead = at > 0 ? stripped.slice(0, at).trim() : '';
-        if (lead) embedded.content = lead;
+      const at = stripped.indexOf(jsonStr);
+      const lead = at > 0 ? stripped.slice(0, at).trim() : '';
+      // Two flavours of "prose lead":
+      //  • short ("Sure! " / "Here you go: ") → keep the envelope text;
+      //    the lead is just a friendly preamble.
+      //  • substantial (full paragraph) → the lead IS the agent's message
+      //    and the embedded envelope is an accidental self-dump (often
+      //    a truncated copy). Use the lead, keep the envelope's UI blocks.
+      if (lead && (!embedded.content || lead.length >= PROSE_LEAD_THRESHOLD)) {
+        embedded.content = lead;
       }
       embedded.content = scrubNestedEnvelope(embedded.content);
       return embedded;
     }
     // Found a `{...}` substring but couldn't parse it. If it LOOKS like an
-    // envelope (has the `text` and `ui` keys), fall through to the regex
-    // recovery below. Log so the regression is visible instead of just
-    // looking like a stale bubble.
+    // envelope (has the `text` and `ui` keys), fall through to Case 3.
+    // Log so the regression is visible instead of just looking like a
+    // stale bubble.
     if (/"text"\s*:/.test(jsonStr) && /"ui"\s*:/.test(jsonStr)) {
       console.warn(
         '[parseAgentResponse] envelope-shaped JSON failed to parse; using regex recovery',
@@ -370,13 +395,19 @@ export function parseAgentResponse(text: string): ParsedAgentResponse {
     }
   }
 
-  // Case 3: parse-clean extraction failed. If the raw text still LOOKS like
-  // an envelope (has both `text` and `ui` keys), recover the analyst's prose
-  // via `streamingDisplayText` so the bubble never shows a wall of raw JSON.
+  // Case 3: parse-clean extraction failed but the reply still LOOKS
+  // envelope-shaped. Find the first envelope-shaped opener (which may be
+  // truncated / malformed) and:
+  //   • if there's any prose BEFORE it, use that as the bubble content;
+  //   • otherwise recover the inner `text` value via `streamingDisplayText`
+  //     so the user at least sees a clean prose answer instead of raw JSON.
   // We can't recover the UI block here (the spec was malformed), so the
   // chart drops — but a clean text bubble degrades far better than raw JSON.
-  if (/^\s*[`~]{0,3}[\w]*\s*\{[\s\S]*"text"\s*:[\s\S]*"ui"\s*:/.test(stripped)) {
-    const recovered = streamingDisplayText(stripped).trim();
+  const envIdx = findEnvelopeStart(stripped);
+  if (envIdx !== -1) {
+    const lead = stripped.slice(0, envIdx).trim();
+    if (lead) return { content: lead };
+    const recovered = streamingDisplayText(stripped.slice(envIdx)).trim();
     if (recovered) return { content: recovered };
   }
 

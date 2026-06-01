@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { clientDashboards, dashboardFromSpec, type Dashboard } from '../../../data/dashboards';
-import { loadUserDashboards } from '../../../lib/user-dashboards';
+import { loadUserDashboards } from '../../../lib/dashboards/user-dashboards';
 import DashboardDetail from '../../../components/dashboards/DashboardDetail';
 
 // Per-dashboard route — every dashboard has its own URL (/dashboards/<id>).

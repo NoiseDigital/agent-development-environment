@@ -2,7 +2,7 @@
 // Names + the hidden (soft-deleted) flag are keyed by the ADK session identity
 // and persisted server-side. Soft-deletes survive across devices and reloads.
 
-import { apiRequest } from './http';
+import { apiRequest } from '../http';
 
 const BASE_URL = process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'http://localhost:8000';
 

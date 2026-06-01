@@ -28,7 +28,7 @@
 
 import type { VegaSpec } from '../types/genui';
 import { clients } from './media-model';
-import type { UserDashboardSpec } from '../lib/user-dashboards';
+import type { UserDashboardSpec } from '../lib/dashboards/user-dashboards';
 
 // ── Tile model ────────────────────────────────────────────────────────────────
 

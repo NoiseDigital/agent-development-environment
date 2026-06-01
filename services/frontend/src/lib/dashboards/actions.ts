@@ -7,9 +7,9 @@
 // Returns a short user-facing summary string so the Action block can
 // confirm what happened ("Pinned to Overall", "Banner → #047857").
 
-import type { ActionProps, VegaSpec } from '../types/genui';
+import type { ActionProps, VegaSpec } from '../../types/genui';
 import { pinsApi } from './pins-api';
-import { setDashboardOverride } from './dashboard-overrides';
+import { setDashboardOverride } from './overrides';
 import { isUserDashboard, saveUserDashboard, loadUserDashboards } from './user-dashboards';
 
 export interface DashboardActionContext {

@@ -4,8 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useChat } from '../../hooks/useChat';
 import { useChatAutoScroll } from '../../hooks/useChatAutoScroll';
-import { useDashboardEdit, useAddVizIntent } from '../../lib/dashboard-edit-context';
-import { buildDashboardContext } from '../../lib/dashboard-context';
+import { useDashboardEdit, useAddVizIntent } from '../../lib/dashboards/edit-context';
+import { buildDashboardContext } from '../../lib/dashboards/context';
 import ChatMessage from './ChatMessage';
 
 // Two agents power the floating assistant, picked by context:

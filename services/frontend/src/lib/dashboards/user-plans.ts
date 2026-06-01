@@ -18,8 +18,8 @@ import type {
   PlanCampaign,
   PlanEdit,
   PlanLine,
-} from '../data/plans/types';
-import { clientPlans } from '../data/plans/clients';
+} from '../../data/plans/types';
+import { clientPlans } from '../../data/plans/clients';
 
 const OVERRIDES_KEY = 'noise:plan-overrides';
 const HISTORY_KEY = 'noise:plan-history';

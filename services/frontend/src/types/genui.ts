@@ -109,7 +109,7 @@ export interface FiltersProps {
 /** Templated chart payload — the agent emits this for common shapes
  *  (weekly_trend, bar_by_dim, pareto) and the frontend applies a
  *  deterministic Vega-Lite template at render time. Skips the
- *  VegaChartsAgent subagent's LLM call entirely. See `lib/vega-templates.ts`.
+ *  VegaChartsAgent subagent's LLM call entirely. See `lib/charts/templates.ts`.
  *
  *  Kept as `Record<string, unknown>` here so the type module stays free of
  *  vega-template imports; the consumer narrows via `coerceTemplatedChartProps`. */

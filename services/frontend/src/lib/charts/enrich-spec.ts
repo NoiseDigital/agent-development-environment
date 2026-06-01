@@ -11,7 +11,7 @@
 //   - A crosshair rule + hover param overlay on line charts that don't
 //     already have one — same crosshair the dashboard trend tile uses.
 
-import type { VegaSpec } from '../types/genui';
+import type { VegaSpec } from '../../types/genui';
 
 const CURRENCY_FIELDS = /^(total_)?(spend|cost|budget|cpa|cpc|cpm)$/i;
 const PERCENT_FIELDS = /^(ctr|cvr|vcr|rate|share|engagement)$/i;
@@ -92,7 +92,7 @@ function isLineChartWithoutHover(spec: Record<string, unknown>): boolean {
 }
 
 /** Wrap a flat line spec into a layered spec with a crosshair rule overlay.
- *  Same shape as `singleMetricLineSpec` in lib/vega-specs.ts — critically,
+ *  Same shape as `singleMetricLineSpec` in lib/charts/specs.ts — critically,
  *  the `x` encoding is hoisted to the OUTER spec so BOTH layers inherit it.
  *  Without that hoist the rule layer has no x channel and the hover
  *  selection can't snap to a data point. */
@@ -177,7 +177,11 @@ function enrich(spec: VegaSpec, nested: boolean): VegaSpec {
       out = withCrosshair(out);
     }
     return out as VegaSpec;
-  } catch {
+  } catch (err) {
+    // Silent catches here used to mask the "agent's mark.color got
+    // stomped" class of bugs — surface the failure so a regression in
+    // enrichment shape is visible during dev/QA.
+    console.warn('[enrichAgentSpec] enrichment failed; rendering raw spec', err);
     return spec;
   }
 }

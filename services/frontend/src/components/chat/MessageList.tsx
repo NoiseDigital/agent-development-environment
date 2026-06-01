@@ -5,7 +5,7 @@ import { getAgentConfiguration } from '../../config/agent-config';
 import ChatMessage from './ChatMessage';
 import type { ChatMessage as ChatMessageData } from '../../hooks/useChat';
 import { useChatAutoScroll } from '../../hooks/useChatAutoScroll';
-import type { Rating } from '../../lib/feedback-api';
+import type { Rating } from '../../lib/agent/feedback-api';
 
 // MessageList — the full-height chat transcript. Owns scroll behaviour and the
 // cycling "thinking" verb; each row is rendered by the shared ChatMessage.

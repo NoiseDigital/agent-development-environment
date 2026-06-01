@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import type { DashboardTab, DashboardTile } from '../data/dashboards';
+import type { DashboardTab, DashboardTile } from '../../data/dashboards';
 import {
   buildDashboardContext,
   stripDashboardContext,
   tileManifestLine,
   tileManifestList,
-} from './dashboard-context';
+} from './context';
 
 // A small fixture covering the tile shapes the analyst is most likely to see.
 const KPI: DashboardTile = {

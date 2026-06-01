@@ -4,22 +4,22 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Layout } from 'react-grid-layout';
 import type { Dashboard, DashboardTile, ChartTile } from '../../data/dashboards';
-import { pinsApi, type PinnedChart } from '../../lib/pins-api';
+import { pinsApi, type PinnedChart } from '../../lib/dashboards/pins-api';
 import { invalidateDashboardCache } from '../../lib/dashboards';
 import {
   markDashboardRefreshed,
   formatRefreshTime,
-} from '../../lib/dashboard-refresh';
-import { canDelete, isClientDashboard, isEditable, isPinnable } from '../../lib/dashboard-access';
-import { deleteUserDashboard, isUserDashboard, saveUserDashboard } from '../../lib/user-dashboards';
-import { loadDashboardOverrides, setDashboardOverride } from '../../lib/dashboard-overrides';
+} from '../../lib/dashboards/refresh';
+import { canDelete, isClientDashboard, isEditable, isPinnable } from '../../lib/dashboards/access';
+import { deleteUserDashboard, isUserDashboard, saveUserDashboard } from '../../lib/dashboards/user-dashboards';
+import { loadDashboardOverrides, setDashboardOverride } from '../../lib/dashboards/overrides';
 import { newId } from '../../lib/id';
 import { isAdmin } from '../../lib/auth';
 import { showToast } from '../../lib/toast';
-import { DashboardEditProvider, fireAddVizIntent } from '../../lib/dashboard-edit-context';
-import { DashboardFilterProvider } from '../../lib/dashboard-filter-context';
-import { DashboardTotalsProvider } from '../../lib/dashboard-totals-context';
-import { DashboardRefreshProvider } from '../../lib/dashboard-refresh-context';
+import { DashboardEditProvider, fireAddVizIntent } from '../../lib/dashboards/edit-context';
+import { DashboardFilterProvider } from '../../lib/dashboards/filter-context';
+import { DashboardTotalsProvider } from '../../lib/dashboards/totals-context';
+import { DashboardRefreshProvider } from '../../lib/dashboards/refresh-context';
 import DashboardCanvas from './DashboardCanvas';
 import DashboardReportHeader from './DashboardReportHeader';
 import DashboardFilterBar from './DashboardFilterBar';
@@ -158,7 +158,7 @@ export default function DashboardDetail({
   // Header accent — base color from the dashboard / client × per-dashboard
   // override. The override store is read once on mount and updated optimistically
   // on every picker selection so the header re-renders instantly. Persisted in
-  // localStorage today (see `lib/dashboard-overrides`) so it survives reloads;
+  // localStorage today (see `lib/dashboards/overrides`) so it survives reloads;
   // moves to the DB when codified dashboards land.
   const [accentColor, setAccentColor] = useState(dashboard.accentColor);
   useEffect(() => {

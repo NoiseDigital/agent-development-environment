@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { Dashboard } from '../../data/dashboards';
-import { canShareExternally, dashboardTitle } from '../../lib/dashboard-access';
+import { canShareExternally, dashboardTitle } from '../../lib/dashboards/access';
 import { showToast } from '../../lib/toast';
 
 // A modern share dialog — people + roles + general access, in the shape users

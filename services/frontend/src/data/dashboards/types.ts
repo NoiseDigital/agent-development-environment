@@ -9,7 +9,7 @@
 // Nothing in this file knows about composition or any specific client —
 // it's pure structure. Adding a new tile shape means adding a new TileType
 // literal, a new <…>TileSpec, a member to the DashboardTile union, and an
-// entry to the manifest formatter (see lib/dashboard-context.ts) +
+// entry to the manifest formatter (see lib/dashboards/context.ts) +
 // the tile renderer switch in components/dashboards/DashboardCanvas.tsx.
 
 import type { VegaSpec } from '../../types/genui';

@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { toPng } from 'html-to-image';
 import { clientDashboards, dashboardFromSpec, type Dashboard } from '../data/dashboards';
-import { loadUserDashboards } from '../lib/user-dashboards';
-import { pinsApi } from '../lib/pins-api';
-import { dashboardTitle as dashTitle, isPinnable } from '../lib/dashboard-access';
+import { loadUserDashboards, saveUserDashboard } from '../lib/dashboards/user-dashboards';
+import { pinsApi } from '../lib/dashboards/pins-api';
+import { dashboardTitle as dashTitle, isPinnable } from '../lib/dashboards/access';
 import { saveIssueReport } from '../lib/issue-reports';
 import { showToast } from '../lib/toast';
+import { newId } from '../lib/id';
+import { specTitle, slug, chartToCsv } from '../lib/charts/export';
 import type { VegaSpec } from '../types/genui';
 
 interface ChartActionsProps {
@@ -19,20 +21,6 @@ interface ChartActionsProps {
   exportsOnly?: boolean;
 }
 
-/** A Vega-Lite spec's title may be a bare string or a { text } object. */
-function specTitle(spec: VegaSpec): string {
-  const t = spec.title;
-  if (typeof t === 'string') return t;
-  if (t && typeof t === 'object' && typeof (t as { text?: unknown }).text === 'string') {
-    return (t as { text: string }).text;
-  }
-  return 'chart';
-}
-
-function slug(s: string): string {
-  return (s || 'chart').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
-
 function triggerDownload(filename: string, href: string) {
   const a = document.createElement('a');
   a.href = href;
@@ -40,29 +28,16 @@ function triggerDownload(filename: string, href: string) {
   a.click();
 }
 
-// Flatten a Vega-Lite spec's inline data to CSV.
-function chartToCsv(spec: VegaSpec): string {
-  const values = (spec.data as { values?: unknown[] } | undefined)?.values;
-  if (!Array.isArray(values) || values.length === 0) return '';
-  const rows = values as Record<string, unknown>[];
-  const keys = Object.keys(rows[0]);
-  const cell = (v: unknown) =>
-    typeof v === 'string' && /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v ?? '';
-  return [
-    keys.join(','),
-    ...rows.map((row) => keys.map((k) => cell(row[k])).join(',')),
-  ].join('\n');
-}
-
 // "+" menu on chat / Analyze visuals: save to a dashboard, export PNG, export
 // CSV. Saving is a two-step pick — a dashboard, then which of its tabs — since
 // a dashboard's tiles live on tabs.
 export default function ChartActions({ chart, captureRef, exportsOnly = false }: ChartActionsProps) {
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<'menu' | 'dashboards' | 'tabs' | 'flag'>('menu');
+  const [view, setView] = useState<'menu' | 'dashboards' | 'tabs' | 'flag' | 'create-new'>('menu');
   const [picked, setPicked] = useState<Dashboard | null>(null);
   const [savedTo, setSavedTo] = useState<{ id: string; name: string; tab: string } | null>(null);
   const [flagNotes, setFlagNotes] = useState('');
+  const [newName, setNewName] = useState('');
 
   // Pinning is a runtime edit, so it can only target editable dashboards —
   // client dashboards are code-defined and immutable. User-created dashboards
@@ -78,6 +53,7 @@ export default function ChartActions({ chart, captureRef, exportsOnly = false }:
     setView('menu');
     setPicked(null);
     setFlagNotes('');
+    setNewName('');
   };
 
   const submitFlag = () => {
@@ -129,11 +105,44 @@ export default function ChartActions({ chart, captureRef, exportsOnly = false }:
 
   const saveToTab = (tab: { id: string; label: string }) => {
     if (!picked) return;
-    // Fire-and-forget: optimistic close. A failure surfaces as the chart not
-    // appearing on the target dashboard, which the user discovers naturally;
-    // we don't block the close on the network round-trip.
-    void pinsApi.create(picked.id, tab.id, chart).catch(() => {});
     const target = { id: picked.id, name: dashTitle(picked), tab: tab.label };
+    // Optimistic close so the kebab doesn't feel laggy. Surface failures via
+    // toast + console so the user knows the save didn't persist (silent
+    // catches here used to mask broken pinsApi calls).
+    void pinsApi.create(picked.id, tab.id, chart).catch((err) => {
+      console.warn('[ChartActions] pin to existing failed', picked.id, tab.id, err);
+      showToast({ message: `Couldn't save to ${target.name} · ${target.tab}. Try again.`, tone: 'error' });
+      setSavedTo(null);
+    });
+    close();
+    setSavedTo(target);
+    window.setTimeout(() => setSavedTo(null), 6000);
+  };
+
+  // "+ Create new personal report" flow from inside the dashboards picker.
+  // Mirrors the saveUserDashboard shape NewDashboardModal writes, then pins
+  // the chart to the new dashboard's overall tab so the user lands on a
+  // populated report.
+  const createAndPin = () => {
+    const name = newName.trim() || defaultPersonalReportName();
+    const id = newId();
+    saveUserDashboard({
+      id,
+      name,
+      campaignId: 'all',
+      defaultTabId: 'overall',
+      createdAt: new Date().toISOString(),
+    });
+    const target = { id, name, tab: 'Overall' };
+    void pinsApi.create(id, 'overall', chart).catch((err) => {
+      console.warn('[ChartActions] create + pin failed', id, err);
+      showToast({ message: `Created "${name}" but couldn't pin the chart. Open the report to add it manually.`, tone: 'error' });
+    });
+    // Keep the new dashboard visible in the picker for follow-up saves.
+    setUserDashboards((prev) => [
+      dashboardFromSpec({ id, name, campaignId: 'all', defaultTabId: 'overall', createdAt: new Date().toISOString() }),
+      ...prev,
+    ]);
     close();
     setSavedTo(target);
     window.setTimeout(() => setSavedTo(null), 6000);
@@ -249,6 +258,18 @@ export default function ChartActions({ chart, captureRef, exportsOnly = false }:
             {view === 'dashboards' && (
               <>
                 <BackHeader label="Choose a dashboard" onClick={() => setView('menu')} />
+                <button
+                  type="button"
+                  onClick={() => setView('create-new')}
+                  className="flex w-full items-center gap-2.5 border-b border-zinc-800/60 px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-800 hover:text-white"
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-dashed border-zinc-600 text-zinc-400">
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </span>
+                  <span className="flex-1">Create new personal report</span>
+                </button>
                 {editableDashboards.length > 0 ? (
                   editableDashboards.map((d) => (
                     <button
@@ -283,6 +304,45 @@ export default function ChartActions({ chart, captureRef, exportsOnly = false }:
               </>
             )}
 
+            {view === 'create-new' && (
+              <>
+                <BackHeader label="New personal report" onClick={() => setView('dashboards')} />
+                <div className="px-3 pb-2 pt-1">
+                  <p className="mb-1.5 text-[10px] text-zinc-500">
+                    Pin <span className="text-zinc-300">{specTitle(chart)}</span> to a brand-new report.
+                  </p>
+                  <input
+                    autoFocus
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') createAndPin();
+                      if (e.key === 'Escape') setView('dashboards');
+                    }}
+                    placeholder={defaultPersonalReportName()}
+                    className="w-full rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-[11px] text-white placeholder-zinc-600 focus:border-zinc-600 focus:outline-none"
+                  />
+                  <div className="mt-2 flex justify-end gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setView('dashboards')}
+                      className="rounded-md px-2 py-1 text-[10px] font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={createAndPin}
+                      className="rounded-md bg-white px-2.5 py-1 text-[10px] font-semibold text-black transition-colors hover:bg-zinc-200"
+                    >
+                      Create + pin
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
             {view === 'tabs' && picked && (
               <>
                 <BackHeader label={`Add to ${dashTitle(picked)}`} onClick={() => setView('dashboards')} />
@@ -307,6 +367,14 @@ export default function ChartActions({ chart, captureRef, exportsOnly = false }:
       )}
     </div>
   );
+}
+
+// Short, timestamped default name so rapid-fire saves don't collapse into
+// identical names.
+function defaultPersonalReportName(): string {
+  const d = new Date();
+  const month = d.toLocaleString('en-US', { month: 'short' });
+  return `Personal Report — ${month} ${d.getDate()}`;
 }
 
 function BackHeader({ label, onClick }: { label: string; onClick: () => void }) {

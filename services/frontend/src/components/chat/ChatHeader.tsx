@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Session } from '../../lib/adk-api';
+import { Session } from '../../lib/agent/adk-api';
 import { getAgentConfiguration } from '../../config/agent-config';
 
 interface ChatHeaderProps {

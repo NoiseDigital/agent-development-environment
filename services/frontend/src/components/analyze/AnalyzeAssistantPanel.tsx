@@ -6,7 +6,7 @@
 // reads the current correlation result as a context preamble.
 //
 // The page passes in `contextPrefix` — a multi-line "[Analyze context]"
-// preamble built by `lib/analyze-context.ts`. Every send prepends it, so
+// preamble built by `lib/agent/analyze-context.ts`. Every send prepends it, so
 // the agent always has the freshest result in view even after the user
 // re-runs the analysis.
 

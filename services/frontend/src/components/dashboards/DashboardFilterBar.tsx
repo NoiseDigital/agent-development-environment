@@ -15,7 +15,7 @@ import {
 import {
   useDashboardFilters,
   type DashboardFilters,
-} from '../../lib/dashboard-filter-context';
+} from '../../lib/dashboards/filter-context';
 import MultiSelectFilter from './MultiSelectFilter';
 
 interface FilterSpec {

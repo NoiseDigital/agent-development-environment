@@ -11,7 +11,7 @@
 // back to its default analyse-only behaviour.
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { DashboardTab } from '../data/dashboards';
+import type { DashboardTab } from '../../data/dashboards';
 
 export interface DashboardEditContextValue {
   dashboardId: string;

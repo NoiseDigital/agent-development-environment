@@ -9,7 +9,7 @@
 // so a card with an anomaly badge stays exactly the same height as one
 // without. This keeps the KPI strip in unison across the row.
 
-import { useDashboardTotals } from '../../lib/dashboard-totals-context';
+import { useDashboardTotals } from '../../lib/dashboards/totals-context';
 import { formatByKey, type FormatKey } from '../../lib/format';
 import type { MetricTotalsRow } from '../../lib/dashboards';
 import Sparkline from '../Sparkline';

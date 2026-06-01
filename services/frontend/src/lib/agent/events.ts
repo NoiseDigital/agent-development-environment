@@ -3,10 +3,10 @@
 // state updates, but the logic lives here so it's directly testable.
 
 import type { Event as AdkEvent } from './adk-api';
-import type { UIBlock } from '../types/genui';
-import { parseAgentResponse } from './agent-response';
-import { stripDashboardContext } from './dashboard-context';
-import { normalizeTimestamp } from '../utils/timestamps';
+import type { UIBlock } from '../../types/genui';
+import { parseAgentResponse } from './response';
+import { stripDashboardContext } from '../dashboards/context';
+import { normalizeTimestamp } from '../../utils/timestamps';
 
 /** One tool the agent invoked during a turn — name + arguments only; the SQL
  *  is reconstructed later from the toolbox catalog. */
@@ -30,6 +30,27 @@ export interface ChatMessage {
   toolCalls?: ToolCall[];
 }
 
+/** Data tools whose row shape almost always lands in a chart. When the agent
+ *  fires one of these, we commit to "chart on the way" early so ChatMessage
+ *  can show the chart skeleton in the bubble's tile slot — covers the
+ *  templated-chart fast path where the root agent never calls VegaChartsAgent.
+ *  If the agent ultimately responds with text only, the skeleton unmounts
+ *  the moment text streams in (it's gated on `blocks.length === 0`). */
+const CHART_LIKELY_TOOLS = new Set([
+  'performance_trend',
+  'publisher_spend_breakdown',
+  'campaign_performance_comparison',
+  'market_group_breakdown',
+  'creative_format_breakdown',
+  'kpi_goal_breakdown',
+  'top_performing_campaigns',
+  'platform_engagement_metrics',
+  'conversion_funnel_data',
+  'budget_pacing',
+  'period_over_period',
+  'breakdown_nested',
+]);
+
 /** What the agent is doing right now, derived from an event. `working` is the
  *  process label shown by the spinner BEFORE any text streams. `uiKind` means
  *  a chart / choices block is on the way — it drives the more specific label
@@ -52,6 +73,9 @@ export function phaseFromEvent(
     if (/vegacharts|charts?/i.test(fnName)) return { uiKind: 'chart' };
     if (/choices/i.test(fnName)) return { uiKind: 'choices' };
     if (/filter/i.test(fnName)) return { uiKind: 'filters' };
+    // Data tools that almost always end in a chart — commit to chart early
+    // so the skeleton appears during the data fetch on the templated path.
+    if (CHART_LIKELY_TOOLS.has(fnName)) return { uiKind: 'chart' };
     return { working: 'Querying the data' };
   }
   return null;
