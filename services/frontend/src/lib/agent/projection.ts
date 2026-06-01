@@ -95,11 +95,19 @@ export function deriveMessages(
     });
   } else if (stream.completed) {
     // The SSE has ended successfully — render the parsed reply. Skip if the
-    // committed events already include the matching event id (the session
-    // refetch picked it up); avoids briefly double-rendering during the
-    // window between snapshot and stream-cleanup.
+    // committed events already include the matching event (the session
+    // refetch picked it up). Match by event id when we have one, but ALSO
+    // fall back to (author + content + recent timestamp) — ADK sometimes
+    // re-stamps the event id on persistence, and without the content match
+    // the snapshot renders alongside the committed event as a duplicate.
     const eid = stream.completed.eventId;
-    const alreadyCommitted = !!eid && committed.some((m) => m.id === eid);
+    const c = stream.completed.content;
+    const alreadyCommitted = committed.some((m) =>
+      (!!eid && m.id === eid) ||
+      (m.author === stream.agentAuthor &&
+        m.content === c &&
+        Math.abs(m.timestamp - stream.startedAt) <= 30_000),
+    );
     if (!alreadyCommitted) {
       out.push({
         id: eid ?? stream.streamingId,

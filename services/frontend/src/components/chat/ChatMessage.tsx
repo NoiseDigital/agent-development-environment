@@ -80,12 +80,20 @@ export default function ChatMessage({
 }: ChatMessageProps) {
   const v = VARIANT[variant];
   const isAgent = message.author !== 'user';
-  const isThinking = message.isStreaming && message.content === '';
+  // Treat whitespace-only content as empty — the parser sometimes scrubs an
+  // envelope-dump down to a stray space/newline, and we don't want that to
+  // render as a thin "ghost" bubble with just a streaming cursor inside.
+  const hasContent = message.content.trim() !== '';
+  const isThinking = !!message.isStreaming && !hasContent;
   const blocks = showUi ? message.ui ?? [] : [];
+  // A non-streaming agent message with no prose AND no UI blocks has nothing
+  // to render — skip the bubble entirely instead of drawing an empty box.
+  const isAgentEmpty = isAgent && !message.isStreaming && !hasContent && blocks.length === 0;
   // Text has arrived but a chart / choices block is still being produced —
   // only now show the specific "what's being built" label, where it will land.
   const showUiLoader =
-    !!message.isStreaming && message.content !== '' && !!message.uiKind && blocks.length === 0;
+    !!message.isStreaming && hasContent && !!message.uiKind && blocks.length === 0;
+  if (isAgentEmpty) return null;
   const uiLoaderLabel =
     message.uiKind === 'choices' ? 'Creating selections' : 'Generating visualization';
 
@@ -99,7 +107,7 @@ export default function ChatMessage({
           <div className="group">
             {isThinking ? (
               <LoadingRow label={message.status || loadingLabel} v={v} />
-            ) : (
+            ) : hasContent ? (
               <div className={v.agentBubble}>
                 <div className={`prose prose-invert prose-sm max-w-none ${v.prose}`}>
                   <ReactMarkdown>{message.content}</ReactMarkdown>
@@ -108,7 +116,7 @@ export default function ChatMessage({
                   )}
                 </div>
               </div>
-            )}
+            ) : null}
 
             {showUiLoader && (
               <div className={v.uiGap}>

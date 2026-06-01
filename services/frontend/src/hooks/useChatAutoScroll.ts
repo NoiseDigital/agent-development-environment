@@ -70,15 +70,46 @@ export function useChatAutoScroll({
     }
   }, [messages, endRef]);
 
-  // 2) Reply finished → smooth-scroll its top to the top of the viewport.
+  // 2) Reply finished → smooth-scroll so the reader lands at the right spot.
+  //    • Reply has a UI block (chart / choices / filters) → scroll the BOTTOM
+  //      of the message to the bottom of the viewport. The visual is the
+  //      payoff of the reply; keeping it on-screen matters more than seeing
+  //      the prose lead. The user can still scroll up to re-read.
+  //    • Text-only reply → scroll its TOP to the top so the reader starts
+  //      at the beginning. block:'start' is browser-clamped so short replies
+  //      just sit fully visible.
   useEffect(() => {
     if (!lastMsgRef) return;
     const streaming = messages.some((m) => m.isStreaming);
     const justFinished = wasStreamingRef.current && !streaming;
     wasStreamingRef.current = streaming;
     if (!justFinished) return;
+    const last = messages[messages.length - 1];
+    const hasUi = !!last?.ui?.length;
     const id = setTimeout(() => {
-      lastMsgRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      lastMsgRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: hasUi ? 'end' : 'start',
+      });
+    }, FINISH_SCROLL_DELAY_MS);
+    return () => clearTimeout(id);
+  }, [messages, lastMsgRef]);
+
+  // 2b) UI block arrived AFTER the prose was already visible (e.g. the chart
+  //     skeleton swap to the real chart, or a templated_chart envelope
+  //     finishing). Smooth-scroll the bottom of the reply into view so the
+  //     visual is on-screen — only when the user is still pinned, so we
+  //     don't yank a reader who scrolled up.
+  const prevLastUiCountRef = useRef(0);
+  useEffect(() => {
+    if (!lastMsgRef) return;
+    const last = messages[messages.length - 1];
+    const uiCount = last?.ui?.length ?? 0;
+    const grew = uiCount > prevLastUiCountRef.current;
+    prevLastUiCountRef.current = uiCount;
+    if (!grew || !followStreamRef.current) return;
+    const id = setTimeout(() => {
+      lastMsgRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }, FINISH_SCROLL_DELAY_MS);
     return () => clearTimeout(id);
   }, [messages, lastMsgRef]);

@@ -114,6 +114,37 @@ describe('deriveMessages', () => {
     expect(reply.id).toBe('srv-1');
   });
 
+  it('dedupes the completed snapshot by (author + content + timestamp) when eventIds disagree', () => {
+    // Ghost-duplicate-bubble regression: ADK occasionally re-stamps the event
+    // id when persisting (SSE-final id !== committed event id). Without the
+    // content-match fallback, the snapshot renders alongside the committed
+    // event as a near-duplicate bubble.
+    const committedEnvelope = JSON.stringify({
+      text: 'To show you what is trending, I need to know which metric.',
+      ui: [{ component: 'choices', props: { questions: [] } }],
+    });
+    // Both timestamps in ms — same scale as production (Date.now() on the
+    // client + ADK seconds → ms via normalizeTimestamp on the server side).
+    const s = session('S1', [
+      userEv('u', 'show trending'),
+      agentEv('srv-real-id', committedEnvelope, 'MediaPerformanceAgent', 1700000010000),
+    ]);
+    const stream = baseStream({
+      startedAt: 1700000005000,
+      completed: {
+        content: 'To show you what is trending, I need to know which metric.',
+        ui: [{ component: 'choices', props: { questions: [] } }],
+        toolCalls: [],
+        // eventId from the SSE final differs from the persisted event id.
+        eventId: 'sse-different-id',
+      },
+    });
+    const out = deriveMessages(s, stream, true);
+    const replies = out.filter((m) => m.author === 'MediaPerformanceAgent');
+    expect(replies).toHaveLength(1);
+    expect(replies[0].id).toBe('srv-real-id');
+  });
+
   it('dedupes the completed snapshot once the session refetch has committed the matching event', () => {
     // The committed event id matches `stream.completed.eventId` — the
     // committed render is canonical, the snapshot must be suppressed.
