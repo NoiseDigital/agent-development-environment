@@ -28,6 +28,7 @@ export default function ChatSessionPage() {
     isLoadingApps,
     error,
     sessionNames,
+    aiRenamedIds,
     feedback,
     rateMessage,
     supportsVisualization,
@@ -90,6 +91,7 @@ export default function ChatSessionPage() {
         renameSession={renameSession}
         saveSessionName={saveSessionName}
         sessionNames={sessionNames}
+        aiRenamedIds={aiRenamedIds}
       />
 
       {/* Main */}
@@ -109,6 +111,7 @@ export default function ChatSessionPage() {
             currentSession={currentSession}
             error={error}
             sessionNames={sessionNames}
+            aiRenamedIds={aiRenamedIds}
           />
           <MessageList
             messages={messages}

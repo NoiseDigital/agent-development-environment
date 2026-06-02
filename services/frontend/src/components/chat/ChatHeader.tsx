@@ -3,12 +3,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { Session } from '../../lib/agent/adk-api';
 import { getAgentConfiguration } from '../../config/agent-config';
+import TypingName from './TypingName';
 
 interface ChatHeaderProps {
   selectedApp: string | null;
   currentSession: Session | null;
   error: string | null;
   sessionNames?: Record<string, string>;
+  /** Session ids whose name was just AI-generated — the header types out
+   *  the name char-by-char while membership lasts. */
+  aiRenamedIds?: Set<string>;
 }
 
 export default function ChatHeader({
@@ -16,11 +20,17 @@ export default function ChatHeader({
   currentSession,
   error,
   sessionNames = {},
+  aiRenamedIds,
 }: ChatHeaderProps) {
   const agentConfig = selectedApp ? getAgentConfiguration(selectedApp) : null;
   const sessionLabel = currentSession
     ? (sessionNames[currentSession.id] || agentConfig?.displayName || '')
     : (agentConfig?.displayName || '');
+  // Only the active session's name should type — the header has one slot.
+  const animateLabel =
+    !!currentSession &&
+    !!aiRenamedIds?.has(currentSession.id) &&
+    sessionLabel === sessionNames[currentSession.id];
 
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -40,7 +50,9 @@ export default function ChatHeader({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {selectedApp && sessionLabel && (
-            <h2 className="text-sm font-medium text-white truncate">{sessionLabel}</h2>
+            <h2 className="text-sm font-medium text-white truncate">
+              <TypingName name={sessionLabel} animate={animateLabel} />
+            </h2>
           )}
         </div>
 

@@ -129,6 +129,29 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
     }
   };
 
+  // Sessions whose name was just AI-generated. Consumers (ChatSidebar, ChatHeader)
+  // read this to decide whether to render the name with a typing animation.
+  // Auto-clears after the animation duration so a stale "AI-renamed" flag
+  // doesn't replay the typing on every re-render.
+  const [aiRenamedIds, setAiRenamedIds] = useState<Set<string>>(new Set());
+  const markAiRenamed = (sessionId: string, name: string) => {
+    setAiRenamedIds(prev => {
+      const next = new Set(prev);
+      next.add(sessionId);
+      return next;
+    });
+    // Clear after the TypingName animation completes (≈30ms per char + headroom).
+    const ms = Math.max(800, name.length * 32 + 500);
+    window.setTimeout(() => {
+      setAiRenamedIds(prev => {
+        if (!prev.has(sessionId)) return prev;
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
+    }, ms);
+  };
+
   // Load available apps on mount
   useEffect(() => {
     const loadApps = async () => {
@@ -639,6 +662,10 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
             // Bind to the origin session so a mid-flight session switch can't
             // misattribute the new title to whichever session is now active.
             saveSessionName(originSessionId, name);
+            // Flag for the typing animation in the sidebar + header. The
+            // animation is purely a display-layer effect — persistence above
+            // already wrote the final name.
+            markAiRenamed(originSessionId, name);
             setAllSessions(prev =>
               prev.map(s => s.id === originSessionId ? { ...s } : s)
             );
@@ -721,6 +748,9 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
       const name = cleanName(reply);
       if (!name) return null;
       saveSessionName(sessionId, name);
+      // Same display-layer flag as the auto-rename path — the sparkle-button
+      // result types itself out in the sidebar / header.
+      markAiRenamed(sessionId, name);
       return name;
     } catch (err) {
       setError(`Failed to rename session: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -791,6 +821,10 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
     isLoadingSessions,
     error,
     sessionNames,
+    /** Session ids whose name was just AI-generated. Consumers gate the
+     *  typing animation on membership in this set; it auto-clears after the
+     *  animation duration. */
+    aiRenamedIds,
     feedback,
     rateMessage,
     supportsVisualization,

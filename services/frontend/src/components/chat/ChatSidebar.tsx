@@ -6,6 +6,7 @@ import { getAgentConfiguration } from '../../config/agent-config';
 import { useResizable } from '../../hooks/useResizable';
 import { useSidebarCollapsed } from '../../contexts/SidebarContext';
 import ResizeHandle from '../ResizeHandle';
+import TypingName from './TypingName';
 import { normalizeTimestamp } from '../../utils/timestamps';
 
 const toDateKey = (ts: number) => new Date(ts).toLocaleDateString('en-CA');
@@ -33,6 +34,9 @@ interface ChatSidebarProps {
   renameSession?: (sessionId: string) => Promise<string | null>;
   saveSessionName: (sessionId: string, name: string) => void;
   sessionNames: Record<string, string>;
+  /** Session ids whose name was just AI-generated — each affected row's
+   *  display types out the new name char-by-char while membership lasts. */
+  aiRenamedIds?: Set<string>;
 }
 
 export default function ChatSidebar({
@@ -45,6 +49,7 @@ export default function ChatSidebar({
   renameSession,
   saveSessionName,
   sessionNames,
+  aiRenamedIds,
 }: ChatSidebarProps) {
   const { width, startResize } = useResizable({ initial: 320, min: 240, max: 460, edge: 'right' });
   const [collapsed, setCollapsed] = useSidebarCollapsed('chat');
@@ -91,7 +96,11 @@ export default function ChatSidebar({
     setEditDraft('');
   };
 
-  // Used in edit mode: fetches AI name and populates the draft input
+  // Used in edit mode: fetches AI name and types it into the draft input
+  // char-by-char so the rename feels alive instead of just popping in.
+  // The sidebar row's passive display is also animating (via TypingName +
+  // aiRenamedIds set by useChat); this handler animates the INPUT FIELD
+  // specifically since it's owned by local component state.
   const handleAiRenameToInput = async (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
     if (!renameSession || aiRenamingId) return;
@@ -99,9 +108,21 @@ export default function ChatSidebar({
     setAiRenamingId(sessionId);
     try {
       const name = await renameSession(sessionId);
-      if (name) {
-        if (editingId === sessionId) setEditDraft(name);
-        saveSessionName(sessionId, name);
+      // renameSession already calls saveSessionName + markAiRenamed inside
+      // useChat — we only need to animate the input field here.
+      if (name && editingId === sessionId) {
+        setEditDraft('');
+        let i = 0;
+        const TYPING_MS = 32;
+        const interval = window.setInterval(() => {
+          i += 1;
+          if (i >= name.length) {
+            setEditDraft(name);
+            window.clearInterval(interval);
+            return;
+          }
+          setEditDraft(name.slice(0, i));
+        }, TYPING_MS);
       }
     } finally {
       const elapsed = Date.now() - loadingStartedAt;
@@ -299,7 +320,14 @@ export default function ChatSidebar({
                           /* ── Normal display ── */
                           <div className="flex items-center gap-2 min-w-0">
                             <p className="text-sm text-white truncate flex-1 min-w-0">
-                              {displayName || <span className="text-zinc-400 italic">New chat</span>}
+                              {displayName ? (
+                                <TypingName
+                                  name={displayName}
+                                  animate={!!aiRenamedIds?.has(session.id)}
+                                />
+                              ) : (
+                                <span className="text-zinc-400 italic">New chat</span>
+                              )}
                             </p>
 
                             {/* Right side: buttons slide in from right, time always anchored */}
