@@ -107,9 +107,12 @@ function withCrosshair(spec: Record<string, unknown>): Record<string, unknown> {
   void _x;
   void _t;
   // Preserve the agent's mark properties (color, strokeWidth, opacity, …)
-  // when wrapping. We force `type: "line"` and `point: true` for the
-  // crosshair UX, but anything else the agent set — most importantly
-  // `color` for a "make the line green" turn — survives.
+  // when wrapping. We force `type: "line"` and DEFAULT `point: true` for
+  // the crosshair UX — but anything the agent set explicitly survives.
+  // `color`, `strokeWidth`, `point: false` (the "hide the dots" modify
+  // turn) all flow through. Previously we hardcoded `point: true` and the
+  // "hide the dots" follow-up appeared to no-op because this enrichment
+  // re-added the dots after the agent removed them.
   const originalMark = spec.mark;
   const baseMark =
     originalMark && typeof originalMark === 'object'
@@ -127,7 +130,9 @@ function withCrosshair(spec: Record<string, unknown>): Record<string, unknown> {
     encoding: x ? { x } : undefined,
     layer: [
       {
-        mark: { ...baseMark, type: 'line', point: true },
+        // `point` defaults to true (the crosshair UX), but an explicit
+        // value from the agent (true / false / object) wins.
+        mark: { type: 'line', point: true, ...baseMark },
         encoding: lineLayerEncoding,
       },
       {

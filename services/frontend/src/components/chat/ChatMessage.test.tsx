@@ -71,6 +71,31 @@ describe('ChatMessage — no ghost bubble for invisible/empty content', () => {
     }
   });
 
+  it('catches less-common invisible chars too (variation selectors, soft hyphen, Hangul fillers)', () => {
+    // The Default_Ignorable_Code_Point upgrade should cover every variant
+    // that renders to nothing but survives .trim(). These are the ones the
+    // older char-class regex MISSED:
+    const exotics = [
+      '­',          // soft hyphen
+      '️',          // variation selector-16
+      'ᅟ',          // Hangul Choseong filler
+      '᠎',          // Mongolian vowel separator
+      '͏',          // combining grapheme joiner
+      '­­​', // mixed exotics + ZWSP
+    ];
+    for (const ghost of exotics) {
+      cleanup();
+      render(
+        <ChatMessage
+          message={agent({ content: ghost, isStreaming: true })}
+          loadingLabel="Thinking"
+        />,
+      );
+      expect(document.querySelector('.rounded-2xl'), `bubble leaked for ${JSON.stringify(ghost)}`)
+        .toBeNull();
+    }
+  });
+
   it('DOES render a prose bubble when content has even one visible character', () => {
     render(<ChatMessage message={agent({ content: 'hi' })} />);
     expect(screen.getByText('hi')).toBeInTheDocument();

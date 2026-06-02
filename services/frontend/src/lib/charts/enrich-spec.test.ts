@@ -121,4 +121,45 @@ describe('enrichAgentSpec', () => {
     expect(layers[0].mark?.type).toBe('line');
     expect(layers[0].mark?.point).toBe(true);
   });
+
+  it('respects the agent\'s explicit `point: false` (the "hide the dots" follow-up)', () => {
+    // Regression: when the user clicked the "Hide the dots" suggestion
+    // pill, the agent edited its previous spec to `mark.point: false`,
+    // but the crosshair wrapper hardcoded `point: true` and the dots
+    // came back anyway — making the follow-up look broken.
+    const enriched = enrichAgentSpec({
+      mark: { type: 'line', color: 'green', point: false },
+      encoding: {
+        x: { field: 'name', type: 'temporal' },
+        y: { field: 'value', type: 'quantitative' },
+      },
+    }) as Record<string, unknown>;
+    const layers = enriched.layer as Array<{ mark?: { color?: string; type?: string; point?: boolean } }>;
+    expect(layers[0].mark?.point).toBe(false);
+    expect(layers[0].mark?.color).toBe('green');
+  });
+
+  it('preserves an explicit mark.point OBJECT (e.g. `point: { color: "red" }`)', () => {
+    const enriched = enrichAgentSpec({
+      mark: { type: 'line', point: { color: 'red', size: 80 } },
+      encoding: {
+        x: { field: 'name', type: 'temporal' },
+        y: { field: 'value', type: 'quantitative' },
+      },
+    }) as Record<string, unknown>;
+    const layers = enriched.layer as Array<{ mark?: { point?: unknown } }>;
+    expect(layers[0].mark?.point).toEqual({ color: 'red', size: 80 });
+  });
+
+  it('preserves the agent\'s explicit mark.strokeWidth (the "thinner line" follow-up)', () => {
+    const enriched = enrichAgentSpec({
+      mark: { type: 'line', strokeWidth: 1 },
+      encoding: {
+        x: { field: 'name', type: 'temporal' },
+        y: { field: 'value', type: 'quantitative' },
+      },
+    }) as Record<string, unknown>;
+    const layers = enriched.layer as Array<{ mark?: { strokeWidth?: number } }>;
+    expect(layers[0].mark?.strokeWidth).toBe(1);
+  });
 });

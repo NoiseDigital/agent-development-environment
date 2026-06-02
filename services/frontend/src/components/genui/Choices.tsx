@@ -131,7 +131,11 @@ export default function Choices({
 
   if (questions.length === 0) return null;
 
-  const intro = (props as LooseChoicesProps).intro;
+  // Accept `intro` (canonical) OR `title` (a common agent slip — same shape
+  // applies to several other GenUI blocks, so the agent reaches for "title"
+  // out of habit). Tolerating both keeps the framing visible regardless.
+  const looseProps = props as LooseChoicesProps & { title?: string };
+  const intro = looseProps.intro ?? looseProps.title;
   const active = Math.max(0, Math.min(activeRaw, questions.length - 1));
 
   /** The resolved answer for question `i` — selections and custom text joined. */

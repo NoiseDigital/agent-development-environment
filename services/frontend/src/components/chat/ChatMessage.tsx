@@ -16,12 +16,19 @@ import type { Rating } from '../../lib/agent/feedback-api';
 
 type Variant = 'panel' | 'floating';
 
-// Characters that render as NOTHING visible but survive String.trim():
-// standard whitespace, zero-width chars, bidi marks, line/paragraph separators,
-// narrow no-break space, byte order mark. Used by the "has visible content"
-// guard so an agent reply that's effectively just one of these doesn't draw
-// an empty bubble.
-const INVISIBLE_RE = new RegExp('[\\s\u200B-\u200F\u202A-\u202F\u2060\uFEFF]', 'g');
+// Characters that render as NOTHING visible but survive String.trim().
+// `Default_Ignorable_Code_Point` is the canonical Unicode property for
+// "code points that conforming renderers MUST hide by default" \u2014 it
+// covers every invisible variant we've seen leak out of the LLM
+// JSON-escape pipeline: zero-width chars (U+200B\u2013U+200F), word joiner
+// (U+2060), variation selectors (U+FE00\u2013U+FE0F), bidi marks
+// (U+200E/U+200F/U+202A\u2013U+202E), Hangul fillers (U+115F/U+1160/U+3164/
+// U+FFA0), Mongolian variation selectors (U+180B\u2013U+180E), soft hyphen
+// (U+00AD), BOM (U+FEFF), the mathematical-invisible block
+// (U+2061\u2013U+2064), and the deprecated CGJ (U+034F). Combined with \s
+// for the standard whitespace cases.
+// Requires the `u` flag for \p{}; supported in every browser we target.
+const INVISIBLE_RE = /[\s\p{Default_Ignorable_Code_Point}]/gu;
 
 interface ChatMessageProps {
   message: ChatMessageData;
