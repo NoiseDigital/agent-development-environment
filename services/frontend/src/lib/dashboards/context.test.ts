@@ -39,24 +39,34 @@ const CHART_WITH_TITLE: DashboardTile = {
 };
 
 describe('tileManifestLine', () => {
-  it('formats a KPI by its label', () => {
-    expect(tileManifestLine(KPI)).toBe('- KPI: Spend');
+  it('formats a KPI by its label + id', () => {
+    expect(tileManifestLine(KPI)).toBe('- KPI: Spend [id=k1]');
   });
 
-  it('formats a trend by its metric', () => {
-    expect(tileManifestLine(TREND)).toBe('- Trend: total_spend over time');
+  it('formats a trend by its metric + id', () => {
+    expect(tileManifestLine(TREND)).toBe('- Trend: total_spend over time [id=t1]');
   });
 
-  it('formats a breakdown by its source dimension', () => {
+  it('formats a breakdown by its source dimension + id', () => {
     expect(tileManifestLine(BREAKDOWN)).toBe(
-      '- Breakdown: total_spend by publisher',
+      '- Breakdown: total_spend by publisher [id=b1]',
     );
   });
 
-  it('formats a pinned chart by its spec title', () => {
+  it('formats a pinned chart by its spec title + id', () => {
     expect(tileManifestLine(CHART_WITH_TITLE)).toBe(
-      '- Chart: Weekly spend by publisher',
+      '- Chart: Weekly spend by publisher [id=c1]',
     );
+  });
+
+  it('includes the tile id on EVERY line — the editor agent needs it to address tiles', () => {
+    // Pin the contract: an `update_tile` / `remove_tile` action requires
+    // the agent to pass a real id from the manifest. Without the id in the
+    // line, the agent fabricates one and the action no-ops on the server.
+    expect(tileManifestLine(KPI)).toMatch(/\[id=k1\]$/);
+    expect(tileManifestLine(TREND)).toMatch(/\[id=t1\]$/);
+    expect(tileManifestLine(BREAKDOWN)).toMatch(/\[id=b1\]$/);
+    expect(tileManifestLine(CHART_WITH_TITLE)).toMatch(/\[id=c1\]$/);
   });
 });
 
@@ -121,8 +131,8 @@ describe('buildDashboardContext', () => {
 describe('tileManifestList', () => {
   it('returns one line per tile as a flat string array', () => {
     expect(tileManifestList([KPI, TREND])).toEqual([
-      '- KPI: Spend',
-      '- Trend: total_spend over time',
+      '- KPI: Spend [id=k1]',
+      '- Trend: total_spend over time [id=t1]',
     ]);
   });
 });

@@ -12,7 +12,7 @@ import {
 } from '../../lib/dashboards/refresh';
 import { canDelete, isClientDashboard, isEditable, isPinnable } from '../../lib/dashboards/access';
 import { deleteUserDashboard, isUserDashboard, saveUserDashboard } from '../../lib/dashboards/user-dashboards';
-import { loadDashboardOverrides, setDashboardOverride } from '../../lib/dashboards/overrides';
+import { applyTileOverrides, loadDashboardOverrides, setDashboardOverride } from '../../lib/dashboards/overrides';
 import { newId } from '../../lib/id';
 import { isAdmin } from '../../lib/auth';
 import { showToast } from '../../lib/toast';
@@ -161,19 +161,26 @@ export default function DashboardDetail({
   // localStorage today (see `lib/dashboards/overrides`) so it survives reloads;
   // moves to the DB when codified dashboards land.
   const [accentColor, setAccentColor] = useState(dashboard.accentColor);
+  // Per-tile overrides (title / format / accent / etc.) + soft-remove list
+  // written by the editor agent's `update_tile` / `remove_tile` actions.
+  // Re-derived from localStorage on mount and on every dashboard-override-
+  // changed event so an agent edit shows without a reload.
+  const [tileOverrides, setTileOverrides] = useState(() => loadDashboardOverrides(dashboard.id));
   useEffect(() => {
     const ov = loadDashboardOverrides(dashboard.id);
     setAccentColor(ov.accentColor ?? dashboard.accentColor);
+    setTileOverrides(ov);
   }, [dashboard.id, dashboard.accentColor]);
   // The dashboard editor agent writes through `setDashboardOverride` from a
-  // GenUI Action block — listen for the broadcast so the header re-reads
-  // without a refresh.
+  // GenUI Action block — listen for the broadcast so the header AND any
+  // per-tile overrides re-read without a refresh.
   useEffect(() => {
     const onChange = (e: Event) => {
       const ce = e as CustomEvent<{ dashboardId: string }>;
       if (ce.detail?.dashboardId !== dashboard.id) return;
       const ov = loadDashboardOverrides(dashboard.id);
       setAccentColor(ov.accentColor ?? dashboard.accentColor);
+      setTileOverrides(ov);
     };
     window.addEventListener('dashboard-override-changed', onChange);
     return () => window.removeEventListener('dashboard-override-changed', onChange);
@@ -481,7 +488,7 @@ export default function DashboardDetail({
           </div>
         )}
         <DashboardCanvas
-          tiles={tiles}
+          tiles={applyTileOverrides(tiles, tileOverrides)}
           editing={editing}
           dashboardDefaults={dashboard.defaults}
           onLayoutChange={handleLayoutChange}

@@ -74,11 +74,28 @@ export type FilterField =
  *  Kinds:
  *    - `pin_chart`        — pin a Vega spec to (dashboardId, tab_id)
  *    - `set_accent`       — write a hex into dashboard-overrides
- *    - `rename_dashboard` — write a name into user-dashboards */
+ *    - `rename_dashboard` — write a name into user-dashboards
+ *    - `update_tile`      — patch an existing tile's presentation overrides
+ *                           (title, subtitle, valueFormat, accent, description).
+ *                           Partial — fields omitted are left unchanged.
+ *    - `remove_tile`      — drop a tile from the dashboard (pinsApi.remove for
+ *                           chart pins, soft-removed via overrides otherwise). */
 export type ActionProps =
   | { kind: 'pin_chart'; tab_id: string; spec: VegaSpec }
   | { kind: 'set_accent'; hex: string }
-  | { kind: 'rename_dashboard'; name: string };
+  | { kind: 'rename_dashboard'; name: string }
+  | {
+      kind: 'update_tile';
+      tile_id: string;
+      presentation: {
+        title?: string;
+        subtitle?: string;
+        description?: string;
+        valueFormat?: string;
+        accent?: string;
+      };
+    }
+  | { kind: 'remove_tile'; tile_id: string };
 
 /** Proactive follow-up pills — one-click "ask this" chips the agent drops
  *  beneath a reply. Clicking a pill sends its text as the next user message,

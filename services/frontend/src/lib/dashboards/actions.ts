@@ -9,7 +9,7 @@
 
 import type { ActionProps, VegaSpec } from '../../types/genui';
 import { pinsApi } from './pins-api';
-import { setDashboardOverride } from './overrides';
+import { markTileRemoved, setDashboardOverride, setTilePresentation } from './overrides';
 import { isUserDashboard, saveUserDashboard, loadUserDashboards } from './user-dashboards';
 
 export interface DashboardActionContext {
@@ -42,6 +42,10 @@ export async function runDashboardAction(
         return setAccent(action, ctx);
       case 'rename_dashboard':
         return renameDashboard(action, ctx);
+      case 'update_tile':
+        return updateTile(action, ctx);
+      case 'remove_tile':
+        return await removeTile(action, ctx);
       default: {
         // Exhaustive switch — TS catches missing kinds at compile time.
         const _exhaustive: never = action;
@@ -110,6 +114,72 @@ function renameDashboard(
     }),
   );
   return { ok: true, message: `Renamed to ${name}` };
+}
+
+function updateTile(
+  action: Extract<ActionProps, { kind: 'update_tile' }>,
+  ctx: DashboardActionContext,
+): ActionResult {
+  const tileId = action.tile_id?.trim();
+  if (!tileId) return { ok: false, message: 'No tile id' };
+  const patch = pickPresentation(action.presentation);
+  if (Object.keys(patch).length === 0) {
+    return { ok: false, message: 'Nothing to update — empty presentation patch' };
+  }
+  // If the patch carries an accent hex, normalise it so a typo'd colour
+  // surfaces before we persist (matches set_accent's contract).
+  if (patch.accent !== undefined) {
+    const hex = normaliseHex(patch.accent);
+    if (!hex) return { ok: false, message: `Invalid colour: ${patch.accent}` };
+    patch.accent = hex;
+  }
+  setTilePresentation(ctx.dashboardId, tileId, patch);
+  // Same nudge channel the accent change uses — DashboardDetail listens and
+  // re-reads overrides so the change shows without a remount.
+  window.dispatchEvent(
+    new CustomEvent('dashboard-override-changed', {
+      detail: { dashboardId: ctx.dashboardId },
+    }),
+  );
+  const summary = Object.keys(patch)
+    .map((k) => `${k}=${patch[k as keyof typeof patch]}`)
+    .join(', ');
+  return { ok: true, message: `Updated tile ${tileId} (${summary})` };
+}
+
+async function removeTile(
+  action: Extract<ActionProps, { kind: 'remove_tile' }>,
+  ctx: DashboardActionContext,
+): Promise<ActionResult> {
+  const tileId = action.tile_id?.trim();
+  if (!tileId) return { ok: false, message: 'No tile id' };
+  // Try pinsApi.remove first — pinned chart tiles have a server-side
+  // delete. If that errors with a 404 we fall through to the soft-remove
+  // path (code-defined seed tiles).
+  try {
+    await pinsApi.remove(tileId);
+  } catch (err) {
+    console.warn('[actions.removeTile] pin remove failed; soft-removing', tileId, err);
+  }
+  markTileRemoved(ctx.dashboardId, tileId);
+  window.dispatchEvent(
+    new CustomEvent('dashboard-override-changed', {
+      detail: { dashboardId: ctx.dashboardId },
+    }),
+  );
+  return { ok: true, message: `Removed tile ${tileId}` };
+}
+
+/** Strip undefined fields from the agent's payload so the persistence layer
+ *  doesn't store an explicit `undefined` (which would otherwise mask a
+ *  later "reset to seed" intent). */
+function pickPresentation(p: Extract<ActionProps, { kind: 'update_tile' }>['presentation']): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const k of ['title', 'subtitle', 'description', 'valueFormat', 'accent'] as const) {
+    const v = p?.[k];
+    if (typeof v === 'string' && v.trim() !== '') out[k] = v;
+  }
+  return out;
 }
 
 function isValidSpec(spec: VegaSpec): boolean {

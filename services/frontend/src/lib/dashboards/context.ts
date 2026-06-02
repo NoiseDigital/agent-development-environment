@@ -38,46 +38,49 @@ export interface DashboardContextInput {
 }
 
 /** Turn one tile into one bullet line. Pure; no formatting beyond a leading
- *  dash + a short type label + the most identifying field (title / metric).
+ *  dash + a short type label + the most identifying field (title / metric)
+ *  + the stable tile id the editor agent uses to address the tile in
+ *  `update_tile` / `remove_tile` actions.
  *  Unknown / future tile types fall through to a generic line so the agent
  *  still sees there's *something* there. */
 export function tileManifestLine(tile: DashboardTile): string {
+  const id = ` [id=${tile.id}]`;
   switch (tile.type) {
     case 'kpi':
-      return `- KPI: ${tile.label}`;
+      return `- KPI: ${tile.label}${id}`;
     case 'trend':
       return tile.secondaryMetric
-        ? `- Trend: ${tile.metric} + ${tile.secondaryMetric} over time`
-        : `- Trend: ${tile.metric} over time`;
+        ? `- Trend: ${tile.metric} + ${tile.secondaryMetric} over time${id}`
+        : `- Trend: ${tile.metric} over time${id}`;
     case 'breakdown':
-      return `- Breakdown: ${tile.metric ?? 'total_spend'} by ${tile.source}`;
+      return `- Breakdown: ${tile.metric ?? 'total_spend'} by ${tile.source}${id}`;
     case 'pivot': {
       const dims = tile.innerDim
         ? `${tile.outerDim} × ${tile.innerDim}`
         : tile.outerDim;
-      return `- Pivot: ${tile.title} (${dims})`;
+      return `- Pivot: ${tile.title} (${dims})${id}`;
     }
     case 'quadrant':
-      return `- Quadrant: ${tile.title} (${tile.dim}; ${tile.xMetric} vs ${tile.yMetric})`;
+      return `- Quadrant: ${tile.title} (${tile.dim}; ${tile.xMetric} vs ${tile.yMetric})${id}`;
     case 'pareto':
-      return `- Pareto: ${tile.title}`;
+      return `- Pareto: ${tile.title}${id}`;
     case 'pacing':
-      return `- Pacing: ${tile.title}`;
+      return `- Pacing: ${tile.title}${id}`;
     case 'heatmap':
-      return `- Heatmap: ${tile.title}`;
+      return `- Heatmap: ${tile.title}${id}`;
     case 'narrative':
-      return `- Narrative: ${tile.title}`;
+      return `- Narrative: ${tile.title}${id}`;
     case 'chart':
       // User-pinned Vega spec — the title lives in the spec when present.
       // Falling back to "Pinned chart" keeps the line useful when it doesn't.
-      return `- Chart: ${chartTitle(tile.chart) ?? 'Pinned chart'}`;
+      return `- Chart: ${chartTitle(tile.chart) ?? 'Pinned chart'}${id}`;
     case 'text':
-      return `- Text note: ${tile.text.slice(0, 60).replace(/\s+/g, ' ').trim()}`;
+      return `- Text note: ${tile.text.slice(0, 60).replace(/\s+/g, ' ').trim()}${id}`;
     default: {
       // Exhaustiveness — caught at compile time, not at runtime.
       const _exhaustive: never = tile;
       void _exhaustive;
-      return `- Unknown tile`;
+      return `- Unknown tile${id}`;
     }
   }
 }

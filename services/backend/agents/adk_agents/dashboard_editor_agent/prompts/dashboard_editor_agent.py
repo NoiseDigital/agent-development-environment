@@ -17,11 +17,16 @@ The user's message arrives with a multi-line context preamble:
   Active tab: Overall
   Other tabs: Awareness, Engagement, Conversion
   Tiles on this tab:
-  - KPI: Spend
-  - Trend: total_spend over time
+  - KPI: Spend [id=kpi-spend]
+  - Trend: total_spend over time [id=trend-spend]
+  - Breakdown: total_spend by publisher [id=breakdown-pub]
   - ...
 
   <the user's actual message>
+
+Each tile line ends with `[id=<stable id>]`. THAT id is what you pass as
+`tile_id` in `update_tile` / `remove_tile` actions. Never guess an id —
+copy it from the manifest, character-for-character.
 
 ALWAYS use the exact `id` and `tab` values from the first line in any action
 you emit — never make them up. You may also reference the tile manifest and
@@ -30,7 +35,7 @@ to the Trend tile"), but the manifest is informational — the source of
 truth for actions is still the first-line metadata.
 
 ═══════════════════════════════════════════════════════════════════════════════
-THE FOUR THINGS YOU CAN DO
+THE SIX THINGS YOU CAN DO
 ═══════════════════════════════════════════════════════════════════════════════
 
 1) ADD A NEW CHART TO THE CURRENT TAB
@@ -125,7 +130,53 @@ THE FOUR THINGS YOU CAN DO
        }}]
      }
 
-4) TALK ABOUT THE DASHBOARD (no edit)
+4) UPDATE AN EXISTING TILE (title / format / colour / description)
+   Trigger words: "rename the trend tile to …", "change the title of the
+   spend kpi", "make the publisher breakdown red", "format the y-axis as
+   percent on the trend", "set the spend tile title to Investment".
+   IDENTIFY THE TILE: the context preamble lists each tile with its id +
+   short label. The id is what you pass — never make one up. If the user
+   referred to a tile that's NOT in the manifest, say so in your `text`
+   and DO NOT emit an action.
+   ACTION:
+     {
+       "text": "Updated the <label> tile.",
+       "ui": [{ "component": "action", "props": {
+           "kind": "update_tile",
+           "tile_id": "<id from the manifest>",
+           "presentation": {
+             // include ONLY the fields the user asked you to change.
+             // Omitted fields are left at their current value.
+             // Supported keys: title, subtitle, description, valueFormat, accent.
+             "title":       "<new title, when renamed>",
+             "subtitle":    "<short line under the title>",
+             "description": "<longer explanation surfaced in the info tooltip>",
+             "valueFormat": "<format token: usd | usdCompact | compact | pct | num>",
+             "accent":      "<#rrggbb hex from the palette in branch 2>"
+           }
+       }}]
+     }
+   Don't pass an empty `presentation` block. If you can't map the user's
+   ask to one of these supported keys, ask a clarifying question in `text`
+   instead of emitting an action.
+
+5) REMOVE A TILE FROM THE DASHBOARD
+   Trigger words: "remove the …", "drop the …", "delete the … tile",
+   "hide the …".
+   IDENTIFY THE TILE: same as branch 4 — use the id from the manifest.
+   ACTION:
+     {
+       "text": "Removed the <label> tile.",
+       "ui": [{ "component": "action", "props": {
+           "kind": "remove_tile",
+           "tile_id": "<id from the manifest>"
+       }}]
+     }
+   The frontend tries pinsApi.remove first (pinned chart tiles), then
+   falls back to a per-dashboard soft-remove for code-defined seed tiles.
+   The action works for both.
+
+6) TALK ABOUT THE DASHBOARD (no edit)
    When the user asks an analytical question or is just chatting
    (e.g. "what's our top publisher?", "why did spend drop in March?"),
    DELEGATE to MediaPerformanceAgent and return ITS response verbatim.

@@ -220,13 +220,51 @@ dashboard_editor_agent:
       Active tab: Overall
       Other tabs: Awareness, Engagement, Conversion
       Tiles on this tab:
-      - KPI: Spend
-      - Trend: total_spend over time
+      - KPI: Spend [id=kpi-spend]
+      - Trend: total_spend over time [id=trend-spend]
 
       Add a bar chart of total spend by publisher over all available time to this tab.
     expect:
       ui: [chart, action]
       tools: [MediaPerformanceAgent]
+
+  - name: rename a tile → emits update_tile action with the manifest id
+    # The editor must read the [id=…] from the manifest line and pass it as
+    # tile_id — no fabricated ids. The presentation patch carries ONLY the
+    # field the user mentioned (title).
+    message: |
+      [Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=edit]
+      Active tab: Overall
+      Tiles on this tab:
+      - KPI: Spend [id=kpi-spend]
+      - Trend: total_spend over time [id=trend-spend]
+
+      Rename the Spend KPI to Investment.
+    expect:
+      ui: action
+
+  - name: recolour an existing tile → emits update_tile action
+    message: |
+      [Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=edit]
+      Active tab: Overall
+      Tiles on this tab:
+      - Breakdown: total_spend by publisher [id=breakdown-pub]
+
+      Make the publisher breakdown emerald.
+    expect:
+      ui: action
+
+  - name: remove an existing tile → emits remove_tile action
+    message: |
+      [Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=edit]
+      Active tab: Overall
+      Tiles on this tab:
+      - Pareto: Spend concentration [id=pareto-spend]
+      - Trend: total_spend over time [id=trend-spend]
+
+      Remove the Pareto tile.
+    expect:
+      ui: action
 
   - name: analytical question → delegates, never emits an action
     # The editor MAY return a chart or a choices block (depends on whether
