@@ -4,7 +4,7 @@
 // global toast stack (see lib/toast) bottom-right, with a slide-in animation
 // and an optional inline action (e.g. Undo).
 
-import { useToasts, dismissToast, type ToastTone } from '../lib/toast';
+import { useToasts, dismissToast, type ToastTone } from '../../lib/toast';
 
 const toneStyles: Record<ToastTone, { dot: string; border: string }> = {
   default: { dot: 'bg-zinc-400', border: 'border-line-strong' },

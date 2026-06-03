@@ -2,7 +2,7 @@
 // Centralised here so the page and any future re-uses produce a stable
 // shape — the agent's prompt parses these exact field names.
 
-import type { CorrelateResult, QaResult } from '../stats-api';
+import type { CorrelateResult, QaResult } from '../api/stats';
 import type { SourceRef } from '../../types/source';
 import { sourceUri } from '../../types/source';
 

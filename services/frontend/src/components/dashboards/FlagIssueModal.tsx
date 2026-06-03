@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { Dashboard } from '../../data/dashboards';
-import { saveIssueReport, type IssueArea } from '../../lib/issue-reports';
+import { saveIssueReport, type IssueArea } from '../../lib/api/issue-reports';
 import { dashboardTitle } from '../../lib/dashboards/access';
 import { showToast } from '../../lib/toast';
 

@@ -12,7 +12,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { clientBySlug } from '../../data/clients';
 import { loadPlans } from '../../lib/dashboards/user-plans';
-import { usdCompact } from '../../lib/format';
+import { usdCompact } from '../../lib/format/format';
 
 interface ClientCardSummary {
   code: string;

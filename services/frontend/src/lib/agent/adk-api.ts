@@ -1,5 +1,10 @@
-// API client for ADK server
+// API client for ADK server. CRUD calls go through `apiRequest` so auth
+// headers + FastAPI `detail`-aware error messages stay consistent with the
+// rest of the platform's REST clients. The SSE generator stays on raw
+// fetch — `apiRequest` reads `response.json()` and would consume the
+// stream we need to iterate.
 import { getAgentEndpoints } from '../../config/agent-config';
+import { apiRequest } from '../api/http';
 
 // Agent endpoint configuration (imported from centralized config)
 export interface AgentEndpoint {
@@ -105,56 +110,38 @@ export class ADKApiClient {
     const url = sessionId
       ? `${baseUrl}/apps/${appName}/users/${userId}/sessions/${sessionId}`
       : `${baseUrl}/apps/${appName}/users/${userId}/sessions`;
-
-    const response = await fetch(url, {
+    return apiRequest<Session>(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        state: {},
-        events: []
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: {}, events: [] }),
     });
-
-    if (!response.ok) throw new Error('Failed to create session');
-    return response.json();
   }
 
   async getSession(appName: string, userId: string, sessionId: string): Promise<Session> {
     const baseUrl = this.getBaseUrl(appName);
-    const response = await fetch(`${baseUrl}/apps/${appName}/users/${userId}/sessions/${sessionId}`);
-    if (!response.ok) throw new Error('Failed to get session');
-    return response.json();
+    return apiRequest<Session>(`${baseUrl}/apps/${appName}/users/${userId}/sessions/${sessionId}`);
   }
 
   async listSessions(appName: string, userId: string): Promise<Session[]> {
     const baseUrl = this.getBaseUrl(appName);
-    const response = await fetch(`${baseUrl}/apps/${appName}/users/${userId}/sessions`);
-    if (!response.ok) throw new Error('Failed to list sessions');
-    return response.json();
+    return apiRequest<Session[]>(`${baseUrl}/apps/${appName}/users/${userId}/sessions`);
   }
 
   async deleteSession(appName: string, userId: string, sessionId: string): Promise<void> {
     const baseUrl = this.getBaseUrl(appName);
-    const response = await fetch(`${baseUrl}/apps/${appName}/users/${userId}/sessions/${sessionId}`, {
-      method: 'DELETE',
-    });
-    if (!response.ok) throw new Error('Failed to delete session');
+    await apiRequest<unknown>(
+      `${baseUrl}/apps/${appName}/users/${userId}/sessions/${sessionId}`,
+      { method: 'DELETE' },
+    );
   }
 
   async sendMessage(request: AgentRunRequest): Promise<Event[]> {
     const baseUrl = this.getBaseUrl(request.appName);
-    const response = await fetch(`${baseUrl}/run`, {
+    return apiRequest<Event[]>(`${baseUrl}/run`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request),
     });
-
-    if (!response.ok) throw new Error('Failed to send message');
-    return response.json();
   }
 
   async *sendMessageSSE(request: AgentRunRequest): AsyncGenerator<Event, void, unknown> {
@@ -194,20 +181,10 @@ export class ADKApiClient {
     userId: string,
     text: string,
   ): Promise<string> {
-    const baseUrl = this.getBaseUrl(appName);
     const sessionId = `oneshot-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-
-    const createRes = await fetch(
-      `${baseUrl}/apps/${appName}/users/${userId}/sessions/${sessionId}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: {}, events: [] }),
-      },
-    );
-    if (!createRes.ok) {
-      throw new Error(`one-shot session create failed: ${createRes.status}`);
-    }
+    // Reuse the consolidated session-create path — same auth headers,
+    // same FastAPI-detail-aware error surfacing as every other CRUD call.
+    await this.createSession(appName, userId, sessionId);
 
     try {
       const events = await this.sendMessage({

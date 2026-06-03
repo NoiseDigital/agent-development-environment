@@ -1,5 +1,5 @@
 // The Vega adapter for the platform's canonical number formatters
-// (`lib/format.ts`). Registered as a custom Vega-Lite `numberFormatType` so
+// (`lib/format/format.ts`). Registered as a custom Vega-Lite `numberFormatType` so
 // every axis label, legend, and tooltip uses the same K/M/B + $ + % rules
 // the surrounding tiles render with — one rule set, two consumers.
 //

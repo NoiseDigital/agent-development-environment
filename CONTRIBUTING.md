@@ -109,7 +109,7 @@ All PRs must pass the following checks before merge:
 | `Backend — ruff + mypy` | `ruff check` + `ruff format --check` on `services/backend/agents/` |
 | `Backend — pytest` | `pytest -q` on `services/backend/agents/tests/` |
 | `Frontend — ESLint + TypeScript` | `next lint` + `tsc --noEmit` + `vitest run` on `services/frontend/` |
-| `Gateway — alembic upgrade` | applies every Alembic migration to a fresh Postgres, then re-applies it to confirm idempotency |
+| `Schema — DDL discipline + migration parity` | static check: no DDL outside `alembic/versions/`; repo-touching PRs must include a migration |
 | `Terraform — fmt + validate` | `terraform fmt -check` + `terraform validate` on `terraform/` |
 | `Docker Compose — config validation` | `docker compose config` on root `docker-compose.yml` |
 
@@ -158,6 +158,25 @@ Other guidelines:
 - Self-review before requesting review — check diffs, remove debug code
 - Link to any agent or tool being meaningfully changed
 
+## Architecture docs
+
+Before adding anything non-trivial, skim the relevant doc in [`docs/`](docs/) —
+they describe the contracts you'll be working against:
+
+- [`docs/agents.md`](docs/agents.md) — agent catalog, root → subagent routing,
+  the editor agent's action contract.
+- [`docs/genui.md`](docs/genui.md) — the `{ text, ui }` envelope, every UI
+  block's props, the parser failure modes the platform tolerates.
+- [`docs/dashboards.md`](docs/dashboards.md) — tile registry, presentation
+  overrides, the grid wiring, known footguns.
+
+The codebase-local docs (kept next to the code so they can't drift) are:
+
+- [`services/frontend/src/components/dashboards/tiles/README.md`](services/frontend/src/components/dashboards/tiles/README.md)
+  — adding a tile type / customizing per dashboard.
+- [`services/backend/agents/tests/README.md`](services/backend/agents/tests/README.md)
+  — the agents.yaml live behavior harness.
+
 ## Adding an Agent
 
 1. Create `services/backend/agents/adk_agents/<agent_name>/`
@@ -167,6 +186,62 @@ Other guidelines:
    - `comingSoon: true` — agent appears in the library as a disabled card with a "Coming soon" badge
    - Omit both (or set neither) for a fully active agent
 4. Document any new env vars in `.env.example`
+
+Demo / reference agents (the ADK example agents) live under
+`adk_agents/.demos/` — the leading dot keeps them out of ADK's auto-discovery
+scan so the catalog stays focused. Copy a `.demos/<name>/` directory back up
+to `adk_agents/` to enable it locally.
+
+## Frontend Testing
+
+The frontend uses **Vitest + Testing Library**. Tests live next to the code
+they cover (`Foo.tsx` ↔ `Foo.test.tsx`), not in a separate `__tests__/` tree.
+
+| What you're testing | Where it goes | Environment |
+|---|---|---|
+| A pure module (`lib/*.ts`, parser, projection) | `<file>.test.ts` next to it | default `node` — fastest |
+| A React component (RTL render) | `<file>.test.tsx` next to it | `happy-dom` — opt in per-file |
+| A hook (`renderHook` from RTL) | `<file>.test.tsx` next to it | `happy-dom` |
+
+**Per-file environment opt-in:** add this pragma as line 1 of any DOM-using
+test so the cost of bootstrapping happy-dom is only paid where it's needed:
+
+```ts
+// @vitest-environment happy-dom
+```
+
+**Mocking conventions:**
+
+- Mock the module BOUNDARY, not internals. For a hook that calls
+  `feedbackApi.setRating`, mock `feedbackApi`, not `fetch`.
+- Mock factories run before module evaluation, so use
+  `vi.mock('<path>', () => ({ ... }))` at the top of the file. Use
+  `vi.mocked(<fn>).mockResolvedValue(...)` inside tests to set behavior.
+- For hooks that call optimistic + fire-and-forget APIs (`.catch(...)`), the
+  mocked fn must return a Promise — bare `vi.fn()` returns undefined and
+  calling `.catch` on it throws.
+
+**Running tests:**
+
+```bash
+docker compose exec frontend npm test            # whole suite
+docker compose exec frontend npm test -- <path>  # single file
+```
+
+`tsc --noEmit` runs as part of `npm test` in CI and is wired into the
+pre-commit hook for the frontend; both surface issues before the PR review.
+
+## Bundle Size
+
+The frontend has `@next/bundle-analyzer` plumbed in for on-demand analysis.
+It is off in normal dev/CI builds:
+
+```bash
+docker compose exec frontend npm run analyze
+```
+
+Reports drop into `.next/analyze/{client.html,nodejs.html}` — open them in a
+browser to see what's bloating the bundle.
 
 ## Schema Migrations
 
@@ -195,6 +270,14 @@ green once both steps complete; the agent service waits on
 `gateway: service_healthy` before booting. Migrations are idempotent — a
 restart is a safe no-op. CI applies them to a fresh Postgres on every PR
 and runs an explicit idempotency re-up.
+
+### Why migrations run inside the gateway
+
+Alembic is idempotent, we run a single gateway replica, and the operational
+cost of a separate "migrate" one-shot service outweighs its benefit at this
+scale. If we ever scale to multi-replica gateway with cold-start races, the
+escape hatch is a `gcloud run jobs execute` pre-deploy step in CI — no
+compose change required.
 
 ### Adding a migration
 

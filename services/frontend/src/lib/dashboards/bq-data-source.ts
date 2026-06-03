@@ -1,7 +1,7 @@
 // BigQuery-backed dashboard data source. Hits the gateway's /api/dashboards/query
 // which runs the same toolbox tools the agent uses — one SQL surface.
 
-import { apiRequest } from '../http';
+import { apiRequest } from '../api/http';
 import { cached } from './cache';
 import type {
   DashboardDataSource,

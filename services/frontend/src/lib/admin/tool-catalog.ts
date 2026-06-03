@@ -2,7 +2,7 @@
 // args — never the SQL — so this pairs them with the statement from tools.yaml
 // to reconstruct the query that ran. Admin-facing; see ToolQueries.
 
-import { apiRequest } from './http';
+import { apiRequest } from '../api/http';
 
 const BASE_URL = process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'http://localhost:8000';
 

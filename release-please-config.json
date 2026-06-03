@@ -34,7 +34,17 @@
         },
         {
           "type": "toml",
+          "path": "services/backend/gateway/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
           "path": "services/backend/mcp/math/pyproject.toml",
+          "jsonpath": "$.project.version"
+        },
+        {
+          "type": "toml",
+          "path": "services/backend/mcp/stats/pyproject.toml",
           "jsonpath": "$.project.version"
         },
         "services/backend/mcp/images/toolbox/version.txt",

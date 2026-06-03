@@ -30,8 +30,8 @@ import {
   saveLineEdit,
   type EditableLineField,
 } from '../../lib/dashboards/user-plans';
-import { linePerformance } from '../../lib/plan-performance';
-import { usdCompact, pct } from '../../lib/format';
+import { linePerformance } from '../../lib/plan/performance';
+import { usdCompact, pct } from '../../lib/format/format';
 import { getCurrentUser } from '../../lib/auth';
 import LineHistoryDrawer from './LineHistoryDrawer';
 

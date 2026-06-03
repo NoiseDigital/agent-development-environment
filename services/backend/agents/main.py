@@ -37,5 +37,15 @@ app.include_router(tools_router)  # MCP toolbox query catalog (admin)
 app.include_router(pins_router)  # pinned charts (FloatingAssistant → dashboard)
 
 
+# Liveness probe — kept independent of any DB / model dependency so the
+# Cloud Run container health check stays green even if a downstream is
+# misbehaving. The gateway has its own /healthz; this exists so the agent
+# service can be probed directly (private ingress) without going through
+# the gateway, and so docker-compose's healthcheck has a stable target.
+@app.get("/healthz", include_in_schema=False)
+async def healthz() -> dict[str, str]:
+    return {"status": "ok"}
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))

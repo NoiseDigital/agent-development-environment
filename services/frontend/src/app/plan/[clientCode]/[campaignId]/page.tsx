@@ -8,7 +8,7 @@
 import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { loadPlanByClient } from '../../../../lib/dashboards/user-plans';
-import { usdCompact } from '../../../../lib/format';
+import { usdCompact } from '../../../../lib/format/format';
 import PlanSpreadsheet from '../../../../components/plan/PlanSpreadsheet';
 
 export default function CampaignPlanPage() {

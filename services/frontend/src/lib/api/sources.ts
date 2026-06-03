@@ -1,7 +1,7 @@
 // Client for the data sources API exposed by the agent service.
 // Uploads are registered; BigQuery is a live catalog that is browsed, not registered.
 
-import type { Upload, BigQueryTableRef } from '../types/source';
+import type { Upload, BigQueryTableRef } from '../../types/source';
 import { apiRequest } from './http';
 
 const BASE_URL = process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'http://localhost:8000';

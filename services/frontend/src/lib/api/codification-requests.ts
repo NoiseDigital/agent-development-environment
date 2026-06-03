@@ -4,7 +4,7 @@
 // prototype stays editable; the codified result stays git-versioned and stable.
 // localStorage today; this is a queue that moves to a table.
 
-import { newId } from './id';
+import { newId } from '../id';
 
 export type CodifyTarget = 'new-client' | 'existing-client' | 'reusable-tile';
 

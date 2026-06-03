@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ActionProps } from '../../types/genui';
 import { useDashboardEdit } from '../../lib/dashboards/edit-context';
 import { runDashboardAction, type ActionResult } from '../../lib/dashboards/actions';
-import { loadBlockState, saveBlockState } from '../../lib/genui-state';
+import { loadBlockState, saveBlockState } from '../../lib/genui/state';
 
 export default function Action({
   props,

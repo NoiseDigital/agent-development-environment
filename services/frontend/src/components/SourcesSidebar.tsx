@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { sourcesApi } from '../lib/sources-api';
+import { sourcesApi } from '../lib/api/sources';
 import type { Upload, SourceRef } from '../types/source';
 import { sourceUri, uploadToRef } from '../types/source';
 import { useResizable } from '../hooks/useResizable';
 import { useSidebarCollapsed } from '../contexts/SidebarContext';
-import ResizeHandle from './ResizeHandle';
+import ResizeHandle from './ui/ResizeHandle';
 
 interface SourcesSidebarProps {
   /** Sources currently active in the conversation. */

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { loadBlockState, saveBlockState } from './genui-state';
+import { loadBlockState, saveBlockState } from './state';
 
 beforeEach(() => {
   window.localStorage.clear();

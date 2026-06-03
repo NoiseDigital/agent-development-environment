@@ -4,6 +4,9 @@ Public surface of the backend. Mounts:
 - `/healthz` — liveness probe.
 - `/api/dashboards/query` — async pass-through to the MCP Toolbox; parses
   the toolbox's MCP-shaped response into flat row dicts.
+- `/api/stats/{endpoint}` — proxy to the mcp-stats service (correlate / qa /
+  describe). Stops the frontend from needing direct network access to a
+  service that lives behind internal-only ingress in production.
 - `/api/clients` — platform client directory backed by Postgres.
 - `/*` — catch-all proxy to the private agent service for everything else
   (ADK `/run_sse`, sessions, session-metadata, event-metadata, sources,
@@ -24,6 +27,7 @@ from api.clients import router as clients_router
 from api.dashboards import router as dashboards_router
 from api.health import router as health_router
 from api.proxy import router as proxy_router
+from api.stats import router as stats_router
 
 app = FastAPI(title="NoiseOS Gateway", version="0.1.0")
 
@@ -47,5 +51,6 @@ app.add_middleware(
 # so explicit gateway-owned routes match before falling through to the agent.
 app.include_router(health_router)
 app.include_router(dashboards_router)
+app.include_router(stats_router)
 app.include_router(clients_router)
 app.include_router(proxy_router)

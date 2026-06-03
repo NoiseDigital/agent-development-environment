@@ -85,18 +85,28 @@ terraform/                          # GCP infrastructure
 ### Service topology
 
 ```text
-browser ─► gateway (8080) ─► agent (8000)            ─► postgres
-                              ├─► mcp-toolbox (5000) ─► BigQuery
-                              └─► mcp-stats (5003)
+browser ─► gateway (8080) ─┬─► agent (8000)            ─► postgres
+                           │     ├─► mcp-toolbox (5000) ─► BigQuery
+                           │     └─► mcp-stats (5003)   ─► uploads
+                           ├─► mcp-toolbox (dashboard query)
+                           └─► mcp-stats   (analyze: correlate / qa / describe)
 
 # Boot: gateway runs `alembic upgrade head` in its entrypoint, then starts
 # uvicorn. Its /healthz turns green only once both have completed; the
 # agent waits on that healthcheck before reading the platform tables.
 ```
 
-The frontend talks **only** to the gateway. The gateway owns auth and the
-platform's Postgres schema (via Alembic); everything not handled directly is
-streamed through to the private agent service, SSE included.
+The frontend talks **only** to the gateway. The gateway is the public seam
+for every backend service:
+- ADK runtime (sessions, `/run_sse`, …) → proxied to `agent` via the catch-all.
+- Dashboard queries → `/api/dashboards/query` calls the MCP Toolbox directly.
+- Analyze stats (correlate / qa / describe) → `/api/stats/<endpoint>` proxies
+  to `mcp-stats`.
+
+This shape matches the GCP deployment: in production the agent, toolbox, and
+stats services run on internal-only Cloud Run ingress, and the gateway is the
+only thing the browser can reach. The platform's Postgres schema is owned by
+**Alembic** in the gateway service.
 
 ## Adding an Agent
 
@@ -160,6 +170,15 @@ docker compose restart gateway   # gateway re-runs upgrade head on boot
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md#schema-migrations) for the full workflow.
+
+## Architecture docs
+
+Going deeper than this README — agent contracts, the GenUI envelope, the
+dashboard tile registry — see [`docs/`](docs/):
+
+- [`docs/agents.md`](docs/agents.md) — agent catalog + routing + action contract.
+- [`docs/genui.md`](docs/genui.md) — `{ text, ui }` envelope, block catalog, parser failure modes.
+- [`docs/dashboards.md`](docs/dashboards.md) — tile registry, presentation overrides, footguns.
 
 ## Contributing
 

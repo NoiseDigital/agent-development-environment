@@ -2,7 +2,7 @@
 
 // Chart-level tooltip: summary + Metrics + Good-to-know sections.
 
-import { getMetricDefinition, type MetricDefinition } from '../../../lib/metric-semantics';
+import { getMetricDefinition, type MetricDefinition } from '../../../lib/metrics/semantics';
 import InfoTooltip from './InfoTooltip';
 
 export interface ChartInfo {

@@ -8,7 +8,7 @@
 // so the public signature won't change when we swap the implementation —
 // the spreadsheet and the agent insights both consume `LinePerformance`.
 
-import type { PlanLine } from '../data/plans/types';
+import type { PlanLine } from '../../data/plans/types';
 
 export interface LinePerformance {
   /** Cumulative spend across the line's flight window. */

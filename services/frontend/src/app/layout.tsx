@@ -4,7 +4,7 @@ import "./globals.css";
 import PlatformSidebar from "../components/PlatformSidebar";
 import FloatingAssistant from "../components/chat/FloatingAssistant";
 import NeuralBackground from "../components/NeuralBackground";
-import Toaster from "../components/Toaster";
+import Toaster from "../components/ui/Toaster";
 import { SidebarProvider } from "../contexts/SidebarContext";
 
 const geistSans = Geist({

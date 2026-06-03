@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { ToolCall } from '../../hooks/useChat';
-import { getToolCatalog, resolveSql, type ToolCatalog } from '../../lib/tool-catalog';
+import { getToolCatalog, resolveSql, type ToolCatalog } from '../../lib/admin/tool-catalog';
 import SqlBlock from '../SqlBlock';
 
 // Admin-facing: a collapsible list of the SQL each MCP-toolbox tool call ran

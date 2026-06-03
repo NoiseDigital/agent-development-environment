@@ -8,7 +8,7 @@ import { clientDashboards, dashboardFromSpec, type Dashboard } from '../data/das
 import { loadUserDashboards, saveUserDashboard } from '../lib/dashboards/user-dashboards';
 import { pinsApi } from '../lib/dashboards/pins-api';
 import { dashboardTitle as dashTitle, isPinnable } from '../lib/dashboards/access';
-import { saveIssueReport } from '../lib/issue-reports';
+import { saveIssueReport } from '../lib/api/issue-reports';
 import { showToast } from '../lib/toast';
 import { newId } from '../lib/id';
 import { specTitle, slug, chartToCsv } from '../lib/charts/export';

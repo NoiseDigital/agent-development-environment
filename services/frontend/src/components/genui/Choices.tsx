@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { ChoicesProps, ChoiceQuestion, ChoiceOption } from '../../types/genui';
-import { loadBlockState, saveBlockState } from '../../lib/genui-state';
+import { loadBlockState, saveBlockState } from '../../lib/genui/state';
 
 /** What we persist for a Choices block — the drafts a user has built up plus
  *  the final submission string once they've sent it. */

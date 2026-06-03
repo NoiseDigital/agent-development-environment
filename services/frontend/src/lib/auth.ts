@@ -24,7 +24,7 @@ export function getCurrentUser(): CurrentUser {
 
 /**
  * Identity headers to merge into an API request. Empty today; once auth is live
- * this returns `{ Authorization: 'Bearer <idToken>' }`. Wired into lib/http so
+ * this returns `{ Authorization: 'Bearer <idToken>' }`. Wired into lib/api/http so
  * every platform API call carries it automatically.
  */
 export function authHeaders(): Record<string, string> {

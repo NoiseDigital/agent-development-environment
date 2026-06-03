@@ -3,7 +3,7 @@
 // Every call carries identity via `authHeaders()` (the auth seam) — empty today,
 // a Bearer token once Firebase Auth is live.
 
-import { authHeaders } from './auth';
+import { authHeaders } from '../auth';
 
 export async function apiRequest<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {

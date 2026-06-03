@@ -41,7 +41,7 @@ vi.mock('../lib/id', () => ({ newId: () => 'new-dash-id' }));
 vi.mock('html-to-image', () => ({ toPng: vi.fn().mockResolvedValue('data:image/png;base64,fake') }));
 
 // Issue reports aren't touched by the create-new flow either.
-vi.mock('../lib/issue-reports', () => ({ saveIssueReport: vi.fn() }));
+vi.mock('../lib/api/issue-reports', () => ({ saveIssueReport: vi.fn() }));
 
 beforeEach(() => {
   cleanup();

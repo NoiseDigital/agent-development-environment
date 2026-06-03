@@ -2,7 +2,7 @@
 
 // One metric's canonical definition as a small card.
 
-import type { MetricDefinition } from '../../../lib/metric-semantics';
+import type { MetricDefinition } from '../../../lib/metrics/semantics';
 
 const UNIT_BADGE: Record<NonNullable<MetricDefinition['unit']>, string> = {
   currency: '$',

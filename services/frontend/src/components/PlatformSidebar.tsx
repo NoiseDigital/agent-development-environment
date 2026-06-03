@@ -7,7 +7,7 @@ import { agentConfigurations } from '../config/agent-config';
 import { adkApi } from '../lib/agent/adk-api';
 import { useResizable } from '../hooks/useResizable';
 import { useSidebarCollapsed } from '../contexts/SidebarContext';
-import ResizeHandle from './ResizeHandle';
+import ResizeHandle from './ui/ResizeHandle';
 
 // ── Icons ────────────────────────────────────────────────────────────────────
 

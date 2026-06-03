@@ -6,7 +6,7 @@ import type {
   FilterField,
   ChoiceOption,
 } from '../../types/genui';
-import { loadBlockState, saveBlockState } from '../../lib/genui-state';
+import { loadBlockState, saveBlockState } from '../../lib/genui/state';
 
 /** What we persist for a Filters block — the working draft plus the final
  *  applied message once the user has submitted it. */

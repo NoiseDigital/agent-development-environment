@@ -17,7 +17,7 @@ import {
 import { useDashboardFilters } from '../../../lib/dashboards/filter-context';
 import { useDashboardRefresh } from '../../../lib/dashboards/refresh-context';
 import { useDashboardTotals } from '../../../lib/dashboards/totals-context';
-import { formatByKey, type FormatKey } from '../../../lib/format';
+import { formatByKey, type FormatKey } from '../../../lib/format/format';
 import MetricInfoTooltip from './MetricInfoTooltip';
 import TileChartShell from './TileChartShell';
 
@@ -31,7 +31,7 @@ type PivotMetric =
 export interface PivotColumnSpec {
   key: PivotMetric;
   label: string;
-  /** Canonical format key from `lib/format.ts`. Same vocabulary the KPI strip
+  /** Canonical format key from `lib/format/format.ts`. Same vocabulary the KPI strip
    *  and Vega axes use, so a "Spend" column reads the same everywhere. */
   format: FormatKey;
 }

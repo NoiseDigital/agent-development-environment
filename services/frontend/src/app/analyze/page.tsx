@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { sourcesApi } from '../../lib/sources-api';
-import { statsApi, type CorrelateResult, type QaResult, type ColumnProfile } from '../../lib/stats-api';
+import { sourcesApi } from '../../lib/api/sources';
+import { statsApi, type CorrelateResult, type QaResult, type ColumnProfile } from '../../lib/api/stats';
 import type { Upload, SourceRef, BigQueryTableRef } from '../../types/source';
 import { sourceUri, sourceLabel } from '../../types/source';
 import { heatmapSpec } from '../../lib/charts/specs';
 import { buildAnalyzeContext } from '../../lib/agent/analyze-context';
 import VegaChart from '../../components/VegaChart';
-import InfoHint from '../../components/InfoHint';
+import InfoHint from '../../components/ui/InfoHint';
 import AnalyzeAssistantPanel from '../../components/analyze/AnalyzeAssistantPanel';
 
 // ── Layout primitive — a card-shaped section used in the controls rail. ────

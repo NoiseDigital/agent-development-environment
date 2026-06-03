@@ -2,7 +2,7 @@
 // Separate from codification requests (which promote a prototype to code): this
 // is "something here looks wrong, please look". localStorage today; a table later.
 
-import { newId } from './id';
+import { newId } from '../id';
 
 export type IssueArea = 'data' | 'visual' | 'layout' | 'other';
 

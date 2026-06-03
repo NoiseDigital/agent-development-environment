@@ -5,7 +5,7 @@ import { Session } from '../../lib/agent/adk-api';
 import { getAgentConfiguration } from '../../config/agent-config';
 import { useResizable } from '../../hooks/useResizable';
 import { useSidebarCollapsed } from '../../contexts/SidebarContext';
-import ResizeHandle from '../ResizeHandle';
+import ResizeHandle from '../ui/ResizeHandle';
 import TypingName from './TypingName';
 import { normalizeTimestamp } from '../../utils/timestamps';
 

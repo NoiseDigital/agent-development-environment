@@ -43,6 +43,12 @@ services:
     stdin_open: true
     tty: true
     command: uv run uvicorn main:app --host 0.0.0.0 --port ${AGENT_PORT:-8000} --reload
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${AGENT_PORT:-8000}/healthz || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
 
   # ── Image-based MCP servers ────────────────────────────────────────────────
   # These servers are consumed as images — no source code maintained here.
@@ -125,6 +131,13 @@ services:
         condition: service_started
     stdin_open: true
     tty: true
+    healthcheck:
+      # python:3.13-slim has no curl — use urllib instead.
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/health').status==200 else 1)\""]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
 
   # ── Gateway — the public entry point for the frontend ─────────────────────
   # Owns auth, the platform's non-agent HTTP routes, AND the database
@@ -134,6 +147,12 @@ services:
   # Everything the gateway doesn't handle directly is proxied to the
   # private agent service; `/run_sse` streams through unchanged
   # (see api/proxy.py).
+  #
+  # We keep migrations in the gateway boot (rather than a one-shot service)
+  # because Alembic is idempotent, we run one replica, and the operational
+  # cost of a separate service outweighs its benefit at this scale. If we
+  # ever scale to multi-replica gateway with cold-start migration races,
+  # swap this to a `gcloud run jobs execute` pre-deploy step.
   gateway:
     build:
       context: ./services/backend/gateway
@@ -145,6 +164,7 @@ services:
     environment:
       - PORT=${GATEWAY_PORT:-8080}
       - AGENT_URL=${AGENT_URL_INTERNAL:-http://agent:8000}
+      - STATS_URL=${STATS_URL_INTERNAL:-http://mcp-stats:8080}
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://user:password@postgres:5432/postgres}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost,http://localhost:3000,http://frontend:3000}
       - UV_LINK_MODE=copy
@@ -159,10 +179,7 @@ services:
              exec uv run uvicorn main:app --host 0.0.0.0 --port ${GATEWAY_PORT:-8080} --reload"
     # Healthcheck flips green only once both migrations finished and uvicorn
     # is serving /healthz. `start_period` gives the migration step room on a
-    # cold image build (~30s) before the failing probes start counting; once
-    # boot is past, a 15s steady-state interval is plenty (this only matters
-    # for restart detection, not boot — `start_period` owns boot). The old 3s
-    # interval flooded the agent log with ~20 probes/min for no benefit.
+    # cold image build (~30s) before the failing probes start counting.
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:${GATEWAY_PORT:-8080}/healthz || exit 1"]
       interval: 15s
@@ -183,16 +200,25 @@ services:
       - "${FRONTEND_PORT:-3000}:${FRONTEND_PORT:-3000}"
     environment:
       - NODE_ENV=${NODE_ENV:-development}
-      # The frontend talks to the gateway. The gateway then proxies to the
-      # private agent service for anything that lives there.
+      # The frontend talks to ONLY the gateway. Gateway proxies to the private
+      # agent service (ADK runtime), the MCP Toolbox (dashboards), and
+      # mcp-stats (Analyze page) — none of which the browser reaches directly.
       - NEXT_PUBLIC_AGENTS_BASE_URL=${NEXT_PUBLIC_AGENTS_BASE_URL:-http://localhost:8080}
-      - NEXT_PUBLIC_STATS_BASE_URL=${NEXT_PUBLIC_STATS_BASE_URL:-http://localhost:5003}
     depends_on:
       gateway:
         condition: service_started
     stdin_open: true
     tty: true
     command: npm run dev
+    healthcheck:
+      # Next.js's dev server responds with HTML on `/`. Bare TCP probe would
+      # be cheaper but doesn't catch a wedged compile, so we hit the route.
+      # node:24-slim has no curl — use Node's native fetch (18+).
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:${FRONTEND_PORT:-3000}').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   postgres:
     image: public.ecr.aws/docker/library/postgres:16

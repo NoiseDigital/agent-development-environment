@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { clientDashboards, type Dashboard } from '../../data/dashboards';
-import { saveCodificationRequest, type CodifyTarget } from '../../lib/codification-requests';
+import { saveCodificationRequest, type CodifyTarget } from '../../lib/api/codification-requests';
 import { isClientDashboard } from '../../lib/dashboards/access';
 import { showToast } from '../../lib/toast';
 

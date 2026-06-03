@@ -1,7 +1,7 @@
 // Client for the per-message feedback API on the agent service.
 // Ratings are keyed by the ADK event id of the message they apply to.
 
-import { apiRequest } from '../http';
+import { apiRequest } from '../api/http';
 
 const BASE_URL = process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'http://localhost:8000';
 
