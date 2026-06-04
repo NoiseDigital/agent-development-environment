@@ -62,8 +62,8 @@ export default function Action({
 
   if (!result) {
     return (
-      <p className="mt-1 inline-flex items-center gap-1.5 text-[10px] text-zinc-500">
-        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-500" />
+      <p className="mt-1 inline-flex items-center gap-1.5 text-[10px] text-faint">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-faint" />
         Applying…
       </p>
     );
@@ -72,7 +72,7 @@ export default function Action({
   return (
     <p
       className={`mt-1 inline-flex items-center gap-1.5 text-[10px] ${
-        result.ok ? 'text-emerald-400' : 'text-red-400'
+        result.ok ? 'text-positive' : 'text-danger'
       }`}
     >
       <span>{result.ok ? '✓' : '⚠'}</span>

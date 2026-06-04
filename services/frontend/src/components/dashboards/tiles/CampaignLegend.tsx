@@ -20,15 +20,15 @@ function fmt(iso: string): string {
 export default function CampaignLegend({ windows }: CampaignLegendProps) {
   if (!windows || windows.length === 0) return null;
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[10px] text-zinc-400">
-      <span className="font-medium uppercase tracking-wider text-zinc-500">
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[10px] text-subtle">
+      <span className="font-medium uppercase tracking-wider text-faint">
         Campaigns
       </span>
       {windows.map((w) => (
         <span key={`${w.name}-${w.start_date}`} className="inline-flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-sm bg-emerald-500/40" />
-          <span className="text-zinc-300">{w.name}</span>
-          <span className="text-zinc-600">
+          <span className="text-muted">{w.name}</span>
+          <span className="text-disabled">
             {fmt(w.start_date)} – {fmt(w.end_date)}
           </span>
         </span>

@@ -127,7 +127,7 @@ function AssistantWidget() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open assistant"
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 pl-3.5 pr-4 py-3 rounded-full bg-white text-black shadow-[0_8px_30px_rgba(0,0,0,0.5)] hover:bg-zinc-100 transition-colors"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 pl-3.5 pr-4 py-3 rounded-full bg-inverse text-inverse-foreground shadow-[0_8px_30px_rgba(0,0,0,0.5)] hover:bg-inverse/90 transition-colors"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -140,20 +140,20 @@ function AssistantWidget() {
 
   // ── Expanded: chat panel ───────────────────────────────────────────────────
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col w-[400px] max-w-[calc(100vw-3rem)] h-[600px] max-h-[calc(100vh-3rem)] rounded-2xl border border-zinc-800 bg-zinc-950 shadow-[0_16px_50px_rgba(0,0,0,0.6)] overflow-hidden">
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col w-[400px] max-w-[calc(100vw-3rem)] h-[600px] max-h-[calc(100vh-3rem)] rounded-2xl border border-line bg-surface-sunken shadow-[0_16px_50px_rgba(0,0,0,0.6)] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800/60 shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-white shrink-0">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-line/60 shrink-0">
+        <div className="w-8 h-8 rounded-lg bg-surface-raised border border-line-strong flex items-center justify-center text-foreground shrink-0">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-white leading-tight">
+          <p className="text-sm font-semibold text-foreground leading-tight">
             {editCtx?.canGenerate ? 'Generate a visualization' : 'Media Analyst'}
           </p>
-          <p className="truncate text-[11px] text-zinc-500 leading-tight">
+          <p className="truncate text-[11px] text-faint leading-tight">
             {editCtx?.canGenerate
               ? `Charts you make can be saved to ${editCtx.tabLabel}`
               : 'Plan & dashboard assistant'}
@@ -163,7 +163,7 @@ function AssistantWidget() {
           type="button"
           onClick={() => createNewSession()}
           title="New chat"
-          className="p-1.5 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-md transition-colors"
+          className="p-1.5 text-faint hover:text-foreground hover:bg-surface-raised rounded-md transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -174,7 +174,7 @@ function AssistantWidget() {
           type="button"
           onClick={() => setOpen(false)}
           title="Minimize"
-          className="p-1.5 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-md transition-colors"
+          className="p-1.5 text-faint hover:text-foreground hover:bg-surface-raised rounded-md transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -186,16 +186,16 @@ function AssistantWidget() {
       <div ref={containerRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-6">
-            <div className="w-11 h-11 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-3">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-11 h-11 rounded-full bg-surface border border-line flex items-center justify-center mb-3">
+              <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <p className="text-sm font-semibold text-white">
+            <p className="text-sm font-semibold text-foreground">
               {editCtx?.canGenerate ? 'Describe a viz to add' : 'How can I help?'}
             </p>
-            <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+            <p className="text-xs text-faint mt-1 leading-relaxed">
               {editCtx?.canGenerate
                 ? `Try "weekly spend in 2024 as a line chart" or "spend by publisher". Use the Save button beneath each chart to add it to ${editCtx.tabLabel}.`
                 : 'Ask me to analyze media performance, explain a dashboard, or build a new visualization.'}
@@ -214,12 +214,12 @@ function AssistantWidget() {
             />
           ))
         )}
-        {error && <p className="text-[11px] text-red-400 px-1">{error}</p>}
+        {error && <p className="text-[11px] text-danger px-1">{error}</p>}
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
-      <div className="border-t border-zinc-800/60 p-3 shrink-0">
+      <div className="border-t border-line/60 p-3 shrink-0">
         {pendingSuggestions.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-1.5">
             {pendingSuggestions.map((s) => (
@@ -227,14 +227,14 @@ function AssistantWidget() {
                 key={s}
                 type="button"
                 onClick={() => handleSuggestion(s)}
-                className="rounded-full border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[11px] text-zinc-300 transition-colors hover:border-accent-400 hover:text-white"
+                className="rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] text-muted transition-colors hover:border-accent-400 hover:text-foreground"
               >
                 {s}
               </button>
             ))}
           </div>
         )}
-        <div className="flex items-end gap-2 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 focus-within:border-zinc-600 transition-colors">
+        <div className="flex items-end gap-2 rounded-xl border border-line bg-surface px-3 py-2 focus-within:border-line-strong transition-colors">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -250,14 +250,14 @@ function AssistantWidget() {
                 : 'Ask about plans or dashboards…'
             }
             rows={2}
-            className="flex-1 resize-none bg-transparent text-[13px] text-white placeholder-zinc-600 outline-none"
+            className="flex-1 resize-none bg-transparent text-[13px] text-foreground placeholder-disabled outline-none"
           />
           <button
             type="button"
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
             aria-label="Send message"
-            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-white text-black hover:bg-zinc-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg bg-inverse text-inverse-foreground hover:bg-inverse/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19V5M5 12l7-7 7 7" />

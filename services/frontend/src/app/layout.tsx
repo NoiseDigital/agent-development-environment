@@ -6,6 +6,13 @@ import FloatingAssistant from "../components/chat/FloatingAssistant";
 import NeuralBackground from "../components/NeuralBackground";
 import Toaster from "../components/ui/Toaster";
 import { SidebarProvider } from "../contexts/SidebarContext";
+import { ThemeProvider } from "../contexts/ThemeContext";
+
+// Runs before first paint: resolves the saved preference (or the OS setting on
+// a fresh visit) and sets the `light`/`dark` class on <html> so there's never a
+// flash of the wrong theme. Kept as a tiny string so it can be inlined in
+// <head>; ThemeProvider takes over syncing once React hydrates.
+const themeScript = `(function(){try{var t=localStorage.getItem('theme');var d=window.matchMedia('(prefers-color-scheme: dark)').matches;var m=(t==='light'||t==='dark')?t:(d?'dark':'light');var r=document.documentElement;r.classList.add(m);r.style.colorScheme=m;}catch(e){}})();`;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,21 +35,26 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-canvas text-foreground`}
       >
-        <SidebarProvider>
-          <NeuralBackground />
-          <div className="relative z-10 flex h-screen bg-black/0 overflow-hidden">
-            <PlatformSidebar />
-            <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
-              {children}
+        <ThemeProvider>
+          <SidebarProvider>
+            <NeuralBackground />
+            <div className="relative z-10 flex h-screen overflow-hidden">
+              <PlatformSidebar />
+              <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
+                {children}
+              </div>
             </div>
-          </div>
-          <FloatingAssistant />
-          <Toaster />
-        </SidebarProvider>
+            <FloatingAssistant />
+            <Toaster />
+          </SidebarProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

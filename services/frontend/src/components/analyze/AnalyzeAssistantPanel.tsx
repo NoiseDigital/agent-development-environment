@@ -57,18 +57,18 @@ export default function AnalyzeAssistantPanel({ contextPrefix }: PanelProps) {
   };
 
   return (
-    <aside className="flex h-full w-[380px] shrink-0 flex-col border-l border-zinc-800/60 bg-zinc-950">
+    <aside className="flex h-full w-[380px] shrink-0 flex-col border-l border-line/60 bg-surface-sunken">
       {/* Header */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-zinc-800/60 px-4 py-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-white">
+      <div className="flex shrink-0 items-center gap-3 border-b border-line/60 px-4 py-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-foreground">
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M3 12h2m14 0h2M5.6 5.6l1.4 1.4m9.9 9.9l1.4 1.4M12 3v2m0 14v2M5.6 18.4l1.4-1.4m9.9-9.9l1.4-1.4M9 12a3 3 0 116 0 3 3 0 01-6 0z" />
           </svg>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-white">Analyze Assistant</p>
-          <p className="text-[11px] text-zinc-500">
+          <p className="truncate text-sm font-semibold text-foreground">Analyze Assistant</p>
+          <p className="text-[11px] text-faint">
             {ready ? 'Reading your latest correlation result' : 'Run an analysis to start'}
           </p>
         </div>
@@ -76,7 +76,7 @@ export default function AnalyzeAssistantPanel({ contextPrefix }: PanelProps) {
           type="button"
           onClick={() => createNewSession(ASSISTANT_AGENT)}
           title="New chat"
-          className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-white"
+          className="rounded-md p-1.5 text-faint transition-colors hover:bg-surface-raised hover:text-foreground"
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -103,13 +103,13 @@ export default function AnalyzeAssistantPanel({ contextPrefix }: PanelProps) {
             />
           ))
         )}
-        {error && <p className="px-1 text-[11px] text-red-400">{error}</p>}
+        {error && <p className="px-1 text-[11px] text-danger">{error}</p>}
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
-      <div className="shrink-0 border-t border-zinc-800/60 p-3">
-        <div className="flex items-end gap-2 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 focus-within:border-zinc-600">
+      <div className="shrink-0 border-t border-line/60 p-3">
+        <div className="flex items-end gap-2 rounded-xl border border-line bg-surface px-3 py-2 focus-within:border-line-strong">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -122,14 +122,14 @@ export default function AnalyzeAssistantPanel({ contextPrefix }: PanelProps) {
             placeholder={ready ? 'Ask about this analysis…' : 'Run an analysis first…'}
             rows={2}
             disabled={!ready}
-            className="flex-1 resize-none bg-transparent text-[13px] text-white placeholder-zinc-600 outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex-1 resize-none bg-transparent text-[13px] text-foreground placeholder-disabled outline-none disabled:cursor-not-allowed disabled:opacity-50"
           />
           <button
             type="button"
             onClick={handleSend}
             disabled={!input.trim() || isLoading || !ready}
             aria-label="Send message"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-black transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-inverse text-inverse-foreground transition-colors hover:bg-inverse/90 disabled:cursor-not-allowed disabled:opacity-30"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19V5M5 12l7-7 7 7" />
@@ -147,14 +147,14 @@ function EmptyState({ ready, onAsk }: { ready: boolean; onAsk: (q: string) => vo
   if (!ready) {
     return (
       <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-        <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900">
-          <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-line bg-surface">
+          <svg className="h-5 w-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M9 17v-2a4 4 0 014-4h0M5 12V7a4 4 0 014-4h0m6 18v-2a4 4 0 00-4-4H7m12 6v-2a4 4 0 00-4-4h-1" />
           </svg>
         </div>
-        <p className="text-sm font-semibold text-white">No analysis yet</p>
-        <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+        <p className="text-sm font-semibold text-foreground">No analysis yet</p>
+        <p className="mt-1 text-xs leading-relaxed text-faint">
           Pick a data source on the left, choose your columns, and click <b>Run analysis</b>. I&apos;ll help interpret what comes back.
         </p>
       </div>
@@ -168,8 +168,8 @@ function EmptyState({ ready, onAsk }: { ready: boolean; onAsk: (q: string) => vo
   ];
   return (
     <div className="flex h-full flex-col px-2 py-3">
-      <p className="px-1 text-xs font-medium text-zinc-300">Try asking</p>
-      <p className="px-1 text-[11px] text-zinc-500">
+      <p className="px-1 text-xs font-medium text-muted">Try asking</p>
+      <p className="px-1 text-[11px] text-faint">
         I&apos;m grounded in your current heatmap + top signals.
       </p>
       <div className="mt-3 space-y-1.5">
@@ -178,7 +178,7 @@ function EmptyState({ ready, onAsk }: { ready: boolean; onAsk: (q: string) => vo
             key={s}
             type="button"
             onClick={() => onAsk(s)}
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2 text-left text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:bg-zinc-900 hover:text-white"
+            className="w-full rounded-lg border border-line bg-surface/50 px-3 py-2 text-left text-[12px] text-muted transition-colors hover:border-line-strong hover:bg-surface hover:text-foreground"
           >
             {s}
           </button>

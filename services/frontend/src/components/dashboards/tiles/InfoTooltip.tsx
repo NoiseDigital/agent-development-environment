@@ -90,7 +90,7 @@ export default function InfoTooltip({
         onFocus={() => { cancelClose(); setOpen(true); }}
         onBlur={scheduleClose}
         aria-label={ariaLabel}
-        className="flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full border border-zinc-700 text-[9px] font-bold text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-200"
+        className="flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full border border-line-strong text-[9px] font-bold text-subtle transition-colors hover:border-line-strong hover:text-foreground"
       >
         i
       </button>
@@ -109,7 +109,7 @@ export default function InfoTooltip({
               maxHeight: '70vh',
               overflowY: 'auto',
             }}
-            className={`z-[1000] ${widthClass} rounded-lg border border-zinc-700 bg-zinc-950 p-3 text-left shadow-[0_12px_40px_rgba(0,0,0,0.7)]`}
+            className={`z-[1000] ${widthClass} rounded-lg border border-line-strong bg-surface-sunken p-3 text-left shadow-[0_12px_40px_rgba(0,0,0,0.7)]`}
           >
             {children}
           </div>,

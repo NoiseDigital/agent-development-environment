@@ -61,7 +61,7 @@ function lastPointZ(values: number[]): number | null {
  *  hydration error). */
 function TitleRow({ label, metric }: { label: string; metric: BqMetricKey }) {
   return (
-    <div className="flex h-3 items-center justify-center gap-1 truncate text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+    <div className="flex h-3 items-center justify-center gap-1 truncate text-[10px] font-medium uppercase tracking-wider text-faint">
       <span className="truncate">{label}</span>
       <MetricInfoTooltip metricKey={metric} labelOverride={label} />
     </div>
@@ -80,7 +80,7 @@ export default function KpiTile({
     return (
       <div className="grid h-full grid-rows-[auto_1fr_auto_auto] place-items-center gap-1 text-center">
         <TitleRow label={label} metric={metric} />
-        <span className="text-[1.6rem] font-semibold leading-none tabular-nums text-zinc-600">—</span>
+        <span className="text-[1.6rem] font-semibold leading-none tabular-nums text-disabled">—</span>
         <div className="h-[18px]" />
         <div className="h-3" />
       </div>
@@ -112,13 +112,13 @@ export default function KpiTile({
     <div className="grid h-full grid-rows-[auto_1fr_auto_auto] place-items-center gap-1 text-center">
       <TitleRow label={label} metric={metric} />
       <div className="flex items-baseline justify-center gap-1.5">
-        <span className="truncate text-[1.6rem] font-semibold leading-none tabular-nums text-white">
+        <span className="truncate text-[1.6rem] font-semibold leading-none tabular-nums text-foreground">
           {value}
         </span>
         {delta && (
           <span
             className={`flex shrink-0 items-center gap-0.5 text-[11px] font-medium ${
-              delta.good ? 'text-emerald-400' : 'text-red-400'
+              delta.good ? 'text-positive' : 'text-danger'
             }`}
           >
             {delta.value.trim().startsWith('-') ? '▼' : '▲'}
@@ -132,8 +132,8 @@ export default function KpiTile({
             title={`Most recent bucket is ${anomaly.label} from the rest of the series.`}
             className={`rounded-full border px-1.5 py-px text-[9px] font-medium leading-tight ${
               anomaly.good
-                ? 'border-emerald-500/40 bg-emerald-400/10 text-emerald-300'
-                : 'border-red-500/40 bg-red-400/10 text-red-300'
+                ? 'border-positive/40 bg-positive/10 text-positive'
+                : 'border-danger/40 bg-danger/10 text-danger'
             }`}
           >
             {anomaly.label}

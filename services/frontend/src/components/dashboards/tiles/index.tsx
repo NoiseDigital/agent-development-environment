@@ -137,7 +137,7 @@ export function renderTile(tile: DashboardTile, ctx: TileRenderContext): ReactNo
 
 function UnknownTilePlaceholder({ type }: { type: string }) {
   return (
-    <div className="flex h-full items-center justify-center text-[11px] text-zinc-500">
+    <div className="flex h-full items-center justify-center text-[11px] text-faint">
       Unknown tile type: <code className="ml-1">{type}</code>
     </div>
   );

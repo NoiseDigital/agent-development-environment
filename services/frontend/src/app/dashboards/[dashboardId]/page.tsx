@@ -24,13 +24,13 @@ export default function DashboardPage() {
   }, [params.dashboardId, dashboard]);
 
   if (dashboard === undefined) {
-    return <div className="h-full bg-black" />;
+    return <div className="h-full bg-canvas" />;
   }
 
   if (dashboard === null) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-black text-center">
-        <p className="text-sm text-zinc-400">Dashboard not found.</p>
+      <div className="flex h-full flex-col items-center justify-center bg-canvas text-center">
+        <p className="text-sm text-subtle">Dashboard not found.</p>
         <button
           type="button"
           onClick={() => router.push('/dashboards')}

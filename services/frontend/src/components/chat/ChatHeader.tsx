@@ -46,11 +46,11 @@ export default function ChatHeader({
   }, []);
 
   return (
-    <div className="px-4 py-3 border-b border-zinc-800/60 bg-black">
+    <div className="px-4 py-3 border-b border-line/60 bg-canvas">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {selectedApp && sessionLabel && (
-            <h2 className="text-sm font-medium text-white truncate">
+            <h2 className="text-sm font-medium text-foreground truncate">
               <TypingName name={sessionLabel} animate={animateLabel} />
             </h2>
           )}
@@ -60,7 +60,7 @@ export default function ChatHeader({
         <div className="relative" ref={profileRef}>
           <button
             onClick={() => setProfileOpen(o => !o)}
-            className="w-8 h-8 rounded-full bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center text-white transition-colors shrink-0"
+            className="w-8 h-8 rounded-full bg-surface-raised hover:bg-surface-raised/80 flex items-center justify-center text-foreground transition-colors shrink-0"
             title="Profile"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,14 +69,14 @@ export default function ChatHeader({
           </button>
 
           {profileOpen && (
-            <div className="absolute right-0 mt-2 w-52 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl z-50 overflow-hidden">
-              <div className="px-4 py-3 border-b border-zinc-800/60">
-                <p className="text-[11px] text-zinc-500 mb-0.5">Signed in as</p>
-                <p className="text-sm font-medium text-white truncate">user@example.com</p>
+            <div className="absolute right-0 mt-2 w-52 bg-surface border border-line-strong rounded-xl shadow-xl z-50 overflow-hidden">
+              <div className="px-4 py-3 border-b border-line/60">
+                <p className="text-[11px] text-faint mb-0.5">Signed in as</p>
+                <p className="text-sm font-medium text-foreground truncate">user@example.com</p>
               </div>
               <div className="py-1">
                 <button
-                  className="w-full text-left px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors flex items-center gap-2.5"
+                  className="w-full text-left px-4 py-2.5 text-sm text-muted hover:bg-surface-raised hover:text-foreground transition-colors flex items-center gap-2.5"
                   onClick={() => setProfileOpen(false)}
                 >
                   <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -86,7 +86,7 @@ export default function ChatHeader({
                   Account Settings
                 </button>
                 <button
-                  className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-zinc-800 hover:text-red-300 transition-colors flex items-center gap-2.5"
+                  className="w-full text-left px-4 py-2.5 text-sm text-danger hover:bg-surface-raised hover:text-danger/80 transition-colors flex items-center gap-2.5"
                   onClick={() => setProfileOpen(false)}
                 >
                   <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -101,8 +101,8 @@ export default function ChatHeader({
       </div>
 
       {error && (
-        <div className="mt-2 p-3 bg-red-950 border border-red-800 rounded-xl">
-          <div className="text-red-200 text-sm">{error}</div>
+        <div className="mt-2 p-3 bg-danger/10 border border-danger/30 rounded-xl">
+          <div className="text-danger text-sm">{error}</div>
         </div>
       )}
     </div>

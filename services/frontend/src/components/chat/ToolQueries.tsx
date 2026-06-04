@@ -30,7 +30,7 @@ export default function ToolQueries({ calls }: { calls: ToolCall[] }) {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-500 hover:text-zinc-300 transition-colors"
+        className="flex items-center gap-1.5 text-[11px] font-medium text-faint hover:text-muted transition-colors"
       >
         <span className={`inline-block transition-transform ${open ? 'rotate-90' : ''}`}>▸</span>
         {sqlCalls.length} {sqlCalls.length === 1 ? 'query' : 'queries'} executed

@@ -16,14 +16,14 @@ export default function TextTile({ text, editing, onChange }: TextTileProps) {
         value={text}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Type text…"
-        className="no-drag w-full h-full bg-transparent resize-none text-sm leading-relaxed text-zinc-200 placeholder-zinc-600 outline-none"
+        className="no-drag w-full h-full bg-transparent resize-none text-sm leading-relaxed text-foreground placeholder-disabled outline-none"
       />
     );
   }
 
   return (
-    <div className="h-full overflow-auto text-sm leading-relaxed text-zinc-300 whitespace-pre-wrap">
-      {text || <span className="text-zinc-600 italic">Empty text block</span>}
+    <div className="h-full overflow-auto text-sm leading-relaxed text-muted whitespace-pre-wrap">
+      {text || <span className="text-disabled italic">Empty text block</span>}
     </div>
   );
 }

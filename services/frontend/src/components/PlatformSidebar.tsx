@@ -8,6 +8,7 @@ import { adkApi } from '../lib/agent/adk-api';
 import { useResizable } from '../hooks/useResizable';
 import { useSidebarCollapsed } from '../contexts/SidebarContext';
 import ResizeHandle from './ui/ResizeHandle';
+import ThemeToggle from './ui/ThemeToggle';
 
 // ── Icons ────────────────────────────────────────────────────────────────────
 
@@ -94,8 +95,8 @@ export default function PlatformSidebar() {
   const navItem = (active: boolean) =>
     `group flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium cursor-pointer select-none transition-colors duration-150 ${
       active
-        ? 'bg-zinc-800 text-white'
-        : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'
+        ? 'bg-surface-raised text-foreground'
+        : 'text-subtle hover:bg-surface hover:text-foreground'
     }`;
 
   if (collapsed) {
@@ -105,18 +106,18 @@ export default function PlatformSidebar() {
         onClick={onClick}
         title={label}
         className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors duration-150 ${
-          active ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'
+          active ? 'bg-surface-raised text-foreground' : 'text-subtle hover:bg-surface hover:text-foreground'
         }`}
       >
         {icon}
       </button>
     );
     return (
-      <aside className="w-12 shrink-0 flex flex-col h-full bg-zinc-950 border-r border-zinc-800/60 items-center py-3 gap-1">
+      <aside className="w-12 shrink-0 flex flex-col h-full bg-surface-sunken border-r border-line items-center py-3 gap-1">
         <button
           type="button"
           onClick={() => setCollapsed(false)}
-          className="w-9 h-9 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors duration-150 mb-1"
+          className="w-9 h-9 flex items-center justify-center text-faint hover:text-foreground hover:bg-surface-raised rounded-lg transition-colors duration-150 mb-1"
           title="Expand sidebar"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,26 +128,31 @@ export default function PlatformSidebar() {
         {collapsedItem(pathname.startsWith('/dashboards'), () => router.push('/dashboards'), 'Dashboards', <DashboardsIcon />)}
         {collapsedItem(pathname.startsWith('/analyze'), () => router.push('/analyze'), 'Analyze', <AnalyzeIcon />)}
         {collapsedItem(inAgentsSection, () => router.push('/agents'), 'Agents', <AgentsIcon />)}
+        {/* Theme switch pinned to the bottom of the rail */}
+        <div className="mt-auto">
+          <ThemeToggle />
+        </div>
       </aside>
     );
   }
 
   return (
     <aside
-      className="relative shrink-0 flex flex-col h-full bg-zinc-950 border-r border-zinc-800/60"
+      className="relative shrink-0 flex flex-col h-full bg-surface-sunken border-r border-line"
       style={{ width }}
     >
       <ResizeHandle side="right" onPointerDown={startResize} />
       {/* ── Brand ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between pl-4 pr-2 py-[14px] border-b border-zinc-800/60">
+      <div className="flex items-center justify-between pl-4 pr-2 py-[14px] border-b border-line">
         <div className="flex items-end gap-1.5 min-w-0 cursor-pointer" onClick={() => router.push('/')}>
-          <Image src="/noise_white.svg" alt="Noise" width={72} height={20} className="h-5 w-auto shrink-0" />
-          <span className="text-zinc-400 text-[11px] font-bold tracking-widest uppercase leading-none mb-[1px]">OS</span>
+          {/* Logo art is white; invert it to dark ink on light surfaces. */}
+          <Image src="/noise_white.svg" alt="Noise" width={72} height={20} className="h-5 w-auto shrink-0 light:invert" />
+          <span className="text-subtle text-[11px] font-bold tracking-widest uppercase leading-none mb-[1px]">OS</span>
         </div>
         <button
           type="button"
           onClick={() => setCollapsed(true)}
-          className="p-1.5 text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 rounded-md transition-colors duration-150 shrink-0"
+          className="p-1.5 text-disabled hover:text-muted hover:bg-surface-raised rounded-md transition-colors duration-150 shrink-0"
           title="Collapse sidebar"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -191,12 +197,12 @@ export default function PlatformSidebar() {
 
         {/* Agents — label navigates, chevron toggles */}
         <div>
-          <div className={`flex items-center w-full rounded-lg transition-colors duration-150 ${inAgentsSection ? 'bg-zinc-800' : 'hover:bg-zinc-900'}`}>
+          <div className={`flex items-center w-full rounded-lg transition-colors duration-150 ${inAgentsSection ? 'bg-surface-raised' : 'hover:bg-surface'}`}>
             {/* Main clickable area → go to library */}
             <button
               type="button"
               onClick={() => router.push('/agents')}
-              className={`flex items-center gap-3 flex-1 px-3 py-2 text-sm font-medium cursor-pointer select-none ${inAgentsSection ? 'text-white' : 'text-zinc-400 hover:text-white'}`}
+              className={`flex items-center gap-3 flex-1 px-3 py-2 text-sm font-medium cursor-pointer select-none ${inAgentsSection ? 'text-foreground' : 'text-subtle hover:text-foreground'}`}
             >
               <AgentsIcon />
               <span>Agents</span>
@@ -205,7 +211,7 @@ export default function PlatformSidebar() {
             <button
               type="button"
               onClick={() => setAgentsExpanded((v) => !v)}
-              className={`px-2 py-2 cursor-pointer select-none transition-colors duration-150 rounded-r-lg ${inAgentsSection ? 'text-zinc-300 hover:text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+              className={`px-2 py-2 cursor-pointer select-none transition-colors duration-150 rounded-r-lg ${inAgentsSection ? 'text-muted hover:text-foreground' : 'text-faint hover:text-muted'}`}
               aria-label="Toggle agents list"
             >
               <ChevronRightIcon expanded={agentsExpanded} />
@@ -214,7 +220,7 @@ export default function PlatformSidebar() {
 
           {/* Agent sub-items */}
           {agentsExpanded && (
-            <div className="mt-px ml-[11px] pl-4 border-l border-zinc-800/60 space-y-px">
+            <div className="mt-px ml-[11px] pl-4 border-l border-line space-y-px">
               {visibleAgents.map((agent) => {
                 const active = pathname.startsWith(`/chat/${agent.name}`);
                 const isOnline = onlineAgents.has(agent.name);
@@ -225,11 +231,11 @@ export default function PlatformSidebar() {
                     onClick={() => router.push(`/chat/${agent.name}`)}
                     className={`flex items-center gap-2.5 w-full px-2.5 py-[7px] rounded-md text-[12.5px] cursor-pointer select-none transition-colors duration-150 ${
                       active
-                        ? 'bg-zinc-800 text-white font-medium'
-                        : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'
+                        ? 'bg-surface-raised text-foreground font-medium'
+                        : 'text-subtle hover:bg-surface hover:text-foreground'
                     }`}
                   >
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isOnline ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isOnline ? 'bg-positive' : 'bg-disabled'}`} />
                     <span className="truncate">{agent.displayName}</span>
                   </button>
                 );
@@ -239,7 +245,7 @@ export default function PlatformSidebar() {
               <button
                 type="button"
                 onClick={() => router.push('/agents')}
-                className="flex items-center gap-2.5 w-full px-2.5 py-[7px] rounded-md text-[12px] cursor-pointer select-none transition-colors duration-150 text-zinc-600 hover:bg-zinc-900 hover:text-zinc-300"
+                className="flex items-center gap-2.5 w-full px-2.5 py-[7px] rounded-md text-[12px] cursor-pointer select-none transition-colors duration-150 text-disabled hover:bg-surface hover:text-muted"
               >
                 <ViewAllIcon />
                 <span>View all agents</span>
@@ -248,6 +254,11 @@ export default function PlatformSidebar() {
           )}
         </div>
       </nav>
+
+      {/* ── Footer ─────────────────────────────────────────────────────────── */}
+      <div className="p-2 border-t border-line">
+        <ThemeToggle />
+      </div>
 
     </aside>
   );

@@ -80,7 +80,7 @@ export default function DashboardFilterBar() {
 
       {/* Date range — two date inputs. Both clear together via Reset. */}
       <div>
-        <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+        <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-faint">
           Date Range
         </p>
         <div className="flex items-center gap-1.5">
@@ -88,15 +88,15 @@ export default function DashboardFilterBar() {
             type="date"
             value={draft.date_from ?? ''}
             onChange={(e) => patch('date_from', e.target.value || undefined)}
-            className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-300 transition-colors hover:border-zinc-700"
+            className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-muted transition-colors hover:border-line-strong"
             aria-label="Start date"
           />
-          <span className="text-xs text-zinc-600">→</span>
+          <span className="text-xs text-disabled">→</span>
           <input
             type="date"
             value={draft.date_to ?? ''}
             onChange={(e) => patch('date_to', e.target.value || undefined)}
-            className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-300 transition-colors hover:border-zinc-700"
+            className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-muted transition-colors hover:border-line-strong"
             aria-label="End date"
           />
         </div>
@@ -109,7 +109,7 @@ export default function DashboardFilterBar() {
           <button
             type="button"
             onClick={apply}
-            className="self-end animate-in fade-in slide-in-from-bottom-1 rounded-md bg-white px-3 py-1.5 text-[11px] font-semibold text-black shadow-lg shadow-white/10 transition-colors hover:bg-zinc-200"
+            className="self-end animate-in fade-in slide-in-from-bottom-1 rounded-md bg-inverse px-3 py-1.5 text-[11px] font-semibold text-inverse-foreground shadow-lg shadow-foreground/10 transition-colors hover:bg-inverse/90"
             aria-label="Apply pending filter changes"
           >
             Apply
@@ -119,7 +119,7 @@ export default function DashboardFilterBar() {
           <button
             type="button"
             onClick={reset}
-            className="self-end rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-[11px] font-medium text-zinc-400 transition-colors hover:border-zinc-700 hover:text-white"
+            className="self-end rounded-md border border-line bg-surface px-2.5 py-1.5 text-[11px] font-medium text-subtle transition-colors hover:border-line-strong hover:text-foreground"
           >
             Clear
           </button>

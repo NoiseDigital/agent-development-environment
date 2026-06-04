@@ -29,7 +29,7 @@ export default function TileChartShell({
       <div className="mb-1 flex shrink-0 items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-1.5">
-            <p className="truncate text-sm font-medium text-white">{title}</p>
+            <p className="truncate text-sm font-medium text-foreground">{title}</p>
             {info ? (
               <ChartInfoTooltip {...info} title={title} />
             ) : tooltipKey ? (
@@ -37,7 +37,7 @@ export default function TileChartShell({
             ) : null}
           </div>
           {subtitle && (
-            <p className="mt-0.5 truncate text-[11px] text-zinc-500">{subtitle}</p>
+            <p className="mt-0.5 truncate text-[11px] text-faint">{subtitle}</p>
           )}
         </div>
       </div>

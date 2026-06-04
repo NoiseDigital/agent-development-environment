@@ -20,7 +20,7 @@ export default function Suggestions({
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
       {props.title && (
-        <span className="self-center pr-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+        <span className="self-center pr-1 text-[10px] font-medium uppercase tracking-wider text-faint">
           {props.title}
         </span>
       )}
@@ -29,7 +29,7 @@ export default function Suggestions({
           key={`${i}-${text}`}
           type="button"
           onClick={() => onAction?.(text)}
-          className="rounded-full border border-zinc-800 bg-zinc-900/60 px-2.5 py-1 text-[11px] text-zinc-300 transition-colors hover:border-accent-400/60 hover:bg-accent-400/10 hover:text-white"
+          className="rounded-full border border-line bg-surface/60 px-2.5 py-1 text-[11px] text-muted transition-colors hover:border-accent-400/60 hover:bg-accent-400/10 hover:text-foreground"
         >
           {text}
         </button>

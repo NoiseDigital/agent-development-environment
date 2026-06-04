@@ -29,11 +29,11 @@ export default function CampaignPlanPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <p className="text-sm text-zinc-300">Unknown client &ldquo;{clientCode}&rdquo;.</p>
+          <p className="text-sm text-muted">Unknown client &ldquo;{clientCode}&rdquo;.</p>
           <button
             type="button"
             onClick={() => router.push('/plan')}
-            className="mt-3 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white"
+            className="mt-3 rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-medium text-muted transition-colors hover:border-line-strong hover:text-foreground"
           >
             Back to Plan
           </button>
@@ -47,13 +47,13 @@ export default function CampaignPlanPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <p className="text-sm text-zinc-300">
+          <p className="text-sm text-muted">
             Campaign &ldquo;{campaignId}&rdquo; not found for {plan.clientName}.
           </p>
           <button
             type="button"
             onClick={() => router.push(`/plan/${clientCode}`)}
-            className="mt-3 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white"
+            className="mt-3 rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-medium text-muted transition-colors hover:border-line-strong hover:text-foreground"
           >
             Back to {plan.clientName}
           </button>
@@ -68,12 +68,12 @@ export default function CampaignPlanPage() {
   return (
     <div className="flex h-full flex-col">
       {/* Header — breadcrumb + headline + summary stats */}
-      <div className="shrink-0 border-b border-zinc-800/60 px-8 py-5">
-        <div className="flex items-baseline gap-2 text-[11px] text-zinc-500">
+      <div className="shrink-0 border-b border-line/60 px-8 py-5">
+        <div className="flex items-baseline gap-2 text-[11px] text-faint">
           <button
             type="button"
             onClick={() => router.push('/plan')}
-            className="transition-colors hover:text-zinc-300"
+            className="transition-colors hover:text-muted"
           >
             Plan
           </button>
@@ -81,19 +81,19 @@ export default function CampaignPlanPage() {
           <button
             type="button"
             onClick={() => router.push(`/plan/${plan.clientCode}`)}
-            className="transition-colors hover:text-zinc-300"
+            className="transition-colors hover:text-muted"
           >
             {plan.clientName}
           </button>
           <span>/</span>
-          <span className="text-zinc-400">{campaign.id}</span>
+          <span className="text-subtle">{campaign.id}</span>
         </div>
         <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-semibold tracking-tight text-white">
+            <h1 className="truncate text-lg font-semibold tracking-tight text-foreground">
               {campaign.name}
             </h1>
-            <p className="text-[11px] text-zinc-500">
+            <p className="text-[11px] text-faint">
               {campaign.phase} · {campaign.marketGroup} · {campaign.kpiGoal}
             </p>
           </div>
@@ -116,8 +116,8 @@ export default function CampaignPlanPage() {
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="text-right">
-      <p className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</p>
-      <p className="text-[14px] font-semibold text-white tabular-nums">{value}</p>
+      <p className="text-[10px] uppercase tracking-wider text-faint">{label}</p>
+      <p className="text-[14px] font-semibold text-foreground tabular-nums">{value}</p>
     </div>
   );
 }

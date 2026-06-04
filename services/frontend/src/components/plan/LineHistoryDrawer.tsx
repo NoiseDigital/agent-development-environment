@@ -33,16 +33,16 @@ export default function LineHistoryDrawer({ lineId, entries, onClose }: DrawerPr
         onClick={onClose}
       />
       {/* Panel */}
-      <aside className="flex w-[360px] flex-col border-l border-zinc-800 bg-zinc-950 shadow-[0_0_40px_rgba(0,0,0,0.6)]">
-        <div className="flex shrink-0 items-center justify-between border-b border-zinc-800/60 px-4 py-3">
+      <aside className="flex w-[360px] flex-col border-l border-line bg-surface-sunken shadow-[0_0_40px_rgba(0,0,0,0.6)]">
+        <div className="flex shrink-0 items-center justify-between border-b border-line/60 px-4 py-3">
           <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-wider text-zinc-500">Edit history</p>
-            <p className="truncate font-mono text-[12px] text-white">{lineId}</p>
+            <p className="text-[10px] uppercase tracking-wider text-faint">Edit history</p>
+            <p className="truncate font-mono text-[12px] text-foreground">{lineId}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-white"
+            className="rounded-md p-1.5 text-faint transition-colors hover:bg-surface-raised hover:text-foreground"
             aria-label="Close"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -53,29 +53,29 @@ export default function LineHistoryDrawer({ lineId, entries, onClose }: DrawerPr
 
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {entries.length === 0 ? (
-            <p className="text-[11px] text-zinc-500">
+            <p className="text-[11px] text-faint">
               No edits yet. Changes you make to this line will appear here.
             </p>
           ) : (
             <ul className="space-y-3">
               {entries.map((e, i) => (
-                <li key={i} className="rounded-lg border border-zinc-800/60 bg-zinc-900/40 px-3 py-2">
+                <li key={i} className="rounded-lg border border-line/60 bg-surface/40 px-3 py-2">
                   <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-[12px] font-medium text-white">
+                    <span className="text-[12px] font-medium text-foreground">
                       {fieldLabel[e.field] ?? e.field}
                     </span>
-                    <span className="text-[10px] text-zinc-500">{relativeTime(e.at)}</span>
+                    <span className="text-[10px] text-faint">{relativeTime(e.at)}</span>
                   </div>
                   <div className="mt-1.5 flex items-center gap-2 text-[11px]">
-                    <span className="rounded bg-red-500/10 px-1.5 py-0.5 text-red-300 line-through">
+                    <span className="rounded bg-danger/10 px-1.5 py-0.5 text-danger line-through">
                       {e.before ?? '—'}
                     </span>
-                    <span className="text-zinc-600">→</span>
-                    <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-emerald-300">
+                    <span className="text-disabled">→</span>
+                    <span className="rounded bg-positive/10 px-1.5 py-0.5 text-positive">
                       {e.after ?? '—'}
                     </span>
                   </div>
-                  <p className="mt-1 text-[10px] text-zinc-500">by {e.by}</p>
+                  <p className="mt-1 text-[10px] text-faint">by {e.by}</p>
                 </li>
               ))}
             </ul>

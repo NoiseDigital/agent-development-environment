@@ -158,12 +158,12 @@ export default function ChatSidebar({
   const dayKeys = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
   if (collapsed) {
     return (
-      <aside className="w-12 shrink-0 flex flex-col h-full bg-zinc-950 border-r border-zinc-800/60 items-center py-3 gap-1">
+      <aside className="w-12 shrink-0 flex flex-col h-full bg-surface-sunken border-r border-line/60 items-center py-3 gap-1">
         <button
           type="button"
           onClick={() => setCollapsed(false)}
           title="Expand conversations"
-          className="w-9 h-9 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors duration-150"
+          className="w-9 h-9 flex items-center justify-center text-faint hover:text-foreground hover:bg-surface-raised rounded-lg transition-colors duration-150"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -174,7 +174,7 @@ export default function ChatSidebar({
             type="button"
             onClick={createNewSession}
             title="New chat"
-            className="w-9 h-9 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-900 rounded-lg transition-colors duration-150"
+            className="w-9 h-9 flex items-center justify-center text-subtle hover:text-foreground hover:bg-surface rounded-lg transition-colors duration-150"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -187,15 +187,15 @@ export default function ChatSidebar({
 
   return (
     <aside
-      className="relative shrink-0 h-full bg-zinc-950 border-r border-zinc-800/60 flex flex-col"
+      className="relative shrink-0 h-full bg-surface-sunken border-r border-line/60 flex flex-col"
       style={{ width }}
     >
       <ResizeHandle side="right" onPointerDown={startResize} />
       {/* Header */}
-      <div className="px-4 py-4 border-b border-zinc-800/60 flex items-center justify-between gap-2">
+      <div className="px-4 py-4 border-b border-line/60 flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-0.5">Conversations</p>
-          <p className="text-sm font-medium text-white truncate">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-faint mb-0.5">Conversations</p>
+          <p className="text-sm font-medium text-foreground truncate">
             {agentConfig?.displayName ?? 'Agent'}
           </p>
         </div>
@@ -203,7 +203,7 @@ export default function ChatSidebar({
           {selectedApp && (
             <button
               onClick={createNewSession}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium rounded-lg transition-colors duration-150"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-raised hover:bg-surface-raised/80 text-foreground text-xs font-medium rounded-lg transition-colors duration-150"
               title="New chat"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -216,7 +216,7 @@ export default function ChatSidebar({
             type="button"
             onClick={() => setCollapsed(true)}
             title="Collapse conversations"
-            className="p-1.5 text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 rounded-md transition-colors duration-150"
+            className="p-1.5 text-disabled hover:text-muted hover:bg-surface-raised rounded-md transition-colors duration-150"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -229,13 +229,13 @@ export default function ChatSidebar({
       <div className="flex-1 overflow-y-auto">
         <div className="p-3">
           {sessions.length === 0 ? (
-            <div className="text-center text-zinc-500 py-8 text-sm">
+            <div className="text-center text-faint py-8 text-sm">
               {selectedApp ? 'No conversations yet' : 'Select an agent to start'}
             </div>
           ) : (
             dayKeys.map(dayKey => (
               <div key={dayKey} className="mb-3">
-                <p className="px-2 py-1 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                <p className="px-2 py-1 text-xs font-medium text-faint uppercase tracking-wide">
                   {formatDayLabel(dayKey)}
                 </p>
                 <div className="space-y-1 mt-1">
@@ -253,8 +253,8 @@ export default function ChatSidebar({
                         onClick={() => !isEditing && selectSession(session.id)}
                         className={`px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-150 relative group ${
                           isActive
-                            ? 'bg-zinc-800 border border-zinc-700'
-                            : 'hover:bg-zinc-900 border border-transparent'
+                            ? 'bg-surface-raised border border-line-strong'
+                            : 'hover:bg-surface border border-transparent'
                         }`}
                       >
                         {isEditing ? (
@@ -269,7 +269,7 @@ export default function ChatSidebar({
                                 if (e.key === 'Escape') cancelEdit();
                               }}
                               placeholder="Session name…"
-                              className="flex-1 min-w-0 bg-transparent text-sm text-white outline-none border-b border-zinc-500 focus:border-zinc-300 transition-colors py-0.5"
+                              className="flex-1 min-w-0 bg-transparent text-sm text-foreground outline-none border-b border-faint focus:border-muted transition-colors py-0.5"
                             />
                             {/* AI sparkle — regenerate into input */}
                             {renameSession && (
@@ -280,7 +280,7 @@ export default function ChatSidebar({
                                 className={`p-1 flex-shrink-0 rounded transition-colors ${
                                   isAiRenaming
                                     ? 'text-accent-400 bg-accent-950'
-                                    : 'text-zinc-500 hover:text-accent-400 hover:bg-zinc-700 disabled:opacity-30'
+                                    : 'text-faint hover:text-accent-400 hover:bg-surface-raised disabled:opacity-30'
                                 }`}
                               >
                                 {isAiRenaming ? (
@@ -299,7 +299,7 @@ export default function ChatSidebar({
                             <button
                               onClick={commitEdit}
                               title="Save"
-                              className="p-1 text-emerald-400 hover:text-emerald-300 flex-shrink-0"
+                              className="p-1 text-positive hover:text-positive/80 flex-shrink-0"
                             >
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
@@ -309,7 +309,7 @@ export default function ChatSidebar({
                             <button
                               onClick={cancelEdit}
                               title="Cancel"
-                              className="p-1 text-red-400 hover:text-red-300 flex-shrink-0"
+                              className="p-1 text-danger hover:text-danger/80 flex-shrink-0"
                             >
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
@@ -319,14 +319,14 @@ export default function ChatSidebar({
                         ) : (
                           /* ── Normal display ── */
                           <div className="flex items-center gap-2 min-w-0">
-                            <p className="text-sm text-white truncate flex-1 min-w-0">
+                            <p className="text-sm text-foreground truncate flex-1 min-w-0">
                               {displayName ? (
                                 <TypingName
                                   name={displayName}
                                   animate={!!aiRenamedIds?.has(session.id)}
                                 />
                               ) : (
-                                <span className="text-zinc-400 italic">New chat</span>
+                                <span className="text-subtle italic">New chat</span>
                               )}
                             </p>
 
@@ -339,7 +339,7 @@ export default function ChatSidebar({
                                 <button
                                   onClick={e => startEdit(e, session)}
                                   title="Rename"
-                                  className="p-1.5 text-zinc-500 hover:text-white hover:bg-zinc-700 rounded transition-colors flex-shrink-0"
+                                  className="p-1.5 text-faint hover:text-foreground hover:bg-surface-raised rounded transition-colors flex-shrink-0"
                                 >
                                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 11l6.364-6.364a2 2 0 112.828 2.828L11.828 13.828A2 2 0 0110 14H8v-2a2 2 0 01.586-1.414z" />
@@ -350,19 +350,19 @@ export default function ChatSidebar({
                                 <div className="relative flex-shrink-0">
                                   {isConfirmingDelete && (
                                     <div
-                                      className="absolute bottom-full right-0 mb-1.5 flex items-center gap-1.5 bg-zinc-800 border border-zinc-600 rounded-lg px-2.5 py-1.5 shadow-xl whitespace-nowrap z-20"
+                                      className="absolute bottom-full right-0 mb-1.5 flex items-center gap-1.5 bg-surface-raised border border-line-strong rounded-lg px-2.5 py-1.5 shadow-xl whitespace-nowrap z-20"
                                       onClick={e => e.stopPropagation()}
                                     >
-                                      <span className="text-xs text-zinc-300">Delete?</span>
+                                      <span className="text-xs text-muted">Delete?</span>
                                       <button
                                         onClick={e => confirmDelete(e, session.id)}
-                                        className="text-xs font-semibold text-red-400 hover:text-red-300 transition-colors px-1"
+                                        className="text-xs font-semibold text-danger hover:text-danger/80 transition-colors px-1"
                                       >
                                         Yes
                                       </button>
                                       <button
                                         onClick={e => { e.stopPropagation(); setConfirmingDeleteId(null); }}
-                                        className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors px-1"
+                                        className="text-xs text-subtle hover:text-foreground transition-colors px-1"
                                       >
                                         No
                                       </button>
@@ -373,8 +373,8 @@ export default function ChatSidebar({
                                     title="Delete session"
                                     className={`p-1.5 rounded transition-colors ${
                                       isConfirmingDelete
-                                        ? 'text-red-400 bg-zinc-700'
-                                        : 'text-zinc-500 hover:text-red-400 hover:bg-zinc-700'
+                                        ? 'text-danger bg-surface-raised'
+                                        : 'text-faint hover:text-danger hover:bg-surface-raised'
                                     }`}
                                   >
                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -385,7 +385,7 @@ export default function ChatSidebar({
                               </div>
 
                               {/* Time — always right-anchored */}
-                              <span className="text-xs text-zinc-500 shrink-0 w-10 text-right">{formatTime(ts)}</span>
+                              <span className="text-xs text-faint shrink-0 w-10 text-right">{formatTime(ts)}</span>
                             </div>
                           </div>
                         )}

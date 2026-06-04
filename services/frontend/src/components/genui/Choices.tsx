@@ -184,12 +184,12 @@ export default function Choices({
   if (submitted) {
     return (
       <div className="bg-surface border border-line-strong rounded-xl p-4 mt-3">
-        <p className="text-xs font-medium text-zinc-500 mb-2">Answered</p>
+        <p className="text-xs font-medium text-faint mb-2">Answered</p>
         <ul className="space-y-1.5">
           {questions.map((qq, i) => (
-            <li key={i} className="text-xs text-zinc-400">
+            <li key={i} className="text-xs text-subtle">
               {qq.question}{' '}
-              <span className="text-zinc-200">{answerFor(i)}</span>
+              <span className="text-muted">{answerFor(i)}</span>
             </li>
           ))}
         </ul>
@@ -199,7 +199,7 @@ export default function Choices({
 
   return (
     <div className="bg-surface border border-line-strong rounded-xl p-4 mt-3">
-      {intro && <p className="text-sm text-zinc-300 mb-3">{intro}</p>}
+      {intro && <p className="text-sm text-muted mb-3">{intro}</p>}
 
       {/* Tab bar — one tab per question, with an answered dot. Multiple tabs
           let the user jump around and revise before the single submit. */}
@@ -215,13 +215,13 @@ export default function Choices({
                 onClick={() => setActive(i)}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                   isActive
-                    ? 'bg-accent-500/15 border border-accent-500 text-white'
-                    : 'bg-surface-sunken border border-line text-zinc-400 hover:border-line-strong'
+                    ? 'bg-accent-500/15 border border-accent-500 text-accent'
+                    : 'bg-surface-sunken border border-line text-subtle hover:border-line-strong'
                 }`}
               >
                 <span
                   className={`h-1.5 w-1.5 rounded-full ${
-                    done ? 'bg-emerald-400' : 'bg-zinc-600'
+                    done ? 'bg-positive' : 'bg-line-strong'
                   }`}
                 />
                 Q{i + 1}
@@ -234,23 +234,23 @@ export default function Choices({
       {/* Active question header. Multi-select hint + bulk actions sit on the
           same row so the affordances are discoverable without crowding. */}
       <div className="mb-3 flex items-baseline justify-between gap-3">
-        <p className="text-sm font-medium text-white">{q.question}</p>
+        <p className="text-sm font-medium text-foreground">{q.question}</p>
         {q.multiSelect && (
           <div className="flex shrink-0 items-center gap-2 text-[10px]">
-            <span className="font-medium uppercase tracking-wider text-zinc-500">
+            <span className="font-medium uppercase tracking-wider text-faint">
               Pick all that apply
             </span>
             <button
               type="button"
               onClick={() => patch(active, { selected: q.options.map(valueOf) })}
-              className="rounded px-1.5 py-0.5 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+              className="rounded px-1.5 py-0.5 text-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
             >
               Select all
             </button>
             <button
               type="button"
               onClick={() => patch(active, { selected: [] })}
-              className="rounded px-1.5 py-0.5 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+              className="rounded px-1.5 py-0.5 text-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
             >
               Clear
             </button>
@@ -275,16 +275,16 @@ export default function Choices({
               onClick={() => toggle(val)}
               className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
                 isActive
-                  ? 'border-accent-500 bg-accent-500/15 text-white'
+                  ? 'border-accent-500 bg-accent-500/15 text-accent'
                   : recommended
-                    ? 'border-accent-500/40 bg-accent-500/5 text-zinc-200 hover:border-accent-500/70'
-                    : 'border-line-strong bg-surface-sunken text-zinc-300 hover:border-zinc-600'
+                    ? 'border-accent-500/40 bg-accent-500/5 text-muted hover:border-accent-500/70'
+                    : 'border-line-strong bg-surface-sunken text-muted hover:border-line-strong'
               }`}
             >
               {q.multiSelect ? (
                 <span
                   className={`flex h-3 w-3 shrink-0 items-center justify-center rounded-sm border ${
-                    isActive ? 'border-accent-500 bg-accent-500' : 'border-zinc-600'
+                    isActive ? 'border-accent-500 bg-accent-500' : 'border-line-strong'
                   }`}
                 >
                   {isActive && (
@@ -296,7 +296,7 @@ export default function Choices({
               ) : (
                 <span
                   className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                    isActive ? 'bg-accent-500 ring-2 ring-accent-500/30' : 'border border-zinc-600'
+                    isActive ? 'bg-accent-500 ring-2 ring-accent-500/30' : 'border border-line-strong'
                   }`}
                 />
               )}
@@ -318,7 +318,7 @@ export default function Choices({
             )}
             {rest.length > 0 && (
               <div className="mt-3">
-                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-faint">
                   More options
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -333,8 +333,8 @@ export default function Choices({
       {/* "Type your own" — always visible when allowCustom is set, with a
           subtle divider so it reads as the catch-all path. */}
       {q.allowCustom && (
-        <div className="mt-3 border-t border-zinc-800/60 pt-3">
-          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+        <div className="mt-3 border-t border-line/60 pt-3">
+          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-faint">
             Or type your own
           </p>
           <input
@@ -342,7 +342,7 @@ export default function Choices({
             value={draft.custom}
             onChange={(e) => patch(active, { custom: e.target.value })}
             placeholder="Enter a custom answer…"
-            className="w-full rounded-lg border border-line bg-surface-sunken px-3 py-2 text-xs text-white placeholder-zinc-600 focus:border-zinc-600 focus:outline-none"
+            className="w-full rounded-lg border border-line bg-surface-sunken px-3 py-2 text-xs text-foreground placeholder-disabled focus:border-line-strong focus:outline-none"
           />
         </div>
       )}
@@ -354,7 +354,7 @@ export default function Choices({
             type="button"
             onClick={() => setActive((i) => Math.max(0, i - 1))}
             disabled={active === 0}
-            className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-line-strong bg-surface-sunken text-zinc-300 hover:border-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-line-strong bg-surface-sunken text-muted hover:border-line-strong disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             Back
           </button>
@@ -362,21 +362,21 @@ export default function Choices({
             type="button"
             onClick={() => setActive((i) => Math.min(questions.length - 1, i + 1))}
             disabled={active === questions.length - 1}
-            className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-line-strong bg-surface-sunken text-zinc-300 hover:border-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-line-strong bg-surface-sunken text-muted hover:border-line-strong disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             Next
           </button>
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="text-xs text-zinc-500">
+          <span className="text-xs text-faint">
             {answeredCount}/{questions.length} answered
           </span>
           <button
             type="button"
             onClick={submit}
             disabled={!allAnswered}
-            className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-white text-black hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-inverse text-inverse-foreground hover:bg-inverse/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             Submit
           </button>

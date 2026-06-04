@@ -25,7 +25,7 @@ export default function DashboardActionsMenu({ actions }: { actions: DashboardAc
         type="button"
         onClick={() => setOpen((v) => !v)}
         title="Dashboard actions"
-        className="flex h-[30px] w-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white"
+        className="flex h-[30px] w-9 items-center justify-center rounded-lg border border-line bg-surface text-muted transition-colors hover:border-line-strong hover:text-foreground"
       >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01" />
@@ -35,7 +35,7 @@ export default function DashboardActionsMenu({ actions }: { actions: DashboardAc
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-20 mt-1 w-52 rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
+          <div className="absolute right-0 top-full z-20 mt-1 w-52 rounded-lg border border-line-strong bg-surface py-1 shadow-xl">
             {actions.map((action) => {
               const destructive = action.tone === 'destructive';
               return (
@@ -48,12 +48,12 @@ export default function DashboardActionsMenu({ actions }: { actions: DashboardAc
                   }}
                   className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors ${
                     destructive
-                      ? 'text-red-400 hover:bg-red-500/10 hover:text-red-300'
-                      : 'text-zinc-300 hover:bg-zinc-800 hover:text-white'
+                      ? 'text-danger hover:bg-danger/10 hover:text-danger'
+                      : 'text-muted hover:bg-surface-raised hover:text-foreground'
                   }`}
                 >
                   <svg
-                    className={`h-3.5 w-3.5 shrink-0 ${destructive ? 'text-red-400' : 'text-zinc-500'}`}
+                    className={`h-3.5 w-3.5 shrink-0 ${destructive ? 'text-danger' : 'text-faint'}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"

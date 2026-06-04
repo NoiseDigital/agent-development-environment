@@ -78,17 +78,17 @@ export default function MultiSelectFilter({
 
   return (
     <div ref={rootRef} className="relative">
-      <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+      <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-faint">
         {label}
       </p>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         disabled={loading}
-        className={`flex w-36 items-center justify-between gap-2 rounded-md border bg-zinc-900 px-2.5 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+        className={`flex w-36 items-center justify-between gap-2 rounded-md border bg-surface px-2.5 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
           selected.size > 0
-            ? 'border-accent-400/60 text-white'
-            : 'border-zinc-800 text-zinc-300 hover:border-zinc-700'
+            ? 'border-accent-400/60 text-foreground'
+            : 'border-line text-muted hover:border-line-strong'
         }`}
       >
         <span className="truncate text-left">{display}</span>
@@ -98,33 +98,33 @@ export default function MultiSelectFilter({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-lg border border-zinc-700 bg-zinc-950 shadow-[0_12px_40px_rgba(0,0,0,0.6)]">
+        <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-lg border border-line-strong bg-surface-sunken shadow-[0_12px_40px_rgba(0,0,0,0.6)]">
           {/* Search */}
-          <div className="border-b border-zinc-800 p-2">
+          <div className="border-b border-line p-2">
             <input
               type="text"
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={`Search ${label.toLowerCase()}…`}
-              className="w-full rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 outline-none focus:border-zinc-600"
+              className="w-full rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-foreground placeholder-disabled outline-none focus:border-line-strong"
             />
           </div>
 
           {/* Select all visible / clear all */}
-          <div className="flex items-center justify-between gap-2 border-b border-zinc-800 px-2 py-1.5 text-[10px]">
+          <div className="flex items-center justify-between gap-2 border-b border-line px-2 py-1.5 text-[10px]">
             <button
               type="button"
               onClick={selectAllVisible}
-              className="rounded px-1.5 py-0.5 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+              className="rounded px-1.5 py-0.5 text-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
             >
               Select{query ? ' visible' : ' all'}
             </button>
-            <span className="text-zinc-600">{selected.size} selected</span>
+            <span className="text-disabled">{selected.size} selected</span>
             <button
               type="button"
               onClick={clearAll}
-              className="rounded px-1.5 py-0.5 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+              className="rounded px-1.5 py-0.5 text-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
             >
               Clear all
             </button>
@@ -133,7 +133,7 @@ export default function MultiSelectFilter({
           {/* Option list */}
           <div className="max-h-60 overflow-y-auto py-1">
             {filtered.length === 0 ? (
-              <p className="px-3 py-2 text-[11px] text-zinc-500">No matches.</p>
+              <p className="px-3 py-2 text-[11px] text-faint">No matches.</p>
             ) : (
               filtered.map((o) => {
                 const checked = selected.has(o.name);
@@ -142,11 +142,11 @@ export default function MultiSelectFilter({
                     key={o.name}
                     type="button"
                     onClick={() => toggle(o.name)}
-                    className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-zinc-300 transition-colors hover:bg-zinc-800/60"
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-muted transition-colors hover:bg-surface-raised/60"
                   >
                     <span
                       className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border ${
-                        checked ? 'border-accent-400 bg-accent-400' : 'border-zinc-600'
+                        checked ? 'border-accent-400 bg-accent-400' : 'border-line-strong'
                       }`}
                     >
                       {checked && (

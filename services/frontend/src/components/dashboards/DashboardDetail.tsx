@@ -376,7 +376,7 @@ export default function DashboardDetail({
     <DashboardFilterProvider>
     <DashboardTotalsProvider>
     <DashboardEditProvider value={editContext}>
-    <div ref={rootRef} className="flex h-full flex-col bg-black">
+    <div ref={rootRef} className="flex h-full flex-col bg-canvas">
       <DashboardReportHeader
         dashboard={dashboard}
         onBack={onBack}
@@ -392,7 +392,7 @@ export default function DashboardDetail({
       />
 
       {/* Toolbar — report filters, plus the one actions menu (or edit controls) */}
-      <div className="flex shrink-0 items-end justify-between gap-4 border-b border-zinc-800/60 px-6 py-3">
+      <div className="flex shrink-0 items-end justify-between gap-4 border-b border-line/60 px-6 py-3">
         <DashboardFilterBar />
         <div className="flex shrink-0 items-center gap-2">
           {editing ? (
@@ -400,7 +400,7 @@ export default function DashboardDetail({
               <button
                 type="button"
                 onClick={handleAddText}
-                className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white"
+                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-medium text-muted transition-colors hover:border-line-strong hover:text-foreground"
               >
                 <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -437,7 +437,7 @@ export default function DashboardDetail({
               <button
                 type="button"
                 onClick={handleReset}
-                className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-[11px] font-medium text-zinc-400 transition-colors hover:border-zinc-700 hover:text-white"
+                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-medium text-subtle transition-colors hover:border-line-strong hover:text-foreground"
               >
                 <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -447,7 +447,7 @@ export default function DashboardDetail({
               <button
                 type="button"
                 onClick={() => setEditing(false)}
-                className="rounded-lg bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition-colors hover:bg-zinc-200"
+                className="rounded-lg bg-inverse px-3 py-1.5 text-[11px] font-semibold text-inverse-foreground transition-colors hover:bg-inverse/90"
               >
                 Done
               </button>
@@ -459,7 +459,7 @@ export default function DashboardDetail({
       </div>
 
       {/* Tab bar — Overall + KPI-goal views */}
-      <div className="flex shrink-0 items-center gap-1 border-b border-zinc-800/60 px-6">
+      <div className="flex shrink-0 items-center gap-1 border-b border-line/60 px-6">
         {dashboard.tabs.map((tab) => {
           const active = tab.id === activeTab?.id;
           return (
@@ -469,8 +469,8 @@ export default function DashboardDetail({
               onClick={() => setActiveTabId(tab.id)}
               className={`-mb-px border-b-2 px-3 py-2.5 text-xs font-medium transition-colors ${
                 active
-                  ? 'border-white text-white'
-                  : 'border-transparent text-zinc-500 hover:border-zinc-700 hover:text-zinc-300'
+                  ? 'border-foreground text-foreground'
+                  : 'border-transparent text-faint hover:border-line-strong hover:text-muted'
               }`}
             >
               {tab.label}
@@ -482,7 +482,7 @@ export default function DashboardDetail({
       {/* Canvas */}
       <div className="flex-1 overflow-y-auto px-6 py-4">
         {editing && (
-          <div className="mb-4 flex items-center gap-2 text-[11px] text-zinc-500">
+          <div className="mb-4 flex items-center gap-2 text-[11px] text-faint">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-400" />
             Edit mode — drag a tile to move it, drag its bottom-right corner to resize.
           </div>

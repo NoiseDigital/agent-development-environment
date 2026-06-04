@@ -80,7 +80,7 @@ export default function ChatSessionPage() {
     : undefined;
 
   return (
-    <div className="flex flex-1 h-full bg-black">
+    <div className="flex flex-1 h-full bg-canvas">
       <ChatSidebar
         selectedApp={selectedApp}
         sessions={sessions}

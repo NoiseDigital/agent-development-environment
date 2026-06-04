@@ -7,9 +7,9 @@
 import { useToasts, dismissToast, type ToastTone } from '../../lib/toast';
 
 const toneStyles: Record<ToastTone, { dot: string; border: string }> = {
-  default: { dot: 'bg-zinc-400', border: 'border-line-strong' },
-  success: { dot: 'bg-emerald-400', border: 'border-emerald-500/40' },
-  error: { dot: 'bg-red-400', border: 'border-red-500/40' },
+  default: { dot: 'bg-subtle', border: 'border-line-strong' },
+  success: { dot: 'bg-positive', border: 'border-positive/40' },
+  error: { dot: 'bg-danger', border: 'border-danger/40' },
 };
 
 export default function Toaster() {
@@ -26,7 +26,7 @@ export default function Toaster() {
             className={`animate-toast-in pointer-events-auto flex items-start gap-3 rounded-xl border ${tone.border} bg-surface px-4 py-3 shadow-2xl`}
           >
             <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${tone.dot}`} />
-            <p className="flex-1 text-xs leading-relaxed text-zinc-200">{toast.message}</p>
+            <p className="flex-1 text-xs leading-relaxed text-foreground">{toast.message}</p>
             {toast.action && (
               <button
                 type="button"
@@ -34,7 +34,7 @@ export default function Toaster() {
                   toast.action?.onClick();
                   dismissToast(toast.id);
                 }}
-                className="shrink-0 rounded-md border border-line-strong px-2 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-surface-raised"
+                className="shrink-0 rounded-md border border-line-strong px-2 py-1 text-[11px] font-semibold text-foreground transition-colors hover:bg-surface-raised"
               >
                 {toast.action.label}
               </button>
@@ -42,7 +42,7 @@ export default function Toaster() {
             <button
               type="button"
               onClick={() => dismissToast(toast.id)}
-              className="shrink-0 text-zinc-600 transition-colors hover:text-zinc-300"
+              className="shrink-0 text-disabled transition-colors hover:text-muted"
               aria-label="Dismiss"
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

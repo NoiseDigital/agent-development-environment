@@ -26,17 +26,17 @@ function highlightSql(sql: string): ReactNode[] {
     if (m.index > last) out.push(sql.slice(last, m.index));
     const tok = m[0];
     const cls = m[1]
-      ? 'text-zinc-600 italic' // comment
+      ? 'text-disabled italic' // comment
       : m[2]
-        ? 'text-emerald-400' // string literal
+        ? 'text-positive' // string literal
         : m[3]
-          ? 'text-zinc-300' // `backtick identifier`
+          ? 'text-muted' // `backtick identifier`
           : m[4]
-            ? 'text-amber-400' // number
+            ? 'text-warning' // number
             : m[5] && SQL_KEYWORDS.has(m[5].toUpperCase())
-              ? 'text-sky-400 font-medium' // keyword
+              ? 'text-accent font-medium' // keyword
               : m[5] && sql[m.index + tok.length] === '('
-                ? 'text-blue-300' // function call
+                ? 'text-accent-300' // function call
                 : ''; // plain identifier
     out.push(cls ? <span key={m.index} className={cls}>{tok}</span> : tok);
     last = m.index + tok.length;
@@ -61,12 +61,12 @@ export default function SqlBlock({ name, sql }: { name: string; sql: string }) {
   return (
     <div className="rounded-lg border border-line bg-surface-sunken overflow-hidden">
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-line bg-surface/60">
-        <span className="text-[11px] font-mono font-medium text-zinc-300">{name}</span>
+        <span className="text-[11px] font-mono font-medium text-muted">{name}</span>
         <button
           type="button"
           onClick={copy}
           title="Copy SQL"
-          className="flex items-center gap-1 text-[10px] font-medium text-zinc-500 hover:text-zinc-200 transition-colors"
+          className="flex items-center gap-1 text-[10px] font-medium text-faint hover:text-foreground transition-colors"
         >
           {copied ? (
             <>
@@ -86,7 +86,7 @@ export default function SqlBlock({ name, sql }: { name: string; sql: string }) {
           )}
         </button>
       </div>
-      <pre className="px-3 py-2 text-[11px] leading-relaxed font-mono text-zinc-400 overflow-x-auto whitespace-pre"><code>{highlightSql(sql)}</code></pre>
+      <pre className="px-3 py-2 text-[11px] leading-relaxed font-mono text-subtle overflow-x-auto whitespace-pre"><code>{highlightSql(sql)}</code></pre>
     </div>
   );
 }

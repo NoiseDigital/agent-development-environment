@@ -37,9 +37,9 @@ function windowLabel(from?: string, to?: string): string {
 }
 
 const TONE_RING: Record<InsightBullet['tone'], string> = {
-  positive: 'bg-emerald-400/15 text-emerald-300 border-emerald-500/30',
-  negative: 'bg-red-400/15 text-red-300 border-red-500/30',
-  neutral:  'bg-zinc-700/30 text-zinc-300 border-zinc-700',
+  positive: 'bg-positive/15 text-positive border-positive/30',
+  negative: 'bg-danger/15 text-danger border-danger/30',
+  neutral:  'bg-surface-raised/30 text-muted border-line-strong',
 };
 
 export default function NarrativeTile({ title }: NarrativeTileProps) {
@@ -119,7 +119,7 @@ export default function NarrativeTile({ title }: NarrativeTileProps) {
   if (error || insights.length === 0) {
     return (
       <TileChartShell title={title}>
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-faint">
           {error ?? 'No insights for the selected window.'}
         </p>
       </TileChartShell>
@@ -132,7 +132,7 @@ export default function NarrativeTile({ title }: NarrativeTileProps) {
         {insights.map((it, i) => (
           <li key={i} className={`rounded-md border px-2.5 py-2 ${TONE_RING[it.tone]}`}>
             <p className="text-[12px] font-semibold leading-tight">{it.headline}</p>
-            <p className="mt-0.5 text-[11px] leading-snug text-zinc-300">{it.body}</p>
+            <p className="mt-0.5 text-[11px] leading-snug text-muted">{it.body}</p>
           </li>
         ))}
       </ul>

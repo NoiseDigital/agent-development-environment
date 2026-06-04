@@ -34,7 +34,7 @@ export default function ChartSkeleton({ shape = 'line', variant = 'panel' }: Ske
     <div
       role="status"
       aria-label="Generating chart"
-      className={`relative w-full overflow-hidden rounded-xl border border-zinc-800/60 bg-zinc-950/60 ${h}`}
+      className={`relative w-full overflow-hidden rounded-xl border border-line/60 bg-surface-sunken/60 ${h}`}
     >
       {/* Slow shimmer wash — gentler than the previous 1.6s pass so the
           placeholder reads as "loading" without strobing the eye. */}
@@ -56,7 +56,7 @@ export default function ChartSkeleton({ shape = 'line', variant = 'panel' }: Ske
         {/* Y-axis gridlines — five evenly spaced, thinner than before. */}
         <div className="absolute inset-0 flex flex-col justify-between">
           {[0, 1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-px w-full bg-zinc-800/60" />
+            <div key={i} className="h-px w-full bg-line/60" />
           ))}
         </div>
         {/* Silhouette layer — covers the gridline area exactly. */}
@@ -68,7 +68,7 @@ export default function ChartSkeleton({ shape = 'line', variant = 'panel' }: Ske
       {/* Y-axis labels — right-aligned at the left edge of the plot. */}
       <div className="pointer-events-none absolute inset-y-4 bottom-8 top-4 left-2 flex w-9 flex-col items-end justify-between">
         {yTicks.map((label) => (
-          <span key={label} className="text-[9px] leading-none text-zinc-700">
+          <span key={label} className="text-[9px] leading-none text-disabled">
             {label}
           </span>
         ))}
@@ -77,7 +77,7 @@ export default function ChartSkeleton({ shape = 'line', variant = 'panel' }: Ske
       {/* X-axis labels — varied widths so they read as label stubs. */}
       <div className="pointer-events-none absolute bottom-2 left-12 right-4 flex items-center justify-between">
         {xTickWidths.map((w, i) => (
-          <div key={i} className={`h-1.5 ${w} rounded bg-zinc-800/70`} />
+          <div key={i} className={`h-1.5 ${w} rounded bg-line/70`} />
         ))}
       </div>
     </div>
@@ -130,7 +130,7 @@ function BarSilhouette() {
       {heights.map((h, i) => (
         <div
           key={i}
-          className="flex-1 rounded-sm bg-zinc-700/40"
+          className="flex-1 rounded-sm bg-surface-raised/40"
           style={{ height: `${h}%`, opacity: 0.55 + (heights.length - i) * 0.04 }}
         />
       ))}

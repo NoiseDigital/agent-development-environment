@@ -68,7 +68,7 @@ export default function PacingTile({ title, expectedShare }: PacingTileProps) {
   if (error) {
     return (
       <TileChartShell title={title} info={pacingInfo}>
-        <div className="flex h-full w-full items-center justify-center rounded-lg border border-line bg-surface-sunken px-4 text-center text-[11px] text-red-400">
+        <div className="flex h-full w-full items-center justify-center rounded-lg border border-line bg-surface-sunken px-4 text-center text-[11px] text-danger">
           Failed to load — {error}
         </div>
       </TileChartShell>
@@ -77,7 +77,7 @@ export default function PacingTile({ title, expectedShare }: PacingTileProps) {
   if (rows.budget <= 0) {
     return (
       <TileChartShell title={title} info={pacingInfo}>
-        <div className="flex h-full w-full items-center justify-center rounded-lg border border-line bg-surface-sunken px-4 text-center text-[11px] text-zinc-500">
+        <div className="flex h-full w-full items-center justify-center rounded-lg border border-line bg-surface-sunken px-4 text-center text-[11px] text-faint">
           No budget set for this slice.
         </div>
       </TileChartShell>
@@ -106,38 +106,38 @@ export default function PacingTile({ title, expectedShare }: PacingTileProps) {
     }
   }
   const toneColor =
-    hint.tone === 'positive' ? 'text-emerald-300'
-    : hint.tone === 'negative' ? 'text-red-300'
-    : 'text-zinc-400';
+    hint.tone === 'positive' ? 'text-positive'
+    : hint.tone === 'negative' ? 'text-danger'
+    : 'text-subtle';
 
   return (
     <TileChartShell title={title} info={pacingInfo}>
       <div className="flex h-full flex-col justify-center gap-3">
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-[2rem] font-semibold leading-none tabular-nums text-white">
+          <span className="text-[2rem] font-semibold leading-none tabular-nums text-foreground">
             {(share * 100).toFixed(0)}%
           </span>
           <span className={`text-[11px] font-medium ${toneColor}`}>{hint.label}</span>
         </div>
-        <div className="relative h-3 w-full overflow-hidden rounded-full bg-zinc-800">
+        <div className="relative h-3 w-full overflow-hidden rounded-full bg-surface-raised">
           <div
-            className={`absolute inset-y-0 left-0 ${overSpent ? 'bg-red-400' : 'bg-emerald-400'}`}
+            className={`absolute inset-y-0 left-0 ${overSpent ? 'bg-danger' : 'bg-positive'}`}
             style={{ width: `${clamped * 100}%` }}
           />
           {typeof expectedShare === 'number' && expectedShare > 0 && expectedShare <= 1 && (
             <div
-              className="absolute inset-y-0 w-px bg-white/70"
+              className="absolute inset-y-0 w-px bg-foreground/70"
               style={{ left: `${expectedShare * 100}%` }}
               title={`Expected pace at ${(expectedShare * 100).toFixed(0)}%`}
             />
           )}
         </div>
-        <div className="flex items-center justify-between text-[11px] text-zinc-400">
+        <div className="flex items-center justify-between text-[11px] text-subtle">
           <span>
-            Spent <span className="font-medium text-white">{usdCompact(rows.spent)}</span>
+            Spent <span className="font-medium text-foreground">{usdCompact(rows.spent)}</span>
           </span>
           <span>
-            of <span className="font-medium text-white">{usdCompact(rows.budget)}</span>
+            of <span className="font-medium text-foreground">{usdCompact(rows.budget)}</span>
           </span>
         </div>
       </div>

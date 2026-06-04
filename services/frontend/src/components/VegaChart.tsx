@@ -11,7 +11,8 @@
 import dynamic from 'next/dynamic';
 import { useState, useRef, useEffect, type ComponentType } from 'react';
 import type { VegaSpec } from '../types/genui';
-import { vegaDarkTheme } from '../lib/charts/theme';
+import { vegaTheme } from '../lib/charts/theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { checkVegaSpec } from '../lib/charts/guard';
 import { compactNum } from '../lib/format/compact-num';
 import ChartActions from './ChartActions';
@@ -42,7 +43,7 @@ const MULTI_VIEW_KEYS = ['facet', 'repeat', 'concat', 'hconcat', 'vconcat', 'spe
 
 function Fallback({ message }: { message: string }) {
   return (
-    <div className="flex h-full min-h-[200px] w-full items-center justify-center rounded-lg border border-line bg-surface-sunken px-4 text-center text-[11px] text-zinc-500">
+    <div className="flex h-full min-h-[200px] w-full items-center justify-center rounded-lg border border-line bg-surface-sunken px-4 text-center text-[11px] text-faint">
       {message}
     </div>
   );
@@ -60,6 +61,7 @@ interface VegaChartProps {
 }
 
 export default function VegaChart({ spec, fill = false, saveable = false, onDelete }: VegaChartProps) {
+  const { theme } = useTheme();
   const [error, setError] = useState<string | null>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -91,7 +93,7 @@ export default function VegaChart({ spec, fill = false, saveable = false, onDele
   const themed: VegaSpec = {
     $schema: 'https://vega.github.io/schema/vega-lite/v6.json',
     background: 'transparent',
-    config: vegaDarkTheme,
+    config: vegaTheme(theme),
     // A small top-level padding combined with autosize.contains:'padding'
     // guarantees title and axis labels never touch the edge of their container.
     padding: 8,
@@ -107,7 +109,7 @@ export default function VegaChart({ spec, fill = false, saveable = false, onDele
       ) : ready ? (
         <VegaEmbed
           spec={themed}
-          options={{ actions: false, renderer: 'svg', tooltip: { theme: 'dark' } }}
+          options={{ actions: false, renderer: 'svg', tooltip: { theme } }}
           onError={(e) => setError(String(e))}
         />
       ) : (

@@ -71,15 +71,15 @@ export default function NewDashboardModal({ onClose }: { onClose: () => void }) 
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl"
+        className="w-full max-w-lg rounded-xl border border-line bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-3.5">
-          <h2 className="text-sm font-semibold text-white">New dashboard</h2>
+        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+          <h2 className="text-sm font-semibold text-foreground">New dashboard</h2>
           <button
             type="button"
             onClick={onClose}
-            className="text-zinc-500 transition-colors hover:text-white"
+            className="text-faint transition-colors hover:text-foreground"
             aria-label="Close"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -92,21 +92,21 @@ export default function NewDashboardModal({ onClose }: { onClose: () => void }) 
           <ClientPicker clients={clients} value={clientId} onChange={setClientId} />
 
           <div>
-            <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+            <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-faint">
               Scope
             </label>
             <select
               value={campaign}
               onChange={(e) => setCampaign(e.target.value)}
               disabled={loadingCampaigns}
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-white transition-colors focus:border-zinc-600 focus:outline-none disabled:opacity-60"
+              className="w-full rounded-lg border border-line bg-surface-sunken px-3 py-2 text-xs text-foreground transition-colors focus:border-line-strong focus:outline-none disabled:opacity-60"
             >
               <option value="">Entire {client.name} dataset</option>
               {campaignOptions.map((o) => (
                 <option key={o.name} value={o.name}>{o.name}</option>
               ))}
             </select>
-            <p className="mt-1.5 text-[11px] text-zinc-500">
+            <p className="mt-1.5 text-[11px] text-faint">
               {campaign
                 ? `Filtered to the "${campaign}" campaign.`
                 : 'No campaign filter — every tile sees the full client dataset.'}
@@ -114,7 +114,7 @@ export default function NewDashboardModal({ onClose }: { onClose: () => void }) 
           </div>
 
           <div>
-            <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+            <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-faint">
               Dashboard name
             </label>
             <input
@@ -122,23 +122,23 @@ export default function NewDashboardModal({ onClose }: { onClose: () => void }) 
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={campaign ? `${client.name} — ${campaign}` : `${client.name} — Working Dashboard`}
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-white placeholder-zinc-600 transition-colors focus:border-zinc-600 focus:outline-none"
+              className="w-full rounded-lg border border-line bg-surface-sunken px-3 py-2 text-xs text-foreground placeholder-disabled transition-colors focus:border-line-strong focus:outline-none"
             />
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-zinc-800 px-5 py-3.5">
+        <div className="flex justify-end gap-2 border-t border-line px-5 py-3.5">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-zinc-800 px-3 py-1.5 text-[11px] font-medium text-zinc-400 transition-colors hover:border-zinc-700 hover:text-white"
+            className="rounded-lg border border-line px-3 py-1.5 text-[11px] font-medium text-subtle transition-colors hover:border-line-strong hover:text-foreground"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={create}
-            className="rounded-lg bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition-colors hover:bg-zinc-200"
+            className="rounded-lg bg-inverse px-3 py-1.5 text-[11px] font-semibold text-inverse-foreground transition-colors hover:bg-inverse/90"
           >
             Create dashboard
           </button>
@@ -162,7 +162,7 @@ function ClientPicker({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+      <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-faint">
         From client
       </label>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -175,20 +175,20 @@ function ClientPicker({
               onClick={() => onChange(c.id)}
               className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${
                 selected
-                  ? 'border-emerald-500 bg-emerald-500/10'
-                  : 'border-zinc-800 bg-zinc-950 hover:border-zinc-700'
+                  ? 'border-positive bg-positive/10'
+                  : 'border-line bg-surface-sunken hover:border-line-strong'
               }`}
             >
               {c.logoPath ? (
-                <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md border border-zinc-800 bg-zinc-950">
+                <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md border border-line bg-surface-sunken">
                   <Image src={c.logoPath} alt={c.name} width={32} height={32} className="h-full w-full object-contain" />
                 </div>
               ) : (
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-zinc-700 bg-zinc-800 text-[10px] font-bold text-zinc-300">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-line-strong bg-surface-raised text-[10px] font-bold text-muted">
                   {c.initials}
                 </div>
               )}
-              <span className="truncate text-xs font-medium text-white">{c.name}</span>
+              <span className="truncate text-xs font-medium text-foreground">{c.name}</span>
             </button>
           );
         })}

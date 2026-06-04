@@ -23,7 +23,7 @@ export default class BlockBoundary extends Component<
   render() {
     if (this.state.failed) {
       return (
-        <p className="mt-3 text-xs text-zinc-500 italic">
+        <p className="mt-3 text-xs text-faint italic">
           A part of this response could not be displayed.
         </p>
       );

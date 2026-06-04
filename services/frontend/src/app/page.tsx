@@ -62,18 +62,18 @@ export default function Home() {
       <div className="w-full max-w-2xl">
         {/* Greeting + brand lockup */}
         <div className="mb-12 text-center">
-          <p className="text-zinc-400 text-sm font-medium mb-4 tracking-wide">Welcome to</p>
+          <p className="text-subtle text-sm font-medium mb-4 tracking-wide">Welcome to</p>
           <div className="flex items-end justify-center gap-2 mb-5">
             <Image
               src="/noise_white.svg"
               alt="Noise"
               width={140}
               height={38}
-              className="h-9 w-auto"
+              className="h-9 w-auto light:invert"
             />
-            <span className="text-zinc-400 text-sm font-bold tracking-widest uppercase leading-none mb-[3px]">OS</span>
+            <span className="text-subtle text-sm font-bold tracking-widest uppercase leading-none mb-[3px]">OS</span>
           </div>
-          <p className="text-zinc-400 text-sm leading-relaxed max-w-sm mx-auto">
+          <p className="text-subtle text-sm leading-relaxed max-w-sm mx-auto">
             Your platform for media planning, reporting, and AI-powered tools.
             Pick a section below to get started.
           </p>
@@ -86,13 +86,13 @@ export default function Home() {
               key={s.key}
               type="button"
               onClick={() => router.push(s.href)}
-              className="group flex flex-col items-center text-center rounded-3xl border border-zinc-800 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.08),_rgba(24,24,27,0.96)_45%,_rgba(9,9,11,1)_100%)] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.35)] transition-all duration-300 hover:-translate-y-1 hover:border-zinc-600 hover:shadow-[0_32px_80px_rgba(0,0,0,0.45)] cursor-pointer"
+              className="group flex flex-col items-center text-center rounded-3xl border border-line bg-card-spotlight p-6 shadow-[0_24px_60px_rgba(0,0,0,0.35)] transition-all duration-300 hover:-translate-y-1 hover:border-line-strong hover:shadow-[0_32px_80px_rgba(0,0,0,0.45)] cursor-pointer"
             >
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-zinc-700 bg-zinc-900/90 text-zinc-300 transition-colors duration-200 group-hover:border-zinc-500 group-hover:bg-zinc-800 group-hover:text-white">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-line-strong bg-surface-raised text-muted transition-colors duration-200 group-hover:border-line-strong group-hover:bg-surface group-hover:text-foreground">
                 {s.icon}
               </div>
-              <p className="text-white text-sm font-semibold mb-2">{s.label}</p>
-              <p className="text-zinc-500 text-xs leading-relaxed">{s.description}</p>
+              <p className="text-foreground text-sm font-semibold mb-2">{s.label}</p>
+              <p className="text-faint text-xs leading-relaxed">{s.description}</p>
             </button>
           ))}
         </div>

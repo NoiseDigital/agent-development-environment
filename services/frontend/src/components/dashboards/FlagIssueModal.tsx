@@ -17,7 +17,7 @@ const AREAS: { value: IssueArea; label: string }[] = [
 ];
 
 const inputCls =
-  'w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-white placeholder-zinc-600 transition-colors focus:border-zinc-600 focus:outline-none';
+  'w-full rounded-lg border border-line bg-surface-sunken px-3 py-2 text-xs text-foreground placeholder-disabled transition-colors focus:border-line-strong focus:outline-none';
 
 export default function FlagIssueModal({
   dashboard,
@@ -44,15 +44,15 @@ export default function FlagIssueModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl"
+        className="w-full max-w-md rounded-xl border border-line bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-3.5">
-          <h2 className="text-sm font-semibold text-white">Flag an issue</h2>
+        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+          <h2 className="text-sm font-semibold text-foreground">Flag an issue</h2>
           <button
             type="button"
             onClick={onClose}
-            className="text-zinc-500 transition-colors hover:text-white"
+            className="text-faint transition-colors hover:text-foreground"
             aria-label="Close"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -62,14 +62,14 @@ export default function FlagIssueModal({
         </div>
 
         <div className="space-y-4 px-5 py-4">
-          <p className="text-xs leading-relaxed text-zinc-400">
+          <p className="text-xs leading-relaxed text-subtle">
             Report a problem with{' '}
-            <span className="font-medium text-white">{dashboardTitle(dashboard)}</span>. It goes to
+            <span className="font-medium text-foreground">{dashboardTitle(dashboard)}</span>. It goes to
             the team&apos;s review queue.
           </p>
 
           <div>
-            <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+            <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-faint">
               What kind of issue?
             </label>
             <select value={area} onChange={(e) => setArea(e.target.value as IssueArea)} className={inputCls}>
@@ -82,7 +82,7 @@ export default function FlagIssueModal({
           </div>
 
           <div>
-            <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+            <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-faint">
               Details
             </label>
             <textarea
@@ -95,11 +95,11 @@ export default function FlagIssueModal({
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-zinc-800 px-5 py-3.5">
+        <div className="flex justify-end gap-2 border-t border-line px-5 py-3.5">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-zinc-800 px-3 py-1.5 text-[11px] font-medium text-zinc-400 transition-colors hover:border-zinc-700 hover:text-white"
+            className="rounded-lg border border-line px-3 py-1.5 text-[11px] font-medium text-subtle transition-colors hover:border-line-strong hover:text-foreground"
           >
             Cancel
           </button>
@@ -107,7 +107,7 @@ export default function FlagIssueModal({
             type="button"
             onClick={submit}
             disabled={!notes.trim()}
-            className="rounded-lg bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition-colors hover:bg-zinc-200 disabled:opacity-40"
+            className="rounded-lg bg-inverse px-3 py-1.5 text-[11px] font-semibold text-inverse-foreground transition-colors hover:bg-inverse/90 disabled:opacity-40"
           >
             Submit
           </button>

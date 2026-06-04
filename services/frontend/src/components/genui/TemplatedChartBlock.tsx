@@ -41,7 +41,7 @@ export default function TemplatedChartBlock({ props }: { props: TemplatedChartPr
 
   if (!spec) {
     return (
-      <p className="text-[11px] text-zinc-500">
+      <p className="text-[11px] text-faint">
         Chart payload was malformed — nothing to render.
       </p>
     );

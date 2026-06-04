@@ -23,9 +23,9 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-3 space-y-2">
+    <section className="rounded-xl border border-line/80 bg-surface-sunken/40 p-3 space-y-2">
       <header className="flex items-center justify-between">
-        <h2 className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+        <h2 className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-subtle">
           {title}
           {hint && <InfoHint text={hint} />}
         </h2>
@@ -46,8 +46,8 @@ function Slider({
   return (
     <div>
       <div className="mb-1 flex justify-between text-[11px]">
-        <span className="flex items-center gap-1 text-zinc-400">{label}{hint && <InfoHint text={hint} />}</span>
-        <span className="font-mono text-zinc-200">{value}</span>
+        <span className="flex items-center gap-1 text-subtle">{label}{hint && <InfoHint text={hint} />}</span>
+        <span className="font-mono text-foreground">{value}</span>
       </div>
       <input
         type="range"
@@ -77,20 +77,20 @@ function ColumnSelect({
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between">
-        <span className="flex items-center gap-1 text-xs font-medium text-zinc-300">
-          {label} {hint && <span className="font-normal text-zinc-600">{hint}</span>}
+        <span className="flex items-center gap-1 text-xs font-medium text-muted">
+          {label} {hint && <span className="font-normal text-disabled">{hint}</span>}
           {tip && <InfoHint text={tip} />}
         </span>
         <span className="flex gap-2 text-[10px]">
-          <button type="button" onClick={() => onChange(numericNames)} className="text-zinc-500 hover:text-white">All</button>
-          <button type="button" onClick={() => onChange([])} className="text-zinc-500 hover:text-white">Clear</button>
+          <button type="button" onClick={() => onChange(numericNames)} className="text-faint hover:text-foreground">All</button>
+          <button type="button" onClick={() => onChange([])} className="text-faint hover:text-foreground">Clear</button>
         </span>
       </div>
-      <div className="max-h-40 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950">
+      <div className="max-h-40 overflow-y-auto rounded-lg border border-line bg-surface-sunken">
         {loading ? (
-          <p className="px-2.5 py-2 text-[11px] text-zinc-600">Profiling columns…</p>
+          <p className="px-2.5 py-2 text-[11px] text-disabled">Profiling columns…</p>
         ) : columns.length === 0 ? (
-          <p className="px-2.5 py-2 text-[11px] text-zinc-600">No columns</p>
+          <p className="px-2.5 py-2 text-[11px] text-disabled">No columns</p>
         ) : (
           columns.map((c) => {
             const numeric = c.kind === 'numeric';
@@ -100,7 +100,7 @@ function ColumnSelect({
                 key={c.name}
                 title={numeric ? undefined : `${c.kind} column — not correlatable`}
                 className={`flex items-center gap-2 px-2.5 py-1.5 text-xs ${
-                  numeric ? 'cursor-pointer text-zinc-300 hover:bg-zinc-900' : 'cursor-not-allowed text-zinc-600'
+                  numeric ? 'cursor-pointer text-muted hover:bg-surface' : 'cursor-not-allowed text-disabled'
                 }`}
               >
                 <input
@@ -113,12 +113,12 @@ function ColumnSelect({
                 <span className="flex-1 truncate">{c.name}</span>
                 {numeric ? (
                   c.missing_pct >= 25 && (
-                    <span className="shrink-0 text-[10px] text-amber-500" title="High missingness">
+                    <span className="shrink-0 text-[10px] text-warning" title="High missingness">
                       {c.missing_pct.toFixed(0)}% null
                     </span>
                   )
                 ) : (
-                  <span className="shrink-0 text-[10px] uppercase text-zinc-600">
+                  <span className="shrink-0 text-[10px] uppercase text-disabled">
                     {c.kind === 'datetime' ? 'date' : 'text'}
                   </span>
                 )}
@@ -132,7 +132,7 @@ function ColumnSelect({
 }
 
 const Toggle = ({ label, checked, onChange, hint }: { label: string; checked: boolean; onChange: (v: boolean) => void; hint?: string }) => (
-  <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-300">
+  <label className="flex cursor-pointer items-center gap-2 text-xs text-muted">
     <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="accent-accent-500" />
     <span className="flex items-center gap-1">{label}{hint && <InfoHint text={hint} />}</span>
   </label>
@@ -320,20 +320,20 @@ export default function AnalyzePage() {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex shrink-0 items-center justify-between border-b border-zinc-800/60 px-8 py-5">
+      <div className="flex shrink-0 items-center justify-between border-b border-line/60 px-8 py-5">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-white">Analyze</h1>
-          <p className="mt-0.5 text-xs text-zinc-500">
+          <h1 className="text-lg font-semibold tracking-tight text-foreground">Analyze</h1>
+          <p className="mt-0.5 text-xs text-faint">
             Correlate drivers against KPIs across any data source.
           </p>
         </div>
         {source && (
-          <div className="hidden items-center gap-2 text-[11px] text-zinc-500 md:flex">
-            <span className="rounded-full bg-zinc-900 px-2 py-0.5 text-zinc-400">
+          <div className="hidden items-center gap-2 text-[11px] text-faint md:flex">
+            <span className="rounded-full bg-surface px-2 py-0.5 text-subtle">
               {sourceLabel(source)}
             </span>
             {qa && (
-              <span className="text-zinc-600">
+              <span className="text-disabled">
                 {qa.row_count.toLocaleString()} rows · {qa.column_count} cols
               </span>
             )}
@@ -343,18 +343,18 @@ export default function AnalyzePage() {
 
       <div className="flex min-h-0 flex-1">
         {/* ── Controls rail ────────────────────────────────────────────── */}
-        <aside className="flex w-[300px] shrink-0 flex-col border-r border-zinc-800/60">
+        <aside className="flex w-[300px] shrink-0 flex-col border-r border-line/60">
           <div className="flex-1 space-y-3 overflow-y-auto p-3">
             {/* Source */}
             <Section title="Data source">
-              <div className="flex gap-1 rounded-lg border border-zinc-800 bg-zinc-900 p-1">
+              <div className="flex gap-1 rounded-lg border border-line bg-surface p-1">
                 {(['bigquery', 'upload'] as const).map((k) => (
                   <button
                     key={k}
                     type="button"
                     onClick={() => setSourceKind(k)}
                     className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
-                      sourceKind === k ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                      sourceKind === k ? 'bg-surface-raised text-foreground' : 'text-faint hover:text-muted'
                     }`}
                   >
                     {k === 'bigquery' ? 'BigQuery' : 'Upload'}
@@ -367,7 +367,7 @@ export default function AnalyzePage() {
                   <select
                     value={bqDataset}
                     onChange={(e) => pickDataset(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-xs text-white focus:border-zinc-600 focus:outline-none"
+                    className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground focus:border-line-strong focus:outline-none"
                   >
                     <option value="">Select dataset…</option>
                     {bqDatasets.map((d) => (
@@ -378,7 +378,7 @@ export default function AnalyzePage() {
                     <select
                       value={bqTable}
                       onChange={(e) => setBqTable(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-xs text-white focus:border-zinc-600 focus:outline-none"
+                      className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground focus:border-line-strong focus:outline-none"
                     >
                       <option value="">Select table…</option>
                       {bqTables.map((t) => (
@@ -396,7 +396,7 @@ export default function AnalyzePage() {
                       const u = uploads.find((x) => x.id === e.target.value);
                       setSheet(u?.metadata.sheet_names?.[0] ?? '');
                     }}
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-xs text-white focus:border-zinc-600 focus:outline-none"
+                    className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground focus:border-line-strong focus:outline-none"
                   >
                     <option value="">Select an upload…</option>
                     {uploads.map((u) => (
@@ -407,7 +407,7 @@ export default function AnalyzePage() {
                     <select
                       value={sheet}
                       onChange={(e) => setSheet(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-xs text-white focus:border-zinc-600 focus:outline-none"
+                      className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground focus:border-line-strong focus:outline-none"
                     >
                       {sheetNames.map((s) => (
                         <option key={s} value={s}>Sheet: {s}</option>
@@ -425,7 +425,7 @@ export default function AnalyzePage() {
                     type="button"
                     onClick={() => fileInput.current?.click()}
                     disabled={uploading}
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white disabled:opacity-50"
+                    className="w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-medium text-muted transition-colors hover:border-line-strong hover:text-foreground disabled:opacity-50"
                   >
                     {uploading ? 'Uploading…' : 'Upload a file'}
                   </button>
@@ -441,14 +441,14 @@ export default function AnalyzePage() {
 
             {/* Method */}
             <Section title="Method" hint="Pearson measures linear correlation; Spearman measures rank (monotonic) correlation — more robust to outliers and non-linear-but-ordered trends.">
-              <div className="flex gap-1 rounded-lg border border-zinc-800 bg-zinc-900 p-1">
+              <div className="flex gap-1 rounded-lg border border-line bg-surface p-1">
                 {(['pearson', 'spearman'] as const).map((m) => (
                   <button
                     key={m}
                     type="button"
                     onClick={() => setMethod(m)}
                     className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium capitalize transition-colors ${
-                      method === m ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                      method === m ? 'bg-surface-raised text-foreground' : 'text-faint hover:text-muted'
                     }`}
                   >
                     {m}
@@ -476,12 +476,12 @@ export default function AnalyzePage() {
           </div>
 
           {/* Run button — pinned to the bottom of the rail so it's always reachable. */}
-          <div className="shrink-0 border-t border-zinc-800/60 p-3">
+          <div className="shrink-0 border-t border-line/60 p-3">
             <button
               type="button"
               onClick={run}
               disabled={!source || running}
-              className="w-full rounded-lg bg-white px-3 py-2.5 text-xs font-semibold text-black transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+              className="w-full rounded-lg bg-inverse px-3 py-2.5 text-xs font-semibold text-inverse-foreground transition-colors hover:bg-inverse/90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {running ? 'Running…' : 'Run analysis'}
             </button>
@@ -491,7 +491,7 @@ export default function AnalyzePage() {
         {/* ── Results ───────────────────────────────────────────────────── */}
         <main className="flex-1 overflow-y-auto p-6">
           {error && (
-            <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+            <div className="mb-4 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
               {error}
             </div>
           )}
@@ -505,8 +505,8 @@ export default function AnalyzePage() {
               <div
                 className={`mb-4 rounded-lg border px-3 py-2 text-xs ${
                   qa.ok
-                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                    : 'border-amber-500/30 bg-amber-500/10 text-amber-400'
+                    ? 'border-positive/30 bg-positive/10 text-positive'
+                    : 'border-warning/30 bg-warning/10 text-warning'
                 }`}
               >
                 <span className="font-medium">
@@ -533,7 +533,7 @@ export default function AnalyzePage() {
             <div className="max-w-4xl space-y-6">
               {/* Heatmap */}
               {heatmapChart && (
-                <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-3">
+                <div className="rounded-xl border border-line/80 bg-surface-sunken/40 p-3">
                   <VegaChart spec={heatmapChart} saveable />
                 </div>
               )}
@@ -558,17 +558,17 @@ export default function AnalyzePage() {
 
 function EmptyResults({ source, running }: { source: SourceRef | null; running: boolean }) {
   return (
-    <div className="flex h-72 flex-col items-center justify-center rounded-xl border border-dashed border-zinc-800 bg-zinc-950/40 text-center">
-      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900">
-        <svg className="h-5 w-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div className="flex h-72 flex-col items-center justify-center rounded-xl border border-dashed border-line bg-surface-sunken/40 text-center">
+      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-line bg-surface">
+        <svg className="h-5 w-5 text-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
             d="M9 19V6l-3 1.5M15 5v13l3-1.5M9 6l6 -1M9 19l6 -1" />
         </svg>
       </div>
-      <p className="text-sm font-semibold text-white">
+      <p className="text-sm font-semibold text-foreground">
         {running ? 'Running analysis…' : source ? 'Ready to analyze' : 'Pick a data source'}
       </p>
-      <p className="mt-1 max-w-sm text-xs leading-relaxed text-zinc-500">
+      <p className="mt-1 max-w-sm text-xs leading-relaxed text-faint">
         {running
           ? 'Crunching correlations across your selected columns.'
           : source
@@ -599,25 +599,25 @@ function TopSignalsTable({
 
   if (signals.length === 0) {
     return (
-      <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-4">
-        <h3 className="text-sm font-medium text-white">Top signals</h3>
-        <p className="mt-2 text-xs text-zinc-500">No signals returned.</p>
+      <div className="rounded-xl border border-line/80 bg-surface-sunken/40 p-4">
+        <h3 className="text-sm font-medium text-foreground">Top signals</h3>
+        <p className="mt-2 text-xs text-faint">No signals returned.</p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/40">
-      <div className="flex items-center justify-between border-b border-zinc-800/60 px-4 py-2.5">
-        <h3 className="text-sm font-medium text-white">Top signals</h3>
-        <div className="flex gap-1 rounded-md border border-zinc-800 bg-zinc-900 p-0.5">
+    <div className="rounded-xl border border-line/80 bg-surface-sunken/40">
+      <div className="flex items-center justify-between border-b border-line/60 px-4 py-2.5">
+        <h3 className="text-sm font-medium text-foreground">Top signals</h3>
+        <div className="flex gap-1 rounded-md border border-line bg-surface p-0.5">
           {(['r', 'p'] as const).map((k) => (
             <button
               key={k}
               type="button"
               onClick={() => setSortKey(k)}
               className={`rounded px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider transition-colors ${
-                sortKey === k ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                sortKey === k ? 'bg-surface-raised text-foreground' : 'text-faint hover:text-muted'
               }`}
             >
               {k === 'r' ? '|r|' : 'p'}
@@ -628,7 +628,7 @@ function TopSignalsTable({
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-zinc-800/60 text-left text-zinc-500">
+            <tr className="border-b border-line/60 text-left text-faint">
               <Th>A</Th>
               <Th>B</Th>
               <Th align="right">r</Th>
@@ -646,28 +646,28 @@ function TopSignalsTable({
               return (
                 <tr
                   key={i}
-                  className="border-b border-zinc-800/60 transition-colors last:border-0 hover:bg-zinc-900/30"
+                  className="border-b border-line/60 transition-colors last:border-0 hover:bg-surface/30"
                 >
-                  <Td><span className="text-zinc-300">{s.a}</span></Td>
-                  <Td><span className="text-zinc-300">{s.b}</span></Td>
+                  <Td><span className="text-muted">{s.a}</span></Td>
+                  <Td><span className="text-muted">{s.b}</span></Td>
                   <Td align="right" className={`tabular-nums ${tone}`}>{s.r.toFixed(3)}</Td>
                   <Td>
-                    <div className="relative h-2 w-full overflow-hidden rounded bg-zinc-900">
+                    <div className="relative h-2 w-full overflow-hidden rounded bg-surface">
                       <div
                         className={`absolute inset-y-0 left-0 rounded ${bar}`}
                         style={{ width: `${mag * 100}%` }}
                       />
                     </div>
                   </Td>
-                  <Td align="right" className="tabular-nums text-zinc-500">
+                  <Td align="right" className="tabular-nums text-faint">
                     {s.p < 0.001 ? s.p.toExponential(1) : s.p.toFixed(3)}
                   </Td>
                   <Td align="right">
                     <span
                       className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
                         sig
-                          ? 'border border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
-                          : 'border border-zinc-700/60 bg-zinc-800/40 text-zinc-500'
+                          ? 'border border-positive/40 bg-positive/10 text-positive'
+                          : 'border border-line-strong/60 bg-surface-raised/40 text-faint'
                       }`}
                       title={sig ? `p < α (${alpha})` : `p ≥ α (${alpha}) — not significant`}
                     >

@@ -109,7 +109,7 @@ export default function TrendTile({
   if (series.length === 0) {
     return (
       <TileChartShell title={title} info={info}>
-        <div className="flex h-full w-full items-center justify-center rounded-lg border border-line bg-surface-sunken px-4 text-center text-[11px] text-zinc-500">
+        <div className="flex h-full w-full items-center justify-center rounded-lg border border-line bg-surface-sunken px-4 text-center text-[11px] text-faint">
           No data for the selected window.
         </div>
       </TileChartShell>

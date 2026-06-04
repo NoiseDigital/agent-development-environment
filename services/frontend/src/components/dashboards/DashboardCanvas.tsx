@@ -128,8 +128,8 @@ function TileBody({
     <>
       <div
         ref={tileRef}
-        className={`h-full rounded-xl border bg-zinc-900 p-3 overflow-hidden transition-colors ${
-          editing ? 'border-zinc-700 cursor-move' : 'border-zinc-800'
+        className={`h-full rounded-xl border bg-surface p-3 overflow-hidden transition-colors ${
+          editing ? 'border-line-strong cursor-move' : 'border-line'
         }`}
       >
         {renderTile(tile, { editing, overrides, onTextChange })}

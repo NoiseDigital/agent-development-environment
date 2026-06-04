@@ -66,17 +66,17 @@ export default function MessageList({
       {messages.length === 0 ? (
         <div className="flex justify-center items-center h-full">
           <div className="text-center max-w-sm mx-auto">
-            <div className="w-14 h-14 mx-auto mb-5 bg-zinc-900 rounded-full flex items-center justify-center border border-zinc-800">
+            <div className="w-14 h-14 mx-auto mb-5 bg-surface rounded-full flex items-center justify-center border border-line">
               {agentConfig?.icon || (
-                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-7 h-7 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               )}
             </div>
-            <h3 className="text-lg font-semibold text-white mb-2">
+            <h3 className="text-lg font-semibold text-foreground mb-2">
               {agentConfig?.displayName || 'Assistant'}
             </h3>
-            <p className="text-zinc-400 text-sm leading-relaxed">
+            <p className="text-subtle text-sm leading-relaxed">
               {agentConfig?.description || 'Start a conversation by typing a message below.'}
             </p>
           </div>

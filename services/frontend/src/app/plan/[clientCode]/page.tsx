@@ -21,11 +21,11 @@ export default function ClientPlanPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <p className="text-sm text-zinc-300">Unknown client &ldquo;{code}&rdquo;.</p>
+          <p className="text-sm text-muted">Unknown client &ldquo;{code}&rdquo;.</p>
           <button
             type="button"
             onClick={() => router.push('/plan')}
-            className="mt-3 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white"
+            className="mt-3 rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-medium text-muted transition-colors hover:border-line-strong hover:text-foreground"
           >
             Back to client list
           </button>
@@ -37,18 +37,18 @@ export default function ClientPlanPage() {
   return (
     <div className="flex h-full flex-col">
       {/* Breadcrumb + title */}
-      <div className="flex shrink-0 items-center justify-between border-b border-zinc-800/60 px-8 py-5">
+      <div className="flex shrink-0 items-center justify-between border-b border-line/60 px-8 py-5">
         <div className="min-w-0">
           <button
             type="button"
             onClick={() => router.push('/plan')}
-            className="text-[11px] text-zinc-500 transition-colors hover:text-zinc-300"
+            className="text-[11px] text-faint transition-colors hover:text-muted"
           >
             ← Plan
           </button>
-          <h1 className="mt-0.5 truncate text-lg font-semibold tracking-tight text-white">
+          <h1 className="mt-0.5 truncate text-lg font-semibold tracking-tight text-foreground">
             {plan.clientName}{' '}
-            <span className="font-normal text-zinc-500">— Campaigns</span>
+            <span className="font-normal text-faint">— Campaigns</span>
           </h1>
         </div>
       </div>
@@ -67,7 +67,7 @@ export default function ClientPlanPage() {
           </div>
         ) : (
           <div className="flex h-full items-center justify-center text-center">
-            <p className="text-sm text-zinc-400">No campaigns in this plan yet.</p>
+            <p className="text-sm text-subtle">No campaigns in this plan yet.</p>
           </div>
         )}
       </div>
@@ -76,9 +76,12 @@ export default function ClientPlanPage() {
 }
 
 const phaseTone: Record<string, string> = {
-  Book: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  Travel: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
-  Plan: 'bg-zinc-700/30 text-zinc-300 border-zinc-700',
+  Book: 'bg-positive/15 text-positive border-positive/30',
+  // Categorical phase hue with no semantic token — keep cyan, but pick a shade
+  // that reads on both themes (dark text on the pale light tint, light text on
+  // the dark tint). Extend this map per phase the same way.
+  Travel: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/30',
+  Plan: 'bg-surface-raised/30 text-muted border-line-strong',
 };
 
 function CampaignCard({
@@ -95,12 +98,12 @@ function CampaignCard({
     <button
       type="button"
       onClick={onOpen}
-      className="flex h-full flex-col items-start gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-4 text-left transition-colors duration-150 hover:border-zinc-700 hover:bg-zinc-900/60"
+      className="flex h-full flex-col items-start gap-3 rounded-xl border border-line bg-surface-sunken p-4 text-left transition-colors duration-150 hover:border-line-strong hover:bg-surface/60"
     >
       <div className="flex w-full items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-white">{campaign.name}</p>
-          <p className="text-[11px] text-zinc-500">{campaign.id}</p>
+          <p className="truncate text-sm font-semibold text-foreground">{campaign.name}</p>
+          <p className="text-[11px] text-faint">{campaign.id}</p>
         </div>
         <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${tone}`}>
           {campaign.phase}
@@ -123,7 +126,7 @@ function CampaignCard({
 
 function Pill({ label }: { label: string }) {
   return (
-    <span className="rounded-md border border-zinc-800/80 bg-zinc-900/40 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-zinc-400">
+    <span className="rounded-md border border-line/80 bg-surface/40 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-subtle">
       {label}
     </span>
   );
@@ -131,9 +134,9 @@ function Pill({ label }: { label: string }) {
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/40 px-2.5 py-1.5">
-      <p className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</p>
-      <p className="mt-0.5 text-[13px] font-semibold text-white tabular-nums">{value}</p>
+    <div className="rounded-lg border border-line/80 bg-surface/40 px-2.5 py-1.5">
+      <p className="text-[10px] uppercase tracking-wider text-faint">{label}</p>
+      <p className="mt-0.5 text-[13px] font-semibold text-foreground tabular-nums">{value}</p>
     </div>
   );
 }

@@ -18,7 +18,7 @@ interface Person {
 }
 
 const inputCls =
-  'rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-white placeholder-zinc-600 transition-colors focus:border-zinc-600 focus:outline-none';
+  'rounded-lg border border-line bg-surface-sunken px-3 py-2 text-xs text-foreground placeholder-disabled transition-colors focus:border-line-strong focus:outline-none';
 
 export default function ShareDashboardModal({
   dashboard,
@@ -64,18 +64,18 @@ export default function ShareDashboardModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl"
+        className="w-full max-w-md rounded-xl border border-line bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-3.5">
-          <h2 className="truncate pr-3 text-sm font-semibold text-white">
+        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+          <h2 className="truncate pr-3 text-sm font-semibold text-foreground">
             Share &ldquo;{dashboardTitle(dashboard)}&rdquo;
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 text-zinc-500 transition-colors hover:text-white"
+            className="shrink-0 text-faint transition-colors hover:text-foreground"
             aria-label="Close"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -108,7 +108,7 @@ export default function ShareDashboardModal({
               type="button"
               onClick={addPerson}
               disabled={!invite.trim()}
-              className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-black transition-colors hover:bg-zinc-200 disabled:opacity-40"
+              className="rounded-lg bg-inverse px-3 py-2 text-xs font-semibold text-inverse-foreground transition-colors hover:bg-inverse/90 disabled:opacity-40"
             >
               Invite
             </button>
@@ -116,27 +116,27 @@ export default function ShareDashboardModal({
 
           {/* People with access */}
           <div>
-            <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-faint">
               People with access
             </p>
             <div className="space-y-1.5">
               {people.map((p) => (
                 <div key={p.email} className="flex items-center gap-2.5">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-[10px] font-bold uppercase text-zinc-300">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-raised text-[10px] font-bold uppercase text-muted">
                     {p.name.slice(0, 2)}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs text-white">{p.name}</p>
-                    <p className="truncate text-[10px] text-zinc-500">{p.email}</p>
+                    <p className="truncate text-xs text-foreground">{p.name}</p>
+                    <p className="truncate text-[10px] text-faint">{p.email}</p>
                   </div>
                   {p.role === 'Owner' ? (
-                    <span className="text-[11px] text-zinc-500">Owner</span>
+                    <span className="text-[11px] text-faint">Owner</span>
                   ) : (
                     <>
                       <select
                         value={p.role}
                         onChange={(e) => setRole(p.email, e.target.value as Role)}
-                        className="rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 text-[11px] text-zinc-300 focus:border-zinc-600 focus:outline-none"
+                        className="rounded-md border border-line bg-surface-sunken px-2 py-1 text-[11px] text-muted focus:border-line-strong focus:outline-none"
                       >
                         <option value="Viewer">Viewer</option>
                         <option value="Editor">Editor</option>
@@ -144,7 +144,7 @@ export default function ShareDashboardModal({
                       <button
                         type="button"
                         onClick={() => removePerson(p.email)}
-                        className="text-zinc-600 transition-colors hover:text-zinc-300"
+                        className="text-disabled transition-colors hover:text-muted"
                         aria-label={`Remove ${p.name}`}
                       >
                         <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -160,11 +160,11 @@ export default function ShareDashboardModal({
 
           {/* General access */}
           <div>
-            <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-faint">
               General access
             </p>
-            <div className="flex items-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-zinc-400">
+            <div className="flex items-center gap-2.5 rounded-lg border border-line bg-surface-sunken px-3 py-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-raised text-subtle">
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   {access === 'restricted' ? (
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -176,22 +176,22 @@ export default function ShareDashboardModal({
               <select
                 value={access}
                 onChange={(e) => setAccess(e.target.value as 'restricted' | 'open')}
-                className="flex-1 bg-transparent text-xs text-white focus:outline-none"
+                className="flex-1 bg-transparent text-xs text-foreground focus:outline-none"
               >
                 <option value="restricted">Restricted</option>
                 <option value="open">{openLabel}</option>
               </select>
             </div>
-            <p className="mt-1.5 text-[11px] text-zinc-600">{accessHint}</p>
+            <p className="mt-1.5 text-[11px] text-disabled">{accessHint}</p>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-zinc-800 px-5 py-3.5">
+        <div className="flex items-center justify-between border-t border-line px-5 py-3.5">
           <button
             type="button"
             onClick={copyLink}
-            className="flex items-center gap-1.5 rounded-lg border border-zinc-800 px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white"
+            className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[11px] font-medium text-muted transition-colors hover:border-line-strong hover:text-foreground"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5m6.656-1.328a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5" />
@@ -201,7 +201,7 @@ export default function ShareDashboardModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg bg-white px-4 py-1.5 text-[11px] font-semibold text-black transition-colors hover:bg-zinc-200"
+            className="rounded-lg bg-inverse px-4 py-1.5 text-[11px] font-semibold text-inverse-foreground transition-colors hover:bg-inverse/90"
           >
             Done
           </button>

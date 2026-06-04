@@ -107,10 +107,10 @@ export default function Filters({
   if (submitted) {
     return (
       <div className="bg-surface border border-line-strong rounded-xl p-4 mt-3">
-        <p className="text-xs font-medium text-zinc-500 mb-2">Updated with</p>
+        <p className="text-xs font-medium text-faint mb-2">Updated with</p>
         <ul className="space-y-1.5">
           {submitted.split('\n').map((line, i) => (
-            <li key={i} className="text-xs text-zinc-200">{line}</li>
+            <li key={i} className="text-xs text-muted">{line}</li>
           ))}
         </ul>
       </div>
@@ -123,7 +123,7 @@ export default function Filters({
   return (
     <div className="mt-2 flex flex-wrap items-end gap-x-3 gap-y-2">
       {props.title && (
-        <span className="self-center text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+        <span className="self-center text-[10px] font-medium uppercase tracking-wider text-faint">
           {props.title}
         </span>
       )}
@@ -139,14 +139,14 @@ export default function Filters({
         <button
           type="button"
           onClick={reset}
-          className="rounded-md px-2 py-1 text-[11px] font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+          className="rounded-md px-2 py-1 text-[11px] font-medium text-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
         >
           Reset
         </button>
         <button
           type="button"
           onClick={apply}
-          className="rounded-md bg-white px-2.5 py-1 text-[11px] font-semibold text-black transition-colors hover:bg-zinc-200"
+          className="rounded-md bg-inverse px-2.5 py-1 text-[11px] font-semibold text-inverse-foreground transition-colors hover:bg-inverse/90"
         >
           {props.applyLabel ?? 'Update'}
         </button>
@@ -166,14 +166,14 @@ function FieldControl({
 }) {
   // Inline label + control on one line — reads as a "Metric: spend" pill.
   const inputCls =
-    'rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-[11px] text-white focus:border-zinc-600 focus:outline-none';
+    'rounded-md border border-line bg-surface px-2 py-1 text-[11px] text-foreground focus:border-line-strong focus:outline-none';
 
   if (field.kind === 'select') {
     const opts = field.options
       .map(toOption)
       .filter((o): o is ChoiceOption => o !== null);
     return (
-      <label className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+      <label className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-faint">
         {field.label}
         <select
           value={(value as string) ?? ''}
@@ -193,7 +193,7 @@ function FieldControl({
 
   if (field.kind === 'date') {
     return (
-      <label className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+      <label className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-faint">
         {field.label}
         <input
           type="date"
@@ -207,7 +207,7 @@ function FieldControl({
 
   if (field.kind === 'number') {
     return (
-      <label className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+      <label className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-faint">
         {field.label}
         <input
           type="number"
@@ -226,14 +226,14 @@ function FieldControl({
 
   // text
   return (
-    <label className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+    <label className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-faint">
       {field.label}
       <input
         type="text"
         value={(value as string) ?? ''}
         placeholder={field.placeholder}
         onChange={(e) => onChange(e.target.value || undefined)}
-        className={`${inputCls} placeholder-zinc-600 normal-case`}
+        className={`${inputCls} placeholder-disabled normal-case`}
       />
     </label>
   );

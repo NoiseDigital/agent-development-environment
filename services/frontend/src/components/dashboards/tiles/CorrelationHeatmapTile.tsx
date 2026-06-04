@@ -74,7 +74,7 @@ export default function CorrelationHeatmapTile({ title }: CorrelationHeatmapTile
   if (!matrix) {
     return (
       <TileChartShell title={title} info={info}>
-        <div className="flex h-full w-full items-center justify-center rounded-lg border border-line bg-surface-sunken px-4 text-center text-[11px] text-zinc-500">
+        <div className="flex h-full w-full items-center justify-center rounded-lg border border-line bg-surface-sunken px-4 text-center text-[11px] text-faint">
           Not enough history to correlate.
         </div>
       </TileChartShell>

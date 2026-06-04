@@ -61,23 +61,23 @@ const VARIANT: Record<Variant, {
   panel: {
     agentInner: 'max-w-2xl w-full',
     userInner: 'max-w-lg',
-    agentBubble: 'px-4 py-3.5 rounded-2xl bg-surface border border-line text-white',
-    userBubble: 'px-4 py-3 rounded-2xl bg-surface-raised border border-line-strong text-white text-sm leading-relaxed',
-    prose: 'prose-p:my-1.5 prose-p:leading-relaxed prose-headings:font-semibold prose-headings:text-white prose-h1:text-base prose-h2:text-sm prose-h3:text-sm prose-ul:my-1.5 prose-li:my-0.5 prose-code:text-xs prose-code:bg-surface-raised prose-code:px-1 prose-code:rounded prose-strong:text-white',
+    agentBubble: 'px-4 py-3.5 rounded-2xl bg-surface border border-line text-foreground',
+    userBubble: 'px-4 py-3 rounded-2xl bg-surface-raised border border-line-strong text-foreground text-sm leading-relaxed',
+    prose: 'prose-p:my-1.5 prose-p:leading-relaxed prose-headings:font-semibold prose-headings:text-foreground prose-h1:text-base prose-h2:text-sm prose-h3:text-sm prose-ul:my-1.5 prose-li:my-0.5 prose-code:text-xs prose-code:bg-surface-raised prose-code:px-1 prose-code:rounded prose-strong:text-foreground',
     spinner: 'w-4 h-4',
     loadingGap: 'gap-3',
-    loadingText: 'text-sm text-zinc-300 font-medium',
+    loadingText: 'text-sm text-muted font-medium',
     uiGap: 'mt-3 space-y-3',
   },
   floating: {
     agentInner: 'w-full',
     userInner: 'max-w-[85%]',
-    agentBubble: 'px-3 py-2 rounded-xl bg-surface border border-line text-white text-[13px]',
-    userBubble: 'px-3 py-2 rounded-xl bg-surface-raised border border-line-strong text-white text-[13px]',
-    prose: 'prose-p:my-1 prose-p:leading-relaxed prose-headings:text-white prose-headings:font-semibold prose-strong:text-white prose-ul:my-1 prose-li:my-0.5 prose-code:text-xs prose-code:bg-surface-raised prose-code:px-1 prose-code:rounded',
+    agentBubble: 'px-3 py-2 rounded-xl bg-surface border border-line text-foreground text-[13px]',
+    userBubble: 'px-3 py-2 rounded-xl bg-surface-raised border border-line-strong text-foreground text-[13px]',
+    prose: 'prose-p:my-1 prose-p:leading-relaxed prose-headings:text-foreground prose-headings:font-semibold prose-strong:text-foreground prose-ul:my-1 prose-li:my-0.5 prose-code:text-xs prose-code:bg-surface-raised prose-code:px-1 prose-code:rounded',
     spinner: 'w-3.5 h-3.5 rounded-full',
     loadingGap: 'gap-2',
-    loadingText: 'text-xs text-zinc-400',
+    loadingText: 'text-xs text-subtle',
     uiGap: 'mt-2 space-y-2',
   },
 };
@@ -128,7 +128,7 @@ export default function ChatMessage({
                 <div className={`prose prose-invert prose-sm max-w-none ${v.prose}`}>
                   <ReactMarkdown>{message.content}</ReactMarkdown>
                   {message.isStreaming && (
-                    <span className="inline-block w-1.5 h-3.5 ml-0.5 bg-zinc-400 rounded-sm animate-pulse align-middle" />
+                    <span className="inline-block w-1.5 h-3.5 ml-0.5 bg-subtle rounded-sm animate-pulse align-middle" />
                   )}
                 </div>
               </div>
@@ -168,7 +168,7 @@ export default function ChatMessage({
           <div className={v.userBubble}>
             <p className="whitespace-pre-wrap">{message.content}</p>
             {variant === 'panel' && (
-              <p className="text-[11px] mt-2 text-zinc-500">{formatMessageTime(message.timestamp)}</p>
+              <p className="text-[11px] mt-2 text-faint">{formatMessageTime(message.timestamp)}</p>
             )}
           </div>
         )}
@@ -183,7 +183,7 @@ export default function ChatMessage({
 function LoadingRow({ label, v }: { label: string; v: (typeof VARIANT)[Variant] }) {
   return (
     <div className={`inline-flex items-center py-1 ${v.loadingGap}`}>
-      <span className={`${v.spinner} border-2 border-line-strong border-t-zinc-300 animate-spin flex-shrink-0`} />
+      <span className={`${v.spinner} border-2 border-line-strong border-t-muted animate-spin flex-shrink-0`} />
       <span key={label} className={`${v.loadingText} animate-loading-text`}>
         {label}…
       </span>
@@ -211,14 +211,14 @@ function MessageFooter({
         rating !== null ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
       }`}
     >
-      <span className="text-[11px] text-zinc-600">{formatMessageTime(timestamp)}</span>
+      <span className="text-[11px] text-disabled">{formatMessageTime(timestamp)}</span>
       <div className="flex items-center gap-1 ml-auto">
         <button
           type="button"
           onClick={() => toggle('up')}
           title="Good response"
           className={`p-1 rounded transition-colors ${
-            rating === 'up' ? 'text-emerald-400' : 'text-zinc-600 hover:text-zinc-300'
+            rating === 'up' ? 'text-positive' : 'text-disabled hover:text-muted'
           }`}
         >
           <svg className="w-3.5 h-3.5" fill={rating === 'up' ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
@@ -230,7 +230,7 @@ function MessageFooter({
           onClick={() => toggle('down')}
           title="Poor response"
           className={`p-1 rounded transition-colors ${
-            rating === 'down' ? 'text-red-400' : 'text-zinc-600 hover:text-zinc-300'
+            rating === 'down' ? 'text-danger' : 'text-disabled hover:text-muted'
           }`}
         >
           <svg className="w-3.5 h-3.5" fill={rating === 'down' ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">

@@ -9,7 +9,7 @@ export default function InfoHint({ text }: { text: string }) {
       onClick={(e) => e.preventDefault()}
     >
       <svg
-        className="w-3 h-3 text-zinc-600 hover:text-zinc-400 cursor-help"
+        className="w-3 h-3 text-disabled hover:text-subtle cursor-help"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -20,8 +20,8 @@ export default function InfoHint({ text }: { text: string }) {
       <span
         role="tooltip"
         className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 z-50 w-56
-          rounded-lg border border-zinc-700 bg-zinc-800 px-2.5 py-1.5
-          text-[11px] font-normal normal-case leading-relaxed tracking-normal text-zinc-300
+          rounded-lg border border-line-strong bg-surface-raised px-2.5 py-1.5
+          text-[11px] font-normal normal-case leading-relaxed tracking-normal text-muted
           opacity-0 transition-opacity duration-150 group-hover/hint:opacity-100"
       >
         {text}

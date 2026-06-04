@@ -34,7 +34,7 @@ const tabs: { key: DashboardOwnership | 'all'; label: string }[] = [
 const ownershipBadge: Record<DashboardOwnership, string> = {
   owned: 'bg-accent-500/15 text-accent-400 border-accent-500/30',
   shared: 'bg-accent-500/15 text-accent-400 border-accent-500/30',
-  client: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+  client: 'bg-positive/15 text-positive border-positive/30',
 };
 
 const ownershipLabel: Record<DashboardOwnership, string> = {
@@ -76,11 +76,11 @@ function DashboardCard({
       <button
         type="button"
         onClick={actions.onOpen}
-        className="flex w-full items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-4 text-left transition-colors duration-150 hover:border-zinc-700 hover:bg-zinc-900/60"
+        className="flex w-full items-center gap-3 rounded-xl border border-line bg-surface-sunken p-4 text-left transition-colors duration-150 hover:border-line-strong hover:bg-surface/60"
       >
         {/* Brand mark — image when the client has a logo, initials badge otherwise. */}
         {client.logoPath ? (
-          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
+          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-line bg-surface-sunken">
             <Image
               src={client.logoPath}
               alt={client.name}
@@ -90,14 +90,14 @@ function DashboardCard({
             />
           </div>
         ) : (
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-800 text-[11px] font-bold text-zinc-300">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line-strong bg-surface-raised text-[11px] font-bold text-muted">
             {dashboard.clientInitials}
           </div>
         )}
 
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold leading-snug text-white">{title}</h3>
-          <p className="mt-0.5 truncate text-[11px] text-zinc-500">
+          <h3 className="truncate text-sm font-semibold leading-snug text-foreground">{title}</h3>
+          <p className="mt-0.5 truncate text-[11px] text-faint">
             Updated {fmtDate(dashboard.lastUpdated)}
           </p>
         </div>
@@ -122,7 +122,7 @@ function DashboardCard({
             setMenuOpen((v) => !v);
           }}
           aria-label="Dashboard actions"
-          className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-white"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-faint transition-colors hover:bg-surface-raised hover:text-foreground"
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01" />
@@ -137,7 +137,7 @@ function DashboardCard({
               onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }}
               className="fixed inset-0 z-10 cursor-default"
             />
-            <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 py-1 shadow-xl">
+            <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-line bg-surface-sunken py-1 shadow-xl">
               <CardMenuItem
                 label="Make a copy"
                 onClick={() => { setMenuOpen(false); actions.onCopy(); }}
@@ -172,8 +172,8 @@ function CardMenuItem({
       onClick={onClick}
       className={`flex w-full items-center px-3 py-2 text-left text-[11px] transition-colors ${
         destructive
-          ? 'text-red-400 hover:bg-red-500/10 hover:text-red-300'
-          : 'text-zinc-300 hover:bg-zinc-900 hover:text-white'
+          ? 'text-danger hover:bg-danger/10 hover:text-danger'
+          : 'text-muted hover:bg-surface hover:text-foreground'
       }`}
     >
       {label}
@@ -230,11 +230,11 @@ export default function DashboardsPage() {
   return (
     <div className="flex h-full flex-col">
       {/* Page header */}
-      <div className="flex shrink-0 items-center justify-between border-b border-zinc-800/60 px-8 py-5">
-        <h1 className="text-lg font-semibold tracking-tight text-white">Dashboards</h1>
+      <div className="flex shrink-0 items-center justify-between border-b border-line/60 px-8 py-5">
+        <h1 className="text-lg font-semibold tracking-tight text-foreground">Dashboards</h1>
         <div className="flex items-center gap-3">
           <div className="relative">
-            <svg className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -242,13 +242,13 @@ export default function DashboardsPage() {
               placeholder="Search dashboards…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-52 rounded-lg border border-zinc-800 bg-zinc-900 py-2 pl-9 pr-4 text-xs text-white placeholder-zinc-600 transition-colors focus:border-zinc-600 focus:outline-none"
+              className="w-52 rounded-lg border border-line bg-surface py-2 pl-9 pr-4 text-xs text-foreground placeholder-disabled transition-colors focus:border-line-strong focus:outline-none"
             />
           </div>
           <button
             type="button"
             onClick={() => setModalOpen(true)}
-            className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-black transition-colors hover:bg-zinc-100"
+            className="flex items-center gap-2 rounded-lg bg-inverse px-3 py-2 text-xs font-semibold text-inverse-foreground transition-colors hover:bg-inverse/90"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -259,7 +259,7 @@ export default function DashboardsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex shrink-0 items-center gap-1 border-b border-zinc-800/60 px-8 pb-0 pt-4">
+      <div className="flex shrink-0 items-center gap-1 border-b border-line/60 px-8 pb-0 pt-4">
         {tabs.map((tab) => {
           const count =
             tab.key === 'all'
@@ -273,12 +273,12 @@ export default function DashboardsPage() {
               onClick={() => setActiveTab(tab.key)}
               className={`-mb-px flex items-center gap-1.5 rounded-t border-b-2 px-3 py-2.5 text-xs font-medium transition-colors duration-150 ${
                 active
-                  ? 'border-white text-white'
-                  : 'border-transparent text-zinc-500 hover:border-zinc-700 hover:text-zinc-300'
+                  ? 'border-foreground text-foreground'
+                  : 'border-transparent text-faint hover:border-line-strong hover:text-muted'
               }`}
             >
               {tab.label}
-              <span className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] ${active ? 'bg-zinc-700 text-zinc-200' : 'bg-zinc-900 text-zinc-600'}`}>
+              <span className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] ${active ? 'bg-surface-raised text-foreground' : 'bg-surface text-disabled'}`}>
                 {count}
               </span>
             </button>
@@ -304,8 +304,8 @@ export default function DashboardsPage() {
           </div>
         ) : (
           <div className="flex h-48 flex-col items-center justify-center text-center">
-            <p className="text-sm text-zinc-500">No dashboards found</p>
-            {search && <p className="mt-1 text-xs text-zinc-600">for &ldquo;{search}&rdquo;</p>}
+            <p className="text-sm text-faint">No dashboards found</p>
+            {search && <p className="mt-1 text-xs text-disabled">for &ldquo;{search}&rdquo;</p>}
           </div>
         )}
       </div>

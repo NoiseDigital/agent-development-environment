@@ -130,14 +130,14 @@ export default function PivotTile({
   }
   if (error) {
     return (
-      <div className="flex h-full min-h-[160px] w-full items-center justify-center rounded-lg border border-line bg-surface-sunken px-4 text-center text-[11px] text-red-400">
+      <div className="flex h-full min-h-[160px] w-full items-center justify-center rounded-lg border border-line bg-surface-sunken px-4 text-center text-[11px] text-danger">
         Failed to load — {error}
       </div>
     );
   }
   if (groups.length === 0) {
     return (
-      <div className="flex h-full min-h-[160px] w-full items-center justify-center rounded-lg border border-line bg-surface-sunken px-4 text-center text-[11px] text-zinc-500">
+      <div className="flex h-full min-h-[160px] w-full items-center justify-center rounded-lg border border-line bg-surface-sunken px-4 text-center text-[11px] text-faint">
         No data for the selected window.
       </div>
     );
@@ -159,21 +159,21 @@ export default function PivotTile({
     const hasChildren = g.children.length > 0;
     const expanded = open.has(key);
     flatRows.push(
-      <tr key={key} className="border-t border-zinc-800/70 hover:bg-zinc-800/30">
+      <tr key={key} className="border-t border-line/70 hover:bg-surface-raised/30">
         <td className="py-1.5 pr-3" style={{ paddingLeft: 8 }}>
           <button
             type="button"
             onClick={() => hasChildren && toggle(key)}
             className={`flex items-center gap-1.5 text-left ${hasChildren ? 'no-drag cursor-pointer' : 'cursor-default'}`}
           >
-            <span className="w-3 text-zinc-500">
+            <span className="w-3 text-faint">
               {hasChildren ? <span className={`inline-block transition-transform ${expanded ? 'rotate-90' : ''}`}>▸</span> : null}
             </span>
-            <span className="font-medium text-zinc-200">{g.label}</span>
+            <span className="font-medium text-foreground">{g.label}</span>
           </button>
         </td>
         {columns.map((c) => (
-          <td key={c.key} className="px-3 py-1.5 text-right tabular-nums text-zinc-300">
+          <td key={c.key} className="px-3 py-1.5 text-right tabular-nums text-muted">
             {cell(g.values, c)}
           </td>
         ))}
@@ -182,12 +182,12 @@ export default function PivotTile({
     if (expanded) {
       g.children.forEach((child, ci) => {
         flatRows.push(
-          <tr key={`${key}.${ci}`} className="border-t border-zinc-800/70 hover:bg-zinc-800/30">
+          <tr key={`${key}.${ci}`} className="border-t border-line/70 hover:bg-surface-raised/30">
             <td className="py-1.5 pr-3" style={{ paddingLeft: 8 + 18 }}>
-              <span className="text-zinc-400">{child.inner_name}</span>
+              <span className="text-subtle">{child.inner_name}</span>
             </td>
             {columns.map((c) => (
-              <td key={c.key} className="px-3 py-1.5 text-right tabular-nums text-zinc-300">
+              <td key={c.key} className="px-3 py-1.5 text-right tabular-nums text-muted">
                 {cell(child, c)}
               </td>
             ))}
@@ -215,7 +215,7 @@ export default function PivotTile({
       <div className="no-drag h-full overflow-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="text-zinc-500">
+            <tr className="text-faint">
               <th className="py-1.5 pr-3 text-left font-medium">{rowHeader}</th>
               {columns.map((c) => (
                 <th key={c.key} className="px-3 py-1.5 text-right font-medium">
@@ -229,7 +229,7 @@ export default function PivotTile({
           </thead>
           <tbody>
             {flatRows}
-            <tr className="border-t-2 border-zinc-700 font-semibold text-white">
+            <tr className="border-t-2 border-line-strong font-semibold text-foreground">
               <td className="py-2 pr-3" style={{ paddingLeft: 8 }}>Total</td>
               {columns.map((c) => (
                 <td key={c.key} className="px-3 py-2 text-right tabular-nums">

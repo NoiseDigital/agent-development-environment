@@ -97,8 +97,8 @@ export default function PlanSpreadsheet({ campaign, onChanged }: SpreadsheetProp
     <>
       <div className="overflow-x-auto">
         <table className="min-w-full text-[12px]">
-          <thead className="sticky top-0 z-10 bg-zinc-950/95 backdrop-blur-sm">
-            <tr className="border-b border-zinc-800 text-left">
+          <thead className="sticky top-0 z-10 bg-surface-sunken/95 backdrop-blur-sm">
+            <tr className="border-b border-line text-left">
               <Th className="w-[180px]">Line / Creative</Th>
               <Th className="w-[140px]">Publisher</Th>
               <Th className="w-[140px]">Platform</Th>
@@ -124,18 +124,18 @@ export default function PlanSpreadsheet({ campaign, onChanged }: SpreadsheetProp
               return (
                 <tr
                   key={`${row.line.id}-${row.creativeId}`}
-                  className={`border-b border-zinc-800/60 transition-colors hover:bg-zinc-900/30 ${
-                    sameLineAsPrev ? '' : 'border-t border-t-zinc-800/80'
+                  className={`border-b border-line/60 transition-colors hover:bg-surface/30 ${
+                    sameLineAsPrev ? '' : 'border-t border-t-line/80'
                   }`}
                 >
                   {/* Line / creative identity */}
                   <Td>
                     {row.isLineHead && (
-                      <div className="text-[11px] font-mono text-zinc-500">{row.line.id}</div>
+                      <div className="text-[11px] font-mono text-faint">{row.line.id}</div>
                     )}
                     <div className="flex items-center gap-1.5">
-                      {!row.isLineHead && <span className="text-zinc-600">↳</span>}
-                      <span className="truncate text-zinc-200">{row.creativeName}</span>
+                      {!row.isLineHead && <span className="text-disabled">↳</span>}
+                      <span className="truncate text-muted">{row.creativeName}</span>
                     </div>
                   </Td>
 
@@ -196,7 +196,7 @@ export default function PlanSpreadsheet({ campaign, onChanged }: SpreadsheetProp
                       </Td>
                     </>
                   ) : (
-                    <td colSpan={8} className="bg-zinc-950/40 px-2 py-1.5 text-[11px] text-zinc-600">
+                    <td colSpan={8} className="bg-surface-sunken/40 px-2 py-1.5 text-[11px] text-disabled">
                       Same line — edit above.
                     </td>
                   )}
@@ -218,7 +218,7 @@ export default function PlanSpreadsheet({ campaign, onChanged }: SpreadsheetProp
                         type="button"
                         onClick={() => setHistoryLineId(row.line.id)}
                         title="View edit history"
-                        className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-faint transition-colors hover:bg-surface-raised hover:text-muted"
                       >
                         <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -258,7 +258,7 @@ function Th({
 }) {
   return (
     <th
-      className={`px-2 py-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500 ${className}`}
+      className={`px-2 py-2 text-[10px] font-medium uppercase tracking-wider text-faint ${className}`}
       style={{ textAlign: align }}
     >
       {children}
@@ -268,7 +268,7 @@ function Th({
 
 function PerfTh({ children }: { children: React.ReactNode }) {
   return (
-    <th className="border-l border-zinc-800/60 bg-zinc-900/30 px-2 py-2 text-right text-[10px] font-medium uppercase tracking-wider text-emerald-400/70">
+    <th className="border-l border-line/60 bg-surface/30 px-2 py-2 text-right text-[10px] font-medium uppercase tracking-wider text-positive/70">
       {children}
     </th>
   );
@@ -292,7 +292,7 @@ function Td({
 
 function PerfTd({ children }: { children: React.ReactNode }) {
   return (
-    <td className="border-l border-zinc-800/60 bg-zinc-900/20 px-2 py-1.5 text-right text-zinc-300 tabular-nums">
+    <td className="border-l border-line/60 bg-surface/20 px-2 py-1.5 text-right text-muted tabular-nums">
       {children}
     </td>
   );
@@ -301,7 +301,7 @@ function PerfTd({ children }: { children: React.ReactNode }) {
 // ── Editable cells ──────────────────────────────────────────────────────────
 
 const inputCls =
-  'w-full rounded-md bg-transparent px-1.5 py-1 text-[12px] text-zinc-200 outline-none transition-colors hover:bg-zinc-900 focus:bg-zinc-900 focus:ring-1 focus:ring-zinc-700';
+  'w-full rounded-md bg-transparent px-1.5 py-1 text-[12px] text-muted outline-none transition-colors hover:bg-surface focus:bg-surface focus:ring-1 focus:ring-line-strong';
 
 /** A select cell. Commits on change. Tolerant of a current value that
  *  isn't in the option list (renders + keeps it). */
@@ -322,7 +322,7 @@ function SelectCell({
       className={`${inputCls} appearance-none pr-2`}
     >
       {list.map((o) => (
-        <option key={o} value={o} className="bg-zinc-900">
+        <option key={o} value={o} className="bg-surface">
           {o}
         </option>
       ))}
@@ -407,11 +407,11 @@ function DateCell({
 // ── Pacing badge — green when within ±5pp of flight elapsed, else amber/red.
 
 function PacingBadge({ spent, elapsed }: { spent: number; elapsed: number }) {
-  if (elapsed <= 0) return <span className="text-zinc-600">—</span>;
+  if (elapsed <= 0) return <span className="text-disabled">—</span>;
   const delta = spent - elapsed;
-  let tone = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
-  if (Math.abs(delta) > 0.15) tone = 'bg-red-500/15 text-red-300 border-red-500/30';
-  else if (Math.abs(delta) > 0.05) tone = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+  let tone = 'bg-positive/15 text-positive border-positive/30';
+  if (Math.abs(delta) > 0.15) tone = 'bg-danger/15 text-danger border-danger/30';
+  else if (Math.abs(delta) > 0.05) tone = 'bg-warning/15 text-warning border-warning/30';
   const sign = delta >= 0 ? '+' : '';
   return (
     <span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${tone}`}>

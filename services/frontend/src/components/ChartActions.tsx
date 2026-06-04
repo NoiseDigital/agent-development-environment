@@ -194,7 +194,7 @@ export default function ChartActions({ chart, fallbackTitle, captureRef, exports
       <Link
         href={`/dashboards/${savedTo.id}`}
         title={`Open ${savedTo.name}`}
-        className="group/saved flex items-center gap-1.5 text-[11px] font-medium text-emerald-400 transition-colors hover:text-emerald-300"
+        className="group/saved flex items-center gap-1.5 text-[11px] font-medium text-positive transition-colors hover:text-positive/80"
       >
         <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -216,7 +216,7 @@ export default function ChartActions({ chart, fallbackTitle, captureRef, exports
         type="button"
         onClick={() => setOpen((v) => !v)}
         title="Chart actions"
-        className="flex h-6 w-6 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-white"
+        className="flex h-6 w-6 items-center justify-center rounded-md text-faint transition-colors hover:bg-surface-raised hover:text-foreground"
       >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01" />
@@ -237,7 +237,7 @@ export default function ChartActions({ chart, fallbackTitle, captureRef, exports
               left: menuPos.left,
               zIndex: 1001,
             }}
-            className="mt-1 max-h-80 w-60 overflow-y-auto rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
+            className="mt-1 max-h-80 w-60 overflow-y-auto rounded-lg border border-line-strong bg-surface py-1 shadow-xl">
             {view === 'menu' && (
               <>
                 {canSaveToDashboard && (
@@ -273,7 +273,7 @@ export default function ChartActions({ chart, fallbackTitle, captureRef, exports
                     icon="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                   />
                 )}
-                <div className="my-1 border-t border-zinc-800" />
+                <div className="my-1 border-t border-line" />
                 <MenuItem
                   label="Flag this visual"
                   onClick={() => setView('flag')}
@@ -281,14 +281,14 @@ export default function ChartActions({ chart, fallbackTitle, captureRef, exports
                 />
                 {onDelete && (
                   <>
-                    <div className="my-1 border-t border-zinc-800" />
+                    <div className="my-1 border-t border-line" />
                     <button
                       type="button"
                       onClick={() => {
                         close();
                         onDelete();
                       }}
-                      className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300"
+                      className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-danger transition-colors hover:bg-danger/10 hover:text-danger"
                     >
                       <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2" />
@@ -304,8 +304,8 @@ export default function ChartActions({ chart, fallbackTitle, captureRef, exports
               <>
                 <BackHeader label="Flag this visual" onClick={() => setView('menu')} />
                 <div className="px-3 pb-2 pt-1">
-                  <p className="mb-1.5 text-[10px] text-zinc-500">
-                    What&apos;s wrong with <span className="text-zinc-300">{title}</span>?
+                  <p className="mb-1.5 text-[10px] text-faint">
+                    What&apos;s wrong with <span className="text-muted">{title}</span>?
                   </p>
                   <textarea
                     value={flagNotes}
@@ -313,13 +313,13 @@ export default function ChartActions({ chart, fallbackTitle, captureRef, exports
                     rows={3}
                     placeholder="Describe the issue…"
                     autoFocus
-                    className="w-full resize-none rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-[11px] text-white placeholder-zinc-600 focus:border-zinc-600 focus:outline-none"
+                    className="w-full resize-none rounded-md border border-line bg-surface-sunken px-2 py-1.5 text-[11px] text-foreground placeholder-disabled focus:border-line-strong focus:outline-none"
                   />
                   <div className="mt-2 flex justify-end gap-1.5">
                     <button
                       type="button"
                       onClick={() => setView('menu')}
-                      className="rounded-md px-2 py-1 text-[10px] font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+                      className="rounded-md px-2 py-1 text-[10px] font-medium text-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
                     >
                       Cancel
                     </button>
@@ -327,7 +327,7 @@ export default function ChartActions({ chart, fallbackTitle, captureRef, exports
                       type="button"
                       onClick={submitFlag}
                       disabled={!flagNotes.trim()}
-                      className="rounded-md bg-white px-2.5 py-1 text-[10px] font-semibold text-black transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-md bg-inverse px-2.5 py-1 text-[10px] font-semibold text-inverse-foreground transition-colors hover:bg-inverse/90 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       Submit
                     </button>
@@ -342,9 +342,9 @@ export default function ChartActions({ chart, fallbackTitle, captureRef, exports
                 <button
                   type="button"
                   onClick={() => setView('create-new')}
-                  className="flex w-full items-center gap-2.5 border-b border-zinc-800/60 px-3 py-2 text-left text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-800 hover:text-white"
+                  className="flex w-full items-center gap-2.5 border-b border-line/60 px-3 py-2 text-left text-xs font-medium text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
                 >
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-dashed border-zinc-600 text-zinc-400">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-dashed border-line-strong text-subtle">
                     <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                     </svg>
@@ -360,26 +360,26 @@ export default function ChartActions({ chart, fallbackTitle, captureRef, exports
                         setPicked(d);
                         setView('tabs');
                       }}
-                      className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-zinc-800"
+                      className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-surface-raised"
                     >
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-zinc-700 bg-zinc-800 text-[9px] font-bold text-zinc-300">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-line-strong bg-surface-raised text-[9px] font-bold text-muted">
                         {d.clientInitials}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-xs text-white">{dashTitle(d)}</span>
-                        <span className="block truncate text-[10px] text-zinc-500">{d.client}</span>
+                        <span className="block truncate text-xs text-foreground">{dashTitle(d)}</span>
+                        <span className="block truncate text-[10px] text-faint">{d.client}</span>
                       </span>
-                      <svg className="h-3 w-3 shrink-0 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="h-3 w-3 shrink-0 text-disabled" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                       </svg>
                     </button>
                   ))
                 ) : (
-                  <p className="px-3 py-3 text-[11px] text-zinc-500">
+                  <p className="px-3 py-3 text-[11px] text-faint">
                     No editable dashboards yet — create one from the Dashboards page.
                   </p>
                 )}
-                <p className="mt-1 border-t border-zinc-800 px-3 pb-1 pt-2 text-[10px] leading-relaxed text-zinc-600">
+                <p className="mt-1 border-t border-line px-3 pb-1 pt-2 text-[10px] leading-relaxed text-disabled">
                   Client dashboards are code-defined — duplicate one to pin to it.
                 </p>
               </>
@@ -389,8 +389,8 @@ export default function ChartActions({ chart, fallbackTitle, captureRef, exports
               <>
                 <BackHeader label="New personal report" onClick={() => setView('dashboards')} />
                 <div className="px-3 pb-2 pt-1">
-                  <p className="mb-1.5 text-[10px] text-zinc-500">
-                    Pin <span className="text-zinc-300">{title}</span> to a brand-new report.
+                  <p className="mb-1.5 text-[10px] text-faint">
+                    Pin <span className="text-muted">{title}</span> to a brand-new report.
                   </p>
                   <input
                     autoFocus
@@ -402,20 +402,20 @@ export default function ChartActions({ chart, fallbackTitle, captureRef, exports
                       if (e.key === 'Escape') setView('dashboards');
                     }}
                     placeholder={defaultPersonalReportName()}
-                    className="w-full rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-[11px] text-white placeholder-zinc-600 focus:border-zinc-600 focus:outline-none"
+                    className="w-full rounded-md border border-line bg-surface-sunken px-2 py-1.5 text-[11px] text-foreground placeholder-disabled focus:border-line-strong focus:outline-none"
                   />
                   <div className="mt-2 flex justify-end gap-1.5">
                     <button
                       type="button"
                       onClick={() => setView('dashboards')}
-                      className="rounded-md px-2 py-1 text-[10px] font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+                      className="rounded-md px-2 py-1 text-[10px] font-medium text-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
                       onClick={createAndPin}
-                      className="rounded-md bg-white px-2.5 py-1 text-[10px] font-semibold text-black transition-colors hover:bg-zinc-200"
+                      className="rounded-md bg-inverse px-2.5 py-1 text-[10px] font-semibold text-inverse-foreground transition-colors hover:bg-inverse/90"
                     >
                       Create + pin
                     </button>
@@ -427,15 +427,15 @@ export default function ChartActions({ chart, fallbackTitle, captureRef, exports
             {view === 'tabs' && picked && (
               <>
                 <BackHeader label={`Add to ${dashTitle(picked)}`} onClick={() => setView('dashboards')} />
-                <p className="px-3 pb-1 pt-0.5 text-[10px] text-zinc-600">Pick a tab</p>
+                <p className="px-3 pb-1 pt-0.5 text-[10px] text-disabled">Pick a tab</p>
                 {picked.tabs.map((tab) => (
                   <button
                     key={tab.id}
                     type="button"
                     onClick={() => saveToTab(tab)}
-                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
                   >
-                    <svg className="h-3.5 w-3.5 shrink-0 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-3.5 w-3.5 shrink-0 text-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
                     </svg>
                     <span className="flex-1">{tab.label}</span>
@@ -464,7 +464,7 @@ function BackHeader({ label, onClick }: { label: string; onClick: () => void }) 
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 hover:text-zinc-300"
+      className="flex w-full items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint hover:text-muted"
     >
       <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
@@ -483,14 +483,14 @@ function MenuItem({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+      className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
     >
-      <svg className="h-3.5 w-3.5 shrink-0 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="h-3.5 w-3.5 shrink-0 text-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
       </svg>
       <span className="flex-1">{label}</span>
       {chevron && (
-        <svg className="h-3 w-3 shrink-0 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="h-3 w-3 shrink-0 text-disabled" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
         </svg>
       )}

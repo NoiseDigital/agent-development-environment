@@ -20,30 +20,30 @@ export default function MetricDefinitionBlock({ def, labelOverride }: MetricDefi
   return (
     <div>
       <div className="mb-1 flex items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold text-white">{labelOverride ?? def.label}</p>
+        <p className="text-[11px] font-semibold text-foreground">{labelOverride ?? def.label}</p>
         {def.unit && (
-          <span className="rounded-md border border-zinc-700 bg-zinc-900 px-1.5 text-[9px] font-medium text-zinc-400">
+          <span className="rounded-md border border-line-strong bg-surface px-1.5 text-[9px] font-medium text-subtle">
             {UNIT_BADGE[def.unit]}
           </span>
         )}
       </div>
-      <p className="text-[11px] leading-relaxed text-zinc-300">{def.summary}</p>
+      <p className="text-[11px] leading-relaxed text-muted">{def.summary}</p>
       {def.formula && (
-        <p className="mt-1.5 text-[10px] text-zinc-500">
-          <span className="text-zinc-600">Formula: </span>
-          <span className="font-mono text-zinc-300">{def.formula}</span>
+        <p className="mt-1.5 text-[10px] text-faint">
+          <span className="text-disabled">Formula: </span>
+          <span className="font-mono text-muted">{def.formula}</span>
         </p>
       )}
       {def.betterLower !== undefined && (
-        <p className="mt-1 text-[10px] text-zinc-500">
-          <span className="text-zinc-600">Direction: </span>
-          <span className="text-zinc-300">
+        <p className="mt-1 text-[10px] text-faint">
+          <span className="text-disabled">Direction: </span>
+          <span className="text-muted">
             {def.betterLower ? 'lower is better' : 'higher is better'}
           </span>
         </p>
       )}
       {def.notes && (
-        <p className="mt-1.5 border-t border-zinc-800 pt-1.5 text-[10px] italic text-zinc-500">
+        <p className="mt-1.5 border-t border-line pt-1.5 text-[10px] italic text-faint">
           {def.notes}
         </p>
       )}

@@ -46,10 +46,10 @@ export default function PlanIndexPage() {
   return (
     <div className="flex h-full flex-col">
       {/* Page header */}
-      <div className="flex shrink-0 items-center justify-between border-b border-zinc-800/60 px-8 py-5">
+      <div className="flex shrink-0 items-center justify-between border-b border-line/60 px-8 py-5">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-white">Plan</h1>
-          <p className="mt-0.5 text-[11px] text-zinc-500">
+          <h1 className="text-lg font-semibold tracking-tight text-foreground">Plan</h1>
+          <p className="mt-0.5 text-[11px] text-faint">
             Media plans by client. Open a client to edit campaigns, lines, and creatives.
           </p>
         </div>
@@ -64,21 +64,21 @@ export default function PlanIndexPage() {
                 key={s.code}
                 type="button"
                 onClick={() => router.push(`/plan/${s.code}`)}
-                className="flex h-full flex-col items-start gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-4 text-left transition-colors duration-150 hover:border-zinc-700 hover:bg-zinc-900/60"
+                className="flex h-full flex-col items-start gap-3 rounded-xl border border-line bg-surface-sunken p-4 text-left transition-colors duration-150 hover:border-line-strong hover:bg-surface/60"
               >
                 <div className="flex w-full items-center gap-3">
                   {s.logoPath ? (
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-900">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface">
                       <Image src={s.logoPath} alt={s.name} width={24} height={24} className="h-6 w-auto" />
                     </div>
                   ) : (
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-900 text-[11px] font-semibold tracking-wider text-zinc-400">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface text-[11px] font-semibold tracking-wider text-subtle">
                       {s.code}
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-white">{s.name}</p>
-                    <p className="text-[11px] text-zinc-500">Client code {s.code}</p>
+                    <p className="truncate text-sm font-semibold text-foreground">{s.name}</p>
+                    <p className="text-[11px] text-faint">Client code {s.code}</p>
                   </div>
                 </div>
 
@@ -93,8 +93,8 @@ export default function PlanIndexPage() {
         ) : (
           <div className="flex h-full items-center justify-center text-center">
             <div>
-              <p className="text-sm text-zinc-300">No client plans yet.</p>
-              <p className="mt-1 text-[11px] text-zinc-500">
+              <p className="text-sm text-muted">No client plans yet.</p>
+              <p className="mt-1 text-[11px] text-faint">
                 Add a client plan under <code>data/plans/clients/</code>.
               </p>
             </div>
@@ -107,9 +107,9 @@ export default function PlanIndexPage() {
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/40 px-2.5 py-1.5">
-      <p className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</p>
-      <p className="mt-0.5 text-[13px] font-semibold text-white tabular-nums">{value}</p>
+    <div className="rounded-lg border border-line/80 bg-surface/40 px-2.5 py-1.5">
+      <p className="text-[10px] uppercase tracking-wider text-faint">{label}</p>
+      <p className="mt-0.5 text-[13px] font-semibold text-foreground tabular-nums">{value}</p>
     </div>
   );
 }

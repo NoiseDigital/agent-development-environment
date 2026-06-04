@@ -1,45 +1,132 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Theme strategy: class-based. <html> carries `light` or `dark`; the no-flash
+   script in layout.tsx adds the right class before first paint. */
+@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant light (&:where(.light, .light *));
+
+/* ── Theme tokens ────────────────────────────────────────────────────────────
+   Every color the UI uses resolves through a semantic runtime variable (`--c-*`)
+   defined for BOTH themes below. The @theme map turns each into a Tailwind
+   utility (bg-surface, text-muted, border-line, text-accent …). Components
+   reference those utilities — never raw zinc/white/blue — so retuning or adding
+   a theme means editing ONLY this block. To add a third theme: copy one of the
+   blocks, give <html> that class, change the values. Nothing else changes.
+
+   Surfaces stack by elevation: canvas (page) → surface (cards) → surface-raised
+   (hover/chips). surface-sunken is for recessed insets (code blocks, rails).
+   Text descends in emphasis: foreground → muted → subtle → faint → disabled. */
+
+:root,
+.dark {
+  color-scheme: dark;
+
+  --c-canvas:         #0a0a0a;  /* app background                          */
+  --c-surface:        #18181b;  /* cards, bubbles, panels        (zinc-900) */
+  --c-surface-raised: #27272a;  /* hover, chips, user bubble      (zinc-800) */
+  --c-surface-sunken: #09090b;  /* code blocks, inset fields, rails (zinc-950) */
+
+  --c-line:           #27272a;  /* default hairline border       (zinc-800) */
+  --c-line-strong:    #3f3f46;  /* emphasized / hover border     (zinc-700) */
+
+  --c-foreground:     #fafafa;  /* primary text / headings       (zinc-50)  */
+  --c-muted:          #d4d4d8;  /* body text                     (zinc-300) */
+  --c-subtle:         #a1a1aa;  /* secondary labels              (zinc-400) */
+  --c-faint:          #71717a;  /* tertiary / captions           (zinc-500) */
+  --c-disabled:       #52525b;  /* disabled / ghost              (zinc-600) */
+
+  /* Inverse — elements that flip to contrast the theme (primary buttons,
+     solid badges that were white-on-dark). */
+  --c-inverse:            #fafafa;
+  --c-inverse-foreground: #18181b;
+
+  /* Brand accent ramp — identical in both themes so `bg-accent-500` is stable;
+     only `--c-accent` (the readable accent text/icon color) flips per theme. */
+  --c-accent-100: #dbeafe;
+  --c-accent-300: #93c5fd;
+  --c-accent-400: #60a5fa;
+  --c-accent-500: #3b82f6;      /* the brand accent */
+  --c-accent-600: #2563eb;
+  --c-accent-900: #1e3a8a;
+  --c-accent-950: #172554;
+  --c-accent:     #60a5fa;      /* readable accent on dark surfaces */
+
+  /* Status — semantic. Tinted backgrounds (bg-positive/10 …) read fine on both
+     themes; these tokens carry the text/icon/border color. */
+  --c-positive: #34d399;        /* success / online             (emerald-400) */
+  --c-danger:   #f87171;        /* error / destructive          (red-400)     */
+  --c-warning:  #fbbf24;        /* warning                      (amber-400)   */
+
+  --scrollbar-thumb:       #4b5563;
+  --scrollbar-thumb-hover: #6b7280;
+  --scrollbar-track:       #111111;
+}
+
+.light {
+  color-scheme: light;
+
+  --c-canvas:         #fafafa;  /* zinc-50  */
+  --c-surface:        #ffffff;  /* white    */
+  --c-surface-raised: #f4f4f5;  /* zinc-100 */
+  --c-surface-sunken: #f4f4f5;  /* zinc-100 */
+
+  --c-line:           #e4e4e7;  /* zinc-200 */
+  --c-line-strong:    #d4d4d8;  /* zinc-300 */
+
+  --c-foreground:     #18181b;  /* zinc-900 */
+  --c-muted:          #3f3f46;  /* zinc-700 */
+  --c-subtle:         #52525b;  /* zinc-600 */
+  --c-faint:          #71717a;  /* zinc-500 */
+  --c-disabled:       #a1a1aa;  /* zinc-400 */
+
+  --c-inverse:            #18181b;
+  --c-inverse-foreground: #fafafa;
+
+  --c-accent: #2563eb;          /* readable accent on light surfaces (accent-600) */
+
+  --c-positive: #059669;        /* emerald-600 */
+  --c-danger:   #dc2626;        /* red-600     */
+  --c-warning:  #d97706;        /* amber-600   */
+
+  --scrollbar-thumb:       #c8c8cd;
+  --scrollbar-thumb-hover: #a1a1aa;
+  --scrollbar-track:       #ececef;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-canvas:         var(--c-canvas);
+  --color-surface:        var(--c-surface);
+  --color-surface-raised: var(--c-surface-raised);
+  --color-surface-sunken: var(--c-surface-sunken);
+
+  --color-line:           var(--c-line);
+  --color-line-strong:    var(--c-line-strong);
+
+  --color-foreground:     var(--c-foreground);
+  --color-muted:          var(--c-muted);
+  --color-subtle:         var(--c-subtle);
+  --color-faint:          var(--c-faint);
+  --color-disabled:       var(--c-disabled);
+
+  --color-inverse:            var(--c-inverse);
+  --color-inverse-foreground: var(--c-inverse-foreground);
+
+  --color-accent-100: var(--c-accent-100);
+  --color-accent-300: var(--c-accent-300);
+  --color-accent-400: var(--c-accent-400);
+  --color-accent-500: var(--c-accent-500);
+  --color-accent-600: var(--c-accent-600);
+  --color-accent-900: var(--c-accent-900);
+  --color-accent-950: var(--c-accent-950);
+  --color-accent:     var(--c-accent);
+
+  --color-positive: var(--c-positive);
+  --color-danger:   var(--c-danger);
+  --color-warning:  var(--c-warning);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-/* ── Design tokens ──────────────────────────────────────────────────────────
-   Semantic colors the UI references instead of raw Tailwind shades, so the
-   theme has one source of truth. Surfaces/borders map onto the zinc neutral
-   ramp; `accent` is the single brand color — always blue, never sky / indigo /
-   violet. Text keeps the plain `zinc-*` ramp (already a consistent scale). */
-@theme {
-  --color-surface: #18181b;         /* cards, bubbles, panels        (zinc-900) */
-  --color-surface-raised: #27272a;  /* hover, chips, user bubble     (zinc-800) */
-  --color-surface-sunken: #09090b;  /* code blocks, inset fields     (zinc-950) */
-
-  --color-line: #27272a;            /* default hairline border       (zinc-800) */
-  --color-line-strong: #3f3f46;     /* emphasized / hover border     (zinc-700) */
-
-  --color-accent-100: #dbeafe;
-  --color-accent-300: #93c5fd;
-  --color-accent-400: #60a5fa;
-  --color-accent-500: #3b82f6;      /* the brand accent */
-  --color-accent-600: #2563eb;
-  --color-accent-900: #1e3a8a;
-  --color-accent-950: #172554;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 @keyframes verb-fade-up {
@@ -52,7 +139,9 @@
 }
 
 /* Loading status text — a light band sweeps across the muted label so it stays
-   visibly alive even while a single phase runs for many seconds. */
+   visibly alive even while a single phase runs for many seconds. Endpoints use
+   the faint text color; the sweep is the foreground color, so it reads in both
+   themes. */
 @keyframes loading-shimmer {
   0%   { background-position: 150% 0; }
   100% { background-position: -150% 0; }
@@ -61,7 +150,8 @@
 .animate-loading-text {
   background: linear-gradient(
     90deg,
-    #71717a 0%, #71717a 40%, #f4f4f5 50%, #71717a 60%, #71717a 100%
+    var(--c-faint) 0%, var(--c-faint) 40%, var(--c-foreground) 50%,
+    var(--c-faint) 60%, var(--c-faint) 100%
   );
   background-size: 250% 100%;
   -webkit-background-clip: text;
@@ -100,10 +190,10 @@
   animation: drill-in 0.22s ease-out both;
 }
 
-/* Custom scrollbar styles */
+/* Custom scrollbar styles — themed via tokens so the track/thumb follow the UI. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #4b5563 #111111;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 *::-webkit-scrollbar {
@@ -111,28 +201,59 @@
 }
 
 *::-webkit-scrollbar-track {
-  background: #111111;
+  background: var(--scrollbar-track);
 }
 
 *::-webkit-scrollbar-thumb {
-  background-color: #4b5563;
+  background-color: var(--scrollbar-thumb);
   border-radius: 20px;
-  border: 2px solid #111111;
+  border: 2px solid var(--scrollbar-track);
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background-color: #6b7280;
+  background-color: var(--scrollbar-thumb-hover);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--c-canvas);
+  color: var(--c-foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ── Spotlight surfaces ───────────────────────────────────────────────────────
+   Reusable radial-sheen backgrounds for hero cards and landing canvases. They
+   read off the surface tokens so they flip with the theme: a soft top highlight
+   fading into the card/page surface. Authored here (not as arbitrary Tailwind
+   values) precisely so light and dark each get the right ramp. Add a class +
+   `.light` override the same way to extend. */
+.bg-card-spotlight {
+  background: radial-gradient(
+    circle at top,
+    rgba(255, 255, 255, 0.08),
+    var(--c-surface) 45%,
+    var(--c-surface-sunken) 100%
+  );
+}
+.light .bg-card-spotlight {
+  background: radial-gradient(
+    circle at top,
+    #ffffff,
+    var(--c-surface) 55%,
+    var(--c-surface-sunken) 100%
+  );
+}
+
+.bg-page-spotlight {
+  background: radial-gradient(circle at top, rgba(63, 63, 70, 0.18), var(--c-canvas) 38%);
+}
+.light .bg-page-spotlight {
+  background: radial-gradient(circle at top, rgba(0, 0, 0, 0.04), var(--c-canvas) 42%);
 }
 
 /* ── Vega-Lite chart theming ──────────────────────────────────────────────────
    Vega draws its own SVG, so the platform font and the hover tooltip are themed
-   here in CSS rather than through component props. */
+   here in CSS rather than through component props. Chart colors themselves come
+   from the theme config in lib/charts/theme.ts (light + dark variants). */
 
 /* Force the platform font onto every Vega chart label (Vega sets its own font
    on the SVG text — !important wins regardless of how it applies it). */
@@ -143,14 +264,14 @@ body {
 /* vega-tooltip renders one shared #vg-tooltip-element on <body>; restyle it to
    match the app's surfaces. ID specificity beats vega-tooltip's own stylesheet. */
 #vg-tooltip-element.vg-tooltip {
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-line-strong);
+  background-color: var(--c-surface);
+  border: 1px solid var(--c-line-strong);
   border-radius: 8px;
-  box-shadow: 0 12px 32px -8px rgb(0 0 0 / 0.75);
+  box-shadow: 0 12px 32px -8px rgb(0 0 0 / 0.45);
   padding: 7px 10px;
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   font-size: 11px;
-  color: #e4e4e7;
+  color: var(--c-muted);
 }
 
 #vg-tooltip-element.vg-tooltip h2 {
@@ -159,7 +280,7 @@ body {
   border: none;
   font-size: 11px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--c-foreground);
 }
 
 #vg-tooltip-element.vg-tooltip td {
@@ -167,13 +288,13 @@ body {
 }
 
 #vg-tooltip-element.vg-tooltip td.key {
-  color: #8b8b94;
+  color: var(--c-faint);
   padding-right: 14px;
   font-weight: 400;
 }
 
 #vg-tooltip-element.vg-tooltip td.value {
-  color: #fafafa;
+  color: var(--c-foreground);
   font-weight: 600;
   text-align: right;
 }
@@ -192,7 +313,7 @@ body {
 }
 
 /* Ambient neural-expressive background — three slow-drifting orbs that
- * blend over the dark surface for that "Gemini Neural Expressive" feel.
+ * blend over the surface for that "Gemini Neural Expressive" feel.
  * Mounted at the layout level on non-dashboard pages so the canvas of
  * /d/* stays clean for charts. Pointer-events:none everywhere so the
  * orbs never intercept clicks. */
