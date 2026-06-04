@@ -16,8 +16,8 @@ the GenUI registry.
 
 ## The `text` field
 
-- Plain markdown — the bubble renders with ReactMarkdown + the dark
-  prose theme.
+- Plain markdown — the bubble renders with ReactMarkdown + the theme-aware
+  prose styles (`prose dark:prose-invert`).
 - Never serialize the envelope or the `ui` block inside it. The parser
   ([`lib/agent/response.ts`](../services/frontend/src/lib/agent/response.ts))
   is hardened against the failure modes that have shipped, but the rule

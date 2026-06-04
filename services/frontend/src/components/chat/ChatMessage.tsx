@@ -125,7 +125,7 @@ export default function ChatMessage({
               <LoadingRow label={message.status || loadingLabel} v={v} />
             ) : hasContent ? (
               <div className={v.agentBubble}>
-                <div className={`prose prose-invert prose-sm max-w-none ${v.prose}`}>
+                <div className={`prose dark:prose-invert prose-sm max-w-none ${v.prose}`}>
                   <ReactMarkdown>{message.content}</ReactMarkdown>
                   {message.isStreaming && (
                     <span className="inline-block w-1.5 h-3.5 ml-0.5 bg-subtle rounded-sm animate-pulse align-middle" />

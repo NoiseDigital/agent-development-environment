@@ -192,6 +192,45 @@ Demo / reference agents (the ADK example agents) live under
 scan so the catalog stays focused. Copy a `.demos/<name>/` directory back up
 to `adk_agents/` to enable it locally.
 
+## Frontend Styling & Theming
+
+The UI supports light and dark themes via a **class strategy**: `<html>` carries
+`light` or `dark`, and every color resolves through a semantic token. The single
+source of truth is [`src/app/globals.css`](services/frontend/src/app/globals.css),
+which defines the tokens for both themes and maps them to Tailwind utilities.
+
+**The rule: style with semantic tokens, never raw palette classes.** Use
+`bg-surface` / `text-muted` / `border-line` — not `bg-zinc-900` / `text-zinc-400`
+/ `border-zinc-800`. Tokenized classes flip automatically with the theme; raw
+`zinc`/`white`/`black`/hex classes are dark-only and break light mode.
+
+| Need | Token utilities |
+|---|---|
+| Backgrounds (by elevation) | `canvas` → `surface` → `surface-raised`; `surface-sunken` for insets |
+| Text (by emphasis) | `foreground` → `muted` → `subtle` → `faint` → `disabled` |
+| Borders | `line`, `line-strong` |
+| Brand / status | `accent` (+ `accent-100…950`), `positive`, `danger`, `warning` |
+| Flips to contrast the theme (primary buttons) | `inverse`, `inverse-foreground` |
+
+Opacity (`bg-surface/60`) and variants (`hover:bg-surface-raised`) work as usual.
+
+**Deliberate exceptions** (don't tokenize these):
+- **Modal/drawer scrims** stay `bg-black/NN` — a scrim is intentionally dark in
+  both themes.
+- **Text on a solid brand/status fill** (`text-white` on `bg-accent-500`) stays
+  as-is — the background is theme-stable.
+- **Data-viz / categorical colors** are data, not chrome. For a one-off hue with
+  no token (e.g. a phase badge), pair it explicitly: `text-cyan-700 dark:text-cyan-300`.
+- **Markdown** uses `prose dark:prose-invert` (not bare `prose-invert`).
+- **Charts**: Vega config comes from `vegaTheme(theme)` in
+  [`lib/charts/theme.ts`](services/frontend/src/lib/charts/theme.ts) — chrome flips,
+  data colors stay stable.
+
+**Adding or retuning a theme:** edit only `globals.css`. To add a third theme,
+copy a token block, give `<html>` that class, and change the values — no
+component changes required. Reusable gradient surfaces (`bg-card-spotlight`,
+`bg-page-spotlight`) live there too; add a class + `.light` override to extend.
+
 ## Frontend Testing
 
 The frontend uses **Vitest + Testing Library**. Tests live next to the code
