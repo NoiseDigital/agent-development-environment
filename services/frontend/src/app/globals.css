@@ -312,22 +312,187 @@ body {
   50%      { transform: translate(-50px, 20px) scale(1.05); }
 }
 
-/* Ambient neural-expressive background — three slow-drifting orbs that
- * blend over the surface for that "Gemini Neural Expressive" feel.
- * Mounted at the layout level on non-dashboard pages so the canvas of
- * /d/* stays clean for charts. Pointer-events:none everywhere so the
- * orbs never intercept clicks. */
-@keyframes neuralOrbA {
-  0%, 100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
-  33%      { transform: translate(-35%, -45%) scale(1.08) rotate(60deg); }
-  66%      { transform: translate(-60%, -55%) scale(0.95) rotate(120deg); }
+/* ── Neural-expressive ambient field ─────────────────────────────────────────
+ * Rendered by NeuralBackground at the layout level on non-dashboard pages (the
+ * canvas of /d/* stays clean for charts). It's the app's "passive feedback"
+ * surface: a slow bloom of soft brand color that breathes continuously, and —
+ * while an agent is thinking (`[data-thinking]`) — energizes: brighter, more
+ * saturated, with a central pulsing "heartbeat".
+ *
+ * Design notes:
+ *  • The idle⇄active change is driven by the registered custom property
+ *    `--energy`, which *interpolates* (0→1) on a transition. Nothing swaps
+ *    animation-duration, so the field never visibly jumps — it just intensifies.
+ *  • Only transform/opacity are animated continuously (GPU-composited); the
+ *    expensive blur is static. `isolation:isolate` keeps the additive blend
+ *    contained to the field so overlapping orbs brighten without bleeding into
+ *    page content.
+ *  • Honors prefers-reduced-motion: a calm static field, no motion. */
+@property --energy {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
 }
-@keyframes neuralOrbB {
-  0%, 100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
-  33%      { transform: translate(-65%, -50%) scale(1.05) rotate(-50deg); }
-  66%      { transform: translate(-40%, -60%) scale(1.10) rotate(-100deg); }
+
+.neural-field {
+  isolation: isolate;
+  --energy: 0;
+  --neural-blend: screen;                 /* additive light on dark surfaces */
+  transition: --energy 1.6s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: calc(0.62 + 0.38 * var(--energy));
 }
-@keyframes neuralOrbC {
-  0%, 100% { transform: translate(-50%, -50%) scale(1); }
-  50%      { transform: translate(-55%, -42%) scale(1.12); }
+.light .neural-field {
+  --neural-blend: multiply;               /* soft ink blooms on light surfaces */
+  opacity: calc(0.45 + 0.30 * var(--energy));
+}
+.neural-field[data-thinking] { --energy: 1; }
+
+.neural-orb {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  left: var(--x);
+  top: var(--y);
+  will-change: transform;
+  animation: var(--drift) var(--dur) cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.neural-orb::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 50% 50%, var(--hue), transparent 68%);
+  mix-blend-mode: var(--neural-blend);
+  filter: blur(64px) saturate(calc(1 + 0.85 * var(--energy)));
+  opacity: calc(var(--base-op) * (0.7 + 0.6 * var(--energy)));
+  transition: opacity 1.6s ease, filter 1.6s ease;
+  will-change: transform, opacity;
+  animation: neuralBreathe var(--breath) ease-in-out infinite;
+}
+
+/* Central accent bloom — invisible at rest, blooms and pulses while thinking.
+ * Amplitude is gated by --energy inside the keyframes, so it fades in/out with
+ * the same smooth ramp rather than popping on. */
+.neural-core {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  width: 38rem;
+  height: 38rem;
+  margin: -19rem 0 0 -19rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 50% 50%, var(--c-accent-400), transparent 60%);
+  mix-blend-mode: var(--neural-blend);
+  filter: blur(60px);
+  opacity: 0;
+  will-change: opacity, transform;
+  animation: neuralPulse 3s ease-in-out infinite;
+}
+
+/* Per-orb placement / palette / cadence. Durations are mutually prime so the
+ * four orbs never beat-sync into a visible "everything lines up" moment. */
+.neural-orb-a { --size: 46rem; --x: 6%;  --y: 14%; --hue: rgba(16, 185, 129, 0.55); --base-op: 0.55; --drift: neuralDriftA; --dur: 41s; --breath: 17s; }
+.neural-orb-b { --size: 52rem; --x: 50%; --y: 38%; --hue: rgba(59, 130, 246, 0.55); --base-op: 0.55; --drift: neuralDriftB; --dur: 53s; --breath: 21s; }
+.neural-orb-c { --size: 40rem; --x: 28%; --y: 56%; --hue: rgba(139, 92, 246, 0.50); --base-op: 0.48; --drift: neuralDriftC; --dur: 47s; --breath: 19s; }
+.neural-orb-d { --size: 34rem; --x: 68%; --y: 4%;  --hue: rgba(236, 72, 153, 0.42); --base-op: 0.40; --drift: neuralDriftD; --dur: 59s; --breath: 23s; }
+
+@keyframes neuralBreathe {
+  0%, 100% { transform: scale(0.95); }
+  50%      { transform: scale(1.12); }
+}
+@keyframes neuralPulse {
+  0%, 100% { opacity: calc(0.10 * var(--energy)); transform: scale(0.9); }
+  50%      { opacity: calc(0.52 * var(--energy)); transform: scale(1.08); }
+}
+
+/* Drift paths — translate-only, six stops, gentle deltas (relative to each
+ * orb's own large box, so a few % reads as a slow tens-of-px wander). */
+@keyframes neuralDriftA {
+  0%   { transform: translate(0, 0); }
+  20%  { transform: translate(4%, -3%); }
+  40%  { transform: translate(-3%, -5%); }
+  60%  { transform: translate(-6%, 3%); }
+  80%  { transform: translate(3%, 5%); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes neuralDriftB {
+  0%   { transform: translate(0, 0); }
+  20%  { transform: translate(-5%, 4%); }
+  40%  { transform: translate(2%, 6%); }
+  60%  { transform: translate(6%, -2%); }
+  80%  { transform: translate(-2%, -5%); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes neuralDriftC {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(5%, 3%); }
+  50%  { transform: translate(3%, -5%); }
+  75%  { transform: translate(-5%, -2%); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes neuralDriftD {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(-4%, -4%); }
+  50%  { transform: translate(-6%, 3%); }
+  75%  { transform: translate(2%, 5%); }
+  100% { transform: translate(0, 0); }
+}
+
+/* Localized neural wash — a scoped sibling of the field for use *inside* a
+ * column (the chat thread), where the fixed field is occluded by opaque
+ * surfaces. Same `--energy` ramp, but absolutely positioned by its container
+ * instead of fixed, so the conversation surface itself brightens while the
+ * agent is thinking. Reuses the chatBlob drift keyframes. */
+.neural-wash {
+  --energy: 0;
+  --neural-blend: screen;
+  transition: --energy 1.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.light .neural-wash { --neural-blend: multiply; }
+.neural-wash[data-thinking] { --energy: 1; }
+
+.neural-wash-orb {
+  position: absolute;
+  border-radius: 9999px;
+  mix-blend-mode: var(--neural-blend);
+  filter: blur(72px) saturate(calc(1 + 0.8 * var(--energy)));
+  opacity: calc(var(--base-op) * (0.8 + 0.7 * var(--energy)));
+  transition: opacity 1.6s ease, filter 1.6s ease;
+  will-change: transform, opacity;
+}
+.neural-wash-a {
+  left: -8rem;
+  top: 2.5rem;
+  width: 28rem;
+  height: 28rem;
+  background: radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.6), transparent 70%);
+  --base-op: 0.5;
+  animation: chatBlobA 22s ease-in-out infinite;
+}
+.neural-wash-b {
+  right: -4rem;
+  bottom: -4rem;
+  width: 32rem;
+  height: 32rem;
+  background: radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.55), transparent 70%);
+  --base-op: 0.45;
+  animation: chatBlobB 28s ease-in-out infinite;
+}
+.neural-wash-c {
+  left: 38%;
+  top: 30%;
+  width: 24rem;
+  height: 24rem;
+  background: radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.5), transparent 70%);
+  --base-op: 0.34;
+  animation: chatBlobA 34s ease-in-out infinite reverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .neural-orb,
+  .neural-orb::before,
+  .neural-core,
+  .neural-wash-orb {
+    animation: none;
+  }
 }

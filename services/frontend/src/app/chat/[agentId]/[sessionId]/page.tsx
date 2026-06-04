@@ -10,6 +10,7 @@ import MessageInput from '../../../../components/chat/MessageInput';
 import SourcesSidebar from '../../../../components/SourcesSidebar';
 import type { SourceRef } from '../../../../types/source';
 import { sourceUri, sourceLabel } from '../../../../types/source';
+import { useNeuralThinking } from '../../../../lib/agent/neural-pulse';
 
 export default function ChatSessionPage() {
   const params = useParams();
@@ -17,6 +18,7 @@ export default function ChatSessionPage() {
   const agentId = typeof params.agentId === 'string' ? params.agentId : '';
   const sessionId = typeof params.sessionId === 'string' ? params.sessionId : '';
   const [selectedSources, setSelectedSources] = useState<SourceRef[]>([]);
+  const thinking = useNeuralThinking();
 
   const {
     availableApps,
@@ -96,14 +98,19 @@ export default function ChatSessionPage() {
 
       {/* Main */}
       <div className="relative flex-1 flex flex-col min-w-0">
-        {/* Soft animated radial wash — pure CSS, sits behind everything in
-            the chat column with pointer-events: none so it never intercepts
-            clicks. Two slow-moving blobs blend into the dark surface for a
-            "Gemini Neural Expressive"-style ambient feel without any extra
-            JS frame work. */}
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -left-32 top-10 h-[28rem] w-[28rem] rounded-full bg-emerald-500/[0.06] blur-3xl animate-[chatBlobA_22s_ease-in-out_infinite]" />
-          <div className="absolute right-0 bottom-0 h-[32rem] w-[32rem] rounded-full bg-blue-500/[0.05] blur-3xl animate-[chatBlobB_28s_ease-in-out_infinite]" />
+        {/* Soft animated radial wash behind the chat column (pointer-events:
+            none so it never intercepts clicks). Shares the neural-expressive
+            `--energy` ramp: while the agent is thinking the wash brightens and
+            saturates, then eases back — so the conversation surface itself
+            "breathes with you". Pure CSS; all motion lives in globals.css. */}
+        <div
+          aria-hidden
+          data-thinking={thinking ? 'true' : undefined}
+          className="neural-wash pointer-events-none absolute inset-0 overflow-hidden"
+        >
+          <div className="neural-wash-orb neural-wash-a" />
+          <div className="neural-wash-orb neural-wash-b" />
+          <div className="neural-wash-orb neural-wash-c" />
         </div>
         <div className="relative z-10 flex flex-1 flex-col min-h-0">
           <ChatHeader

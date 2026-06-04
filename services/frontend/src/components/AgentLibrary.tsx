@@ -17,7 +17,7 @@ export default function AgentLibrary({
 
   if (isLoadingApps) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-canvas px-6">
+      <div className="flex-1 flex items-center justify-center px-6">
         <div className="text-center rounded-3xl border border-line bg-surface-sunken/80 px-10 py-12 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
           <div className="mx-auto mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full border border-line bg-surface">
             <div className="w-8 h-8 border-2 border-disabled border-t-foreground rounded-full animate-spin"></div>
@@ -35,7 +35,7 @@ export default function AgentLibrary({
 
   if (activeApps.length === 0 && comingSoonApps.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-canvas px-6">
+      <div className="flex-1 flex items-center justify-center px-6">
         <div className="max-w-md rounded-3xl border border-line bg-surface-sunken/80 px-10 py-12 text-center shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
           <div className="mx-auto mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full border border-line bg-surface">
             <svg className="w-8 h-8 text-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -87,8 +87,10 @@ export default function AgentLibrary({
     );
   };
 
+  // Transparent root so the global neural-expressive field shows through — the
+  // body already supplies the canvas color.
   return (
-    <div className="flex-1 overflow-y-auto bg-page-spotlight px-6 py-10 sm:px-8">
+    <div className="flex-1 overflow-y-auto px-6 py-10 sm:px-8">
       <div className="mx-auto max-w-6xl">
         <div className="mb-10 text-center">
           <p className="mb-3 text-[11px] font-medium uppercase tracking-[0.3em] text-faint">
