@@ -32,15 +32,12 @@ dependencies = [
     { name = "db-dtypes" },
     { name = "fastapi" },
     { name = "google-adk" },
-<<<<<<< HEAD
     { name = "google-cloud-bigquery" },
+    { name = "httpx" },
     { name = "openpyxl" },
     { name = "pandas" },
     { name = "python-multipart" },
     { name = "tabulate" },
-=======
-    { name = "httpx" },
->>>>>>> origin/main
     { name = "toolbox-core" },
     { name = "uvicorn" },
 ]
@@ -60,15 +57,12 @@ requires-dist = [
     { name = "db-dtypes", specifier = ">=1.6.0" },
     { name = "fastapi", specifier = ">=0.116.0" },
     { name = "google-adk", specifier = "==1.32.0" },
-<<<<<<< HEAD
     { name = "google-cloud-bigquery", specifier = ">=3.27.0" },
+    { name = "httpx", specifier = ">=0.27.0" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pandas", specifier = ">=2.3.3" },
     { name = "python-multipart", specifier = ">=0.0.18" },
     { name = "tabulate", specifier = ">=0.10.0" },
-=======
-    { name = "httpx", specifier = ">=0.27.0" },
->>>>>>> origin/main
     { name = "toolbox-core", specifier = ">=0.5.4" },
     { name = "uvicorn", specifier = ">=0.35.0" },
 ]

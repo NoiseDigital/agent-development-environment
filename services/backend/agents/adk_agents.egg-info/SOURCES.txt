@@ -1,7 +1,0 @@
-main.py
-pyproject.toml
-adk_agents.egg-info/PKG-INFO
-adk_agents.egg-info/SOURCES.txt
-adk_agents.egg-info/dependency_links.txt
-adk_agents.egg-info/requires.txt
-adk_agents.egg-info/top_level.txt
