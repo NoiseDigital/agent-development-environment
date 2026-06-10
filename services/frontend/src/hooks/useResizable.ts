@@ -13,6 +13,9 @@ interface ResizableOptions {
 
 interface ResizableResult {
   width: number;
+  /** True while a drag-resize is in progress — use it to suppress width
+   *  transitions so the panel tracks the pointer 1:1. */
+  isResizing: boolean;
   /** Attach to a thin drag handle's onPointerDown. */
   startResize: (e: React.PointerEvent) => void;
 }
@@ -23,10 +26,12 @@ interface ResizableResult {
  */
 export function useResizable({ initial, min, max, edge }: ResizableOptions): ResizableResult {
   const [width, setWidth] = useState(initial);
+  const [isResizing, setIsResizing] = useState(false);
   const widthRef = useRef(initial);
 
   const startResize = (e: React.PointerEvent) => {
     e.preventDefault();
+    setIsResizing(true);
     const startX = e.clientX;
     const startWidth = widthRef.current;
 
@@ -41,6 +46,7 @@ export function useResizable({ initial, min, max, edge }: ResizableOptions): Res
       window.removeEventListener('pointerup', onUp);
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
+      setIsResizing(false);
     };
 
     document.body.style.userSelect = 'none';
@@ -49,5 +55,5 @@ export function useResizable({ initial, min, max, edge }: ResizableOptions): Res
     window.addEventListener('pointerup', onUp);
   };
 
-  return { width, startResize };
+  return { width, isResizing, startResize };
 }

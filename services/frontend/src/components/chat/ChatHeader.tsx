@@ -46,8 +46,8 @@ export default function ChatHeader({
   }, []);
 
   return (
-    <div className="px-4 py-3 border-b border-line/60 bg-canvas">
-      <div className="flex items-center justify-between">
+    <div className="px-4 h-14 shrink-0 border-b border-line/60 bg-canvas flex items-center">
+      <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-3">
           {selectedApp && sessionLabel && (
             <h2 className="text-sm font-medium text-foreground truncate">

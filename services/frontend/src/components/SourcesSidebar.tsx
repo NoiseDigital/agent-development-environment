@@ -4,9 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { sourcesApi } from '../lib/api/sources';
 import type { Upload, SourceRef } from '../types/source';
 import { sourceUri, uploadToRef } from '../types/source';
-import { useResizable } from '../hooks/useResizable';
 import { useSidebarCollapsed } from '../contexts/SidebarContext';
-import ResizeHandle from './ui/ResizeHandle';
+import CollapsiblePanel from './ui/CollapsiblePanel';
 
 interface SourcesSidebarProps {
   /** Sources currently active in the conversation. */
@@ -22,7 +21,6 @@ function fmtSize(bytes?: number | null): string {
 }
 
 export default function SourcesSidebar({ selected, onChange }: SourcesSidebarProps) {
-  const { width, startResize } = useResizable({ initial: 288, min: 240, max: 460, edge: 'left' });
   const [collapsed, setCollapsed] = useSidebarCollapsed('sources');
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -116,31 +114,27 @@ export default function SourcesSidebar({ selected, onChange }: SourcesSidebarPro
     }
   };
 
-  if (collapsed) {
-    return (
-      <aside className="w-10 shrink-0 border-l border-line/60 bg-canvas flex flex-col items-center py-3">
+  return (
+    <CollapsiblePanel
+      collapsed={collapsed}
+      resize={{ initial: 288, min: 240, max: 460 }}
+      side="left"
+      className="bg-canvas border-line/60"
+      rail={
         <button
           type="button"
           onClick={() => setCollapsed(false)}
           title="Show sources"
-          className="p-2 text-faint hover:text-foreground hover:bg-surface-raised rounded-lg transition-colors"
+          className="w-9 h-9 flex items-center justify-center text-faint hover:text-foreground hover:bg-surface-raised rounded-lg transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7M9 3h6M4 7h16" />
           </svg>
         </button>
-      </aside>
-    );
-  }
-
-  return (
-    <aside
-      className="relative shrink-0 border-l border-line/60 bg-canvas flex flex-col"
-      style={{ width }}
+      }
     >
-      <ResizeHandle side="left" onPointerDown={startResize} />
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-line/60 shrink-0">
+      <div className="flex items-center justify-between px-4 h-14 border-b border-line/60 shrink-0">
         <div>
           <h2 className="text-sm font-semibold text-foreground">Sources</h2>
           <p className="text-[11px] text-faint">{selected.length} active in chat</p>
@@ -271,6 +265,6 @@ export default function SourcesSidebar({ selected, onChange }: SourcesSidebarPro
           Checked sources are passed to the analyst with your next message.
         </p>
       </div>
-    </aside>
+    </CollapsiblePanel>
   );
 }

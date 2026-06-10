@@ -5,9 +5,9 @@ import { useState, useEffect, type ReactNode } from 'react';
 import Image from 'next/image';
 import { agentConfigurations } from '../config/agent-config';
 import { adkApi } from '../lib/agent/adk-api';
-import { useResizable } from '../hooks/useResizable';
 import { useSidebarCollapsed } from '../contexts/SidebarContext';
-import ResizeHandle from './ui/ResizeHandle';
+import CollapsiblePanel from './ui/CollapsiblePanel';
+import Collapsible from './ui/Collapsible';
 import ThemeToggle from './ui/ThemeToggle';
 
 // ── Icons ────────────────────────────────────────────────────────────────────
@@ -61,7 +61,6 @@ const ViewAllIcon = () => (
 export default function PlatformSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { width, startResize } = useResizable({ initial: 224, min: 180, max: 340, edge: 'right' });
 
   const inAgentsSection = pathname.startsWith('/agents') || pathname.startsWith('/chat');
   const [agentsExpanded, setAgentsExpanded] = useState(inAgentsSection);
@@ -99,51 +98,51 @@ export default function PlatformSidebar() {
         : 'text-subtle hover:bg-surface hover:text-foreground'
     }`;
 
-  if (collapsed) {
-    const collapsedItem = (active: boolean, onClick: () => void, label: string, icon: ReactNode) => (
-      <button
-        type="button"
-        onClick={onClick}
-        title={label}
-        className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors duration-150 ${
-          active ? 'bg-surface-raised text-foreground' : 'text-subtle hover:bg-surface hover:text-foreground'
-        }`}
-      >
-        {icon}
-      </button>
-    );
-    return (
-      <aside className="w-12 shrink-0 flex flex-col h-full bg-surface-sunken border-r border-line items-center py-3 gap-1">
-        <button
-          type="button"
-          onClick={() => setCollapsed(false)}
-          className="w-9 h-9 flex items-center justify-center text-faint hover:text-foreground hover:bg-surface-raised rounded-lg transition-colors duration-150 mb-1"
-          title="Expand sidebar"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-        {collapsedItem(pathname.startsWith('/plan'), () => router.push('/plan'), 'Plan', <PlanIcon />)}
-        {collapsedItem(pathname.startsWith('/dashboards'), () => router.push('/dashboards'), 'Dashboards', <DashboardsIcon />)}
-        {collapsedItem(pathname.startsWith('/analyze'), () => router.push('/analyze'), 'Analyze', <AnalyzeIcon />)}
-        {collapsedItem(inAgentsSection, () => router.push('/agents'), 'Agents', <AgentsIcon />)}
-        {/* Theme switch pinned to the bottom of the rail */}
-        <div className="mt-auto">
-          <ThemeToggle />
-        </div>
-      </aside>
-    );
-  }
+  // Collapsed-rail nav button (icon-only) — shared by the rail render below.
+  const collapsedItem = (active: boolean, onClick: () => void, label: string, icon: ReactNode) => (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors duration-150 ${
+        active ? 'bg-surface-raised text-foreground' : 'text-subtle hover:bg-surface hover:text-foreground'
+      }`}
+    >
+      {icon}
+    </button>
+  );
 
   return (
-    <aside
-      className="relative shrink-0 flex flex-col h-full bg-surface-sunken border-r border-line"
-      style={{ width }}
+    <CollapsiblePanel
+      collapsed={collapsed}
+      resize={{ initial: 224, min: 180, max: 340 }}
+      side="right"
+      className="bg-surface-sunken border-line"
+      rail={
+        <>
+          <button
+            type="button"
+            onClick={() => setCollapsed(false)}
+            className="w-9 h-9 flex items-center justify-center text-faint hover:text-foreground hover:bg-surface-raised rounded-lg transition-colors duration-150 mb-1"
+            title="Expand sidebar"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+          {collapsedItem(pathname.startsWith('/plan'), () => router.push('/plan'), 'Plan', <PlanIcon />)}
+          {collapsedItem(pathname.startsWith('/dashboards'), () => router.push('/dashboards'), 'Dashboards', <DashboardsIcon />)}
+          {collapsedItem(pathname.startsWith('/analyze'), () => router.push('/analyze'), 'Analyze', <AnalyzeIcon />)}
+          {collapsedItem(inAgentsSection, () => router.push('/agents'), 'Agents', <AgentsIcon />)}
+          {/* Theme switch pinned to the bottom of the rail */}
+          <div className="mt-auto">
+            <ThemeToggle />
+          </div>
+        </>
+      }
     >
-      <ResizeHandle side="right" onPointerDown={startResize} />
-      {/* ── Brand ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between pl-4 pr-2 py-[14px] border-b border-line">
+      {/* Brand */}
+      <div className="flex items-center justify-between pl-4 pr-2 h-14 shrink-0 border-b border-line">
         <div className="flex items-end gap-1.5 min-w-0 cursor-pointer" onClick={() => router.push('/')}>
           {/* Logo art is white; invert it to dark ink on light surfaces. */}
           <Image src="/noise_white.svg" alt="Noise" width={72} height={20} className="h-5 w-auto shrink-0 light:invert" />
@@ -161,7 +160,7 @@ export default function PlatformSidebar() {
         </button>
       </div>
 
-      {/* ── Navigation ────────────────────────────────────────────────────── */}
+      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-2 space-y-px">
 
         {/* Plan — the one-stop media planning surface (first because it's
@@ -218,8 +217,8 @@ export default function PlatformSidebar() {
             </button>
           </div>
 
-          {/* Agent sub-items */}
-          {agentsExpanded && (
+          {/* Agent sub-items — height + fade animated */}
+          <Collapsible open={agentsExpanded}>
             <div className="mt-px ml-[11px] pl-4 border-l border-line space-y-px">
               {visibleAgents.map((agent) => {
                 const active = pathname.startsWith(`/chat/${agent.name}`);
@@ -251,15 +250,14 @@ export default function PlatformSidebar() {
                 <span>View all agents</span>
               </button>
             </div>
-          )}
+          </Collapsible>
         </div>
       </nav>
 
-      {/* ── Footer ─────────────────────────────────────────────────────────── */}
+      {/* Footer */}
       <div className="p-2 border-t border-line">
         <ThemeToggle />
       </div>
-
-    </aside>
+    </CollapsiblePanel>
   );
 }

@@ -3,9 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Session } from '../../lib/agent/adk-api';
 import { getAgentConfiguration } from '../../config/agent-config';
-import { useResizable } from '../../hooks/useResizable';
 import { useSidebarCollapsed } from '../../contexts/SidebarContext';
-import ResizeHandle from '../ui/ResizeHandle';
+import CollapsiblePanel from '../ui/CollapsiblePanel';
 import TypingName from './TypingName';
 import { normalizeTimestamp } from '../../utils/timestamps';
 
@@ -51,7 +50,6 @@ export default function ChatSidebar({
   sessionNames,
   aiRenamedIds,
 }: ChatSidebarProps) {
-  const { width, startResize } = useResizable({ initial: 320, min: 240, max: 460, edge: 'right' });
   const [collapsed, setCollapsed] = useSidebarCollapsed('chat');
   const agentConfig = selectedApp ? getAgentConfiguration(selectedApp) : null;
 
@@ -156,43 +154,41 @@ export default function ChatSidebar({
     grouped[key].push(s);
   }
   const dayKeys = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
-  if (collapsed) {
-    return (
-      <aside className="w-12 shrink-0 flex flex-col h-full bg-surface-sunken border-r border-line/60 items-center py-3 gap-1">
-        <button
-          type="button"
-          onClick={() => setCollapsed(false)}
-          title="Expand conversations"
-          className="w-9 h-9 flex items-center justify-center text-faint hover:text-foreground hover:bg-surface-raised rounded-lg transition-colors duration-150"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-        {selectedApp && (
+  return (
+    <CollapsiblePanel
+      collapsed={collapsed}
+      resize={{ initial: 320, min: 240, max: 460 }}
+      side="right"
+      className="bg-surface-sunken border-line/60"
+      rail={
+        <>
           <button
             type="button"
-            onClick={createNewSession}
-            title="New chat"
-            className="w-9 h-9 flex items-center justify-center text-subtle hover:text-foreground hover:bg-surface rounded-lg transition-colors duration-150"
+            onClick={() => setCollapsed(false)}
+            title="Expand conversations"
+            className="w-9 h-9 flex items-center justify-center text-faint hover:text-foreground hover:bg-surface-raised rounded-lg transition-colors duration-150"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
-        )}
-      </aside>
-    );
-  }
-
-  return (
-    <aside
-      className="relative shrink-0 h-full bg-surface-sunken border-r border-line/60 flex flex-col"
-      style={{ width }}
+          {selectedApp && (
+            <button
+              type="button"
+              onClick={createNewSession}
+              title="New chat"
+              className="w-9 h-9 flex items-center justify-center text-subtle hover:text-foreground hover:bg-surface rounded-lg transition-colors duration-150"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+          )}
+        </>
+      }
     >
-      <ResizeHandle side="right" onPointerDown={startResize} />
       {/* Header */}
-      <div className="px-4 py-4 border-b border-line/60 flex items-center justify-between gap-2">
+      <div className="px-4 h-14 shrink-0 border-b border-line/60 flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-faint mb-0.5">Conversations</p>
           <p className="text-sm font-medium text-foreground truncate">
@@ -398,6 +394,6 @@ export default function ChatSidebar({
           )}
         </div>
       </div>
-    </aside>
+    </CollapsiblePanel>
   );
 }

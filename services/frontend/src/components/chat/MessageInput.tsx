@@ -31,7 +31,7 @@ export default function MessageInput({
     const text = inputMessage;
     setInputMessage('');
     setJustSent(true);
-    window.setTimeout(() => setJustSent(false), 700);
+    window.setTimeout(() => setJustSent(false), 1500);
     await onSendMessage(text);
   };
 
@@ -66,6 +66,11 @@ export default function MessageInput({
               </svg>
             </button>
           </div>
+          {/* Subtle, persistent AI-fallibility disclaimer — small and out of the
+              way, but always visible beneath the composer. */}
+          <p className="mt-2 text-center text-[10px] leading-none text-disabled select-none">
+            Generative AI can make mistakes, review responses thoroughly.
+          </p>
         </form>
       </div>
     </div>
