@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcp-asana"
+version = "0.1.0"
+description = "MCP service for Asana tools"
+requires-python = "==3.13.*"
+dependencies = [
+    "starlette>=0.37.2",
+    "uvicorn>=0.35.0",
+    "google-adk>=0.2.2",
+    "python-dotenv>=1.0.0",
+]

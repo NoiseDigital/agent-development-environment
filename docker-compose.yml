@@ -139,6 +139,16 @@ services:
       retries: 5
       start_period: 15s
 
+  mcp-asana:
+    build:
+      context: ./services/backend/mcp/asana
+    ports:
+      - "${ASANA_MCP_PORT:-5004}:8080"
+    profiles:
+      - asana
+    stdin_open: true
+    tty: true
+
   # ── Gateway — the public entry point for the frontend ─────────────────────
   # Owns auth, the platform's non-agent HTTP routes, AND the database
   # schema. Boot order: `alembic upgrade head` → uvicorn → /healthz returns
