@@ -111,6 +111,7 @@ services:
     stdin_open: true
     tty: true
 
+<<<<<<< HEAD
   # Statistics & correlation analysis engine. Resolves data sources via the
   # agent API and reads uploads from the shared volume.
   mcp-stats:
@@ -186,6 +187,17 @@ services:
       timeout: 3s
       retries: 5
       start_period: 30s
+=======
+  mcp-asana:
+    build:
+      context: ./services/backend/mcp/asana
+    ports:
+      - "${ASANA_MCP_PORT:-5003}:8080"
+    profiles:
+      - asana
+    stdin_open: true
+    tty: true
+>>>>>>> origin/main
 
   frontend:
     build:
