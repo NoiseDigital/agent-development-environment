@@ -1,39 +1,16 @@
-// Utility functions for timestamp handling
+// Timestamp helpers shared across the chat UI.
 
-// Helper function to convert ADK timestamp to JavaScript timestamp
+/** Coerce an ADK timestamp (seconds or millis, number or ISO string) to epoch millis. */
 export const normalizeTimestamp = (timestamp: number | string): number => {
-  let normalizedTimestamp = timestamp;
-
-  // If timestamp is a string, try to parse it
-  if (typeof normalizedTimestamp === 'string') {
-    normalizedTimestamp = new Date(normalizedTimestamp).getTime();
-  }
-
-  // If timestamp seems to be in seconds instead of milliseconds (Unix timestamp)
-  if (normalizedTimestamp < 1000000000000) { // Less than year 2001 in milliseconds
-    normalizedTimestamp = normalizedTimestamp * 1000;
-  }
-
-  // Fallback to current time if timestamp is invalid
-  if (!normalizedTimestamp || isNaN(normalizedTimestamp) || normalizedTimestamp <= 0) {
-    console.warn('Invalid timestamp detected, using current time:', timestamp);
-    normalizedTimestamp = Date.now();
-  }
-
-  return normalizedTimestamp;
+  let ts = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
+  if (ts < 1_000_000_000_000) ts *= 1000; // seconds → ms
+  if (!ts || isNaN(ts) || ts <= 0) ts = Date.now();
+  return ts;
 };
 
-// Format timestamp for display in session list
-export const formatSessionDate = (timestamp: number | string): string => {
-  const normalizedTimestamp = normalizeTimestamp(timestamp);
-  return new Date(normalizedTimestamp).toLocaleDateString();
-};
-
-// Format timestamp for message display
-export const formatMessageTime = (timestamp: number | string): string => {
-  const normalizedTimestamp = normalizeTimestamp(timestamp);
-  return new Date(normalizedTimestamp).toLocaleTimeString('en-US', {
+/** Hour:minute label for a message timestamp. */
+export const formatMessageTime = (timestamp: number | string): string =>
+  new Date(normalizeTimestamp(timestamp)).toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
   });
-};

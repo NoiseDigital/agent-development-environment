@@ -5,7 +5,9 @@ __pycache__/
 *.egg-info/
 .local
 .venv
-data
+# Anchored to repo root so it ignores a top-level data/ dump only —
+# a bare "data" also swallowed source dirs like frontend/src/data/.
+/data
 .env
 .vscode/settings.json
 .DS_Store
@@ -21,4 +23,3 @@ application_default_credentials.json
 terraform/.terraform/
 terraform/*.tfstate
 terraform/*.tfstate.backup
-/services/backend/agents/adk_agents.egg-info

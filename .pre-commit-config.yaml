@@ -44,3 +44,93 @@ repos:
     rev: v0.10.0.1
     hooks:
       - id: shellcheck
+
+  # Conventional-commit message linter (runs at commit-msg stage).
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.31.0
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+
+  # GitHub Actions YAML linter.
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.4
+    hooks:
+      - id: actionlint
+
+  # Secrets detection (broader than the built-in detect-private-key).
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  # Python type-checking — split per service so `api.db` (which exists in
+  # both agents/ and gateway/) doesn't trip mypy's duplicate-module check.
+  # Each hook entry uses a non-overlapping `files:` regex so a single
+  # invocation only ever sees ONE service's files.
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        alias: mypy-agents
+        name: mypy (agents)
+        files: ^services/backend/agents/.*\.py$
+        additional_dependencies: [pydantic, fastapi, sqlalchemy, google-adk, types-PyYAML]
+        args: [--ignore-missing-imports, --follow-imports=silent]
+      - id: mypy
+        alias: mypy-gateway
+        name: mypy (gateway)
+        files: ^services/backend/gateway/.*\.py$
+        additional_dependencies: [pydantic, fastapi, sqlalchemy, alembic, httpx]
+        args: [--ignore-missing-imports, --follow-imports=silent]
+
+  # Local hooks — fast checks that only fire when the relevant files change so
+  # `git commit` stays snappy. The heavyweight equivalents run on every push
+  # in CI (see .github/workflows/ci.yml).
+  - repo: local
+    hooks:
+      # Frontend ESLint — only on staged TS/TSX files (next lint is too slow
+      # to run repo-wide on every commit). Calls the workspace-local binary
+      # directly so the hook doesn't depend on `npx` being on PATH. The
+      # wrapper cd's into services/frontend so flat-config resolution works,
+      # and strips the prefix from each staged path.
+      - id: frontend-eslint
+        name: frontend ESLint (staged files)
+        language: system
+        files: ^services/frontend/.*\.(ts|tsx)$
+        pass_filenames: true
+        entry: bash -c 'cd services/frontend && exec node_modules/.bin/eslint --max-warnings=0 "${@#services/frontend/}"' --
+
+      # Frontend type-check — runs tsc on the whole project when ANY frontend
+      # source changes. Catches the cross-file regressions ESLint can't see.
+      - id: frontend-typecheck
+        name: frontend tsc --noEmit
+        language: system
+        files: ^services/frontend/.*\.(ts|tsx)$
+        pass_filenames: false
+        entry: bash -c 'cd services/frontend && exec node_modules/.bin/tsc --noEmit'
+
+      # Frontend unit tests — vitest in run-once mode, gated to frontend changes.
+      - id: frontend-vitest
+        name: frontend vitest (run-once)
+        language: system
+        files: ^services/frontend/.*\.(ts|tsx)$
+        pass_filenames: false
+        entry: bash -c 'cd services/frontend && exec node_modules/.bin/vitest run --reporter=dot --passWithNoTests'
+
+      # Python AST + import sanity on backend services. Guards against
+      # broken __init__.py / circular import regressions before push.
+      - id: backend-ast-check
+        name: backend python AST parse
+        language: system
+        files: ^services/backend/.*\.py$
+        pass_filenames: true
+        entry: python3 -c "import ast,sys;[ast.parse(open(p).read(),p) for p in sys.argv[1:]]"
+
+      # Quick docker-compose syntax check — catches a broken YAML before push.
+      - id: compose-config
+        name: docker compose config validates
+        language: system
+        files: ^docker-compose\.yml$
+        pass_filenames: false
+        entry: docker compose config --quiet

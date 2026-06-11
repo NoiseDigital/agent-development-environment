@@ -27,12 +27,12 @@ from google.genai.types import (
     ThinkingConfig,
 )
 
-from services.backend.agents.adk_agents.data_agent.prompts.crm_business_analyst import (
+from ..prompts.crm_business_analyst import (
     system_instruction as crm_business_analyst_instruction,
 )
 
 
-BUSINESS_ANALYST_AGENT_MODEL_ID = "gemini-2.5-pro"
+BUSINESS_ANALYST_AGENT_MODEL_ID = "gemini-2.5-flash"
 
 
 async def after_model_callback(
@@ -49,7 +49,7 @@ async def after_model_callback(
 
 
 crm_business_analyst_agent = LlmAgent(
-    model="gemini-2.5-pro",
+    model="gemini-2.5-flash",
     name="crm_business_analyst",
     description="""
         This is your Senior Business Analyst.

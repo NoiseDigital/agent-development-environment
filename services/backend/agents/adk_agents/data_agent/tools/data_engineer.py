@@ -29,19 +29,19 @@ from google.genai import Client as GenaiClient
 
 from google.adk.tools import ToolContext
 
-from services.backend.agents.adk_agents.data_agent.prompts.data_engineer import (
+from ..prompts.data_engineer import (
     system_instruction as data_engineer_instruction,
     prompt as data_engineer_prompt,
 )
-from services.backend.agents.adk_agents.data_agent.prompts.sql_correction import (
+from ..prompts.sql_correction import (
     instruction as sql_correction_instruction,
     prompt as sql_correction_prompt,
 )
 
 # "gemini-2.5-pro-preview-05-06"
-DATA_ENGINEER_AGENT_MODEL_ID = "gemini-2.5-pro"
+DATA_ENGINEER_AGENT_MODEL_ID = "gemini-2.5-flash"
 # "gemini-2.5-pro-preview-05-06"
-SQL_VALIDATOR_MODEL_ID = "gemini-2.5-pro"
+SQL_VALIDATOR_MODEL_ID = "gemini-2.5-flash"
 _DEFAULT_METADATA_FILE = "sfdc_metadata.json"
 
 

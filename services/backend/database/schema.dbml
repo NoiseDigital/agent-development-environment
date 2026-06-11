@@ -1,0 +1,174 @@
+// NoiseOS — platform-owned Postgres schema
+//
+// Documents every table the platform creates and owns. Paste into
+// dbdiagram.io / dbdocs.io for a visual ERD; export to PNG/PDF for handoffs.
+//
+// Source of truth is the Alembic migrations under
+// services/backend/gateway/alembic/versions/. This file mirrors them so the
+// architecture is reviewable at a glance without trawling migration history.
+//
+// What is NOT here:
+// - ADK-owned tables (sessions, events). ADK manages its own schema and
+//   ships its own migrations; we never write to them or document them here.
+// - BigQuery tables (e.g. media_campaign_performance_NOI). Those are the
+//   analytical store the agent and the dashboards query LIVE — never copied
+//   into Postgres. Postgres is for platform metadata only.
+
+Project NoiseOS {
+  database_type: 'PostgreSQL'
+  Note: '''
+    Platform metadata for an agentic analytics product:
+    - Per-session / per-event metadata (display names, ratings)
+    - User-uploaded sources for the stats MCP server
+    - Pinned charts (chat → dashboard hand-off)
+    - User-created dashboards (DaaC's editable counterpart)
+
+    BigQuery (`nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`)
+    is the live analytical store. The MCP Toolbox container is the only thing
+    that holds BQ credentials; agent + gateway call it for every query.
+  '''
+}
+
+// ─── Sessions ──────────────────────────────────────────────────────────────
+// Display names + soft-delete flag for ADK sessions. Keyed by ADK session
+// identity (app, user, session). One row per session; the row is absent
+// until the user gives the session a name or hides it.
+
+Table session_metadata {
+  app_name      text         [not null]
+  user_id       text         [not null]
+  session_id    text         [not null]
+  display_name  text         [not null, default: "''"]
+  hidden        boolean      [not null, default: false, note: 'soft-delete']
+  updated_at    timestamptz  [not null, default: `now()`]
+
+  indexes {
+    (app_name, user_id, session_id) [pk]
+  }
+  Note: 'Per-session display names + soft-delete flag.'
+}
+
+// ─── Events ────────────────────────────────────────────────────────────────
+// Per-event metadata that lives outside ADK's event store — today thumb
+// ratings + optional comments. UUID PK so future event-level features (saves,
+// shares, replays) can FK to a single id.
+
+Table event_metadata {
+  id          uuid         [pk, default: `uuid_generate_v4()`]
+  app_name    text         [not null]
+  user_id     text         [not null]
+  session_id  text         [not null]
+  event_id    text         [not null, note: 'ADK event id']
+  rating      text         [not null, note: "'up' | 'down'"]
+  comment     text
+  created_at  timestamptz  [not null, default: `now()`]
+  updated_at  timestamptz  [not null, default: `now()`]
+
+  indexes {
+    (app_name, user_id, session_id, event_id) [unique]
+    (app_name, user_id, session_id)
+  }
+  Note: 'Per-event ratings + comments. ADK event identity is the natural key.'
+}
+
+// ─── Sources ───────────────────────────────────────────────────────────────
+// User-uploaded analysis files (CSV / XLSX). Storage backend is local volume
+// in dev (`/data/uploads/`), GCS in prod. The stats MCP server reads files by
+// `storage_key`. BigQuery refs are NOT registered here — they're referenced
+// live as `bigquery:<dataset>.<table>` strings.
+
+Table sources {
+  id           uuid         [pk, default: `uuid_generate_v4()`]
+  user_id      text         [not null]
+  name         text         [not null]
+  storage_key  text         [not null]
+  file_ext     text
+  size_bytes   bigint
+  metadata     jsonb        [not null, default: `'{}'::jsonb`]
+  created_at   timestamptz  [not null, default: `now()`]
+
+  indexes {
+    (user_id, created_at)
+  }
+  Note: 'User-uploaded data sources for the stats MCP.'
+}
+
+// ─── Pinned charts ────────────────────────────────────────────────────────
+// Charts the user pinned to a dashboard via the FloatingAssistant. The
+// Vega-Lite spec is stored as JSONB so the chart re-renders identically
+// across devices.
+
+Table pinned_charts {
+  id            uuid         [pk, default: `uuid_generate_v4()`]
+  user_id       text         [not null]
+  dashboard_id  text         [not null]
+  tab_id        text         [not null]
+  spec          jsonb        [not null, note: 'Vega-Lite spec']
+  created_at    timestamptz  [not null, default: `now()`]
+
+  indexes {
+    (user_id, dashboard_id, tab_id, created_at)
+  }
+  Note: 'Tab-pinned agent-generated charts.'
+}
+
+// ─── User dashboards ──────────────────────────────────────────────────────
+// Editable internal dashboards the user creates (today by "Make a copy" off
+// a client dashboard). Lives here instead of localStorage so dashboards
+// survive across devices + browsers and can be shared between teammates.
+// When a layout is worth canonicalising, the Codify flow promotes it back
+// into the SEED list as code (DaaC).
+
+Table user_dashboards {
+  id              uuid         [pk, default: `uuid_generate_v4()`]
+  user_id         text         [not null]
+  name            text         [not null]
+  campaign_id     text         [not null, note: 'links to the BQ dataset / mock campaign']
+  default_tab     text
+  layout          jsonb        [not null, default: `'{}'::jsonb`, note: 'optional layout overrides']
+  created_at      timestamptz  [not null, default: `now()`]
+  updated_at      timestamptz  [not null, default: `now()`]
+  last_viewed_at  timestamptz  [note: 'drives Recent sorting + engagement analytics']
+
+  indexes {
+    (user_id, created_at)
+  }
+  Note: 'Editable internal dashboards — DaaC ↔ on-the-fly hand-off lives here.'
+}
+
+// ─── Clients ──────────────────────────────────────────────────────────────
+// One row per ad-client. The "New Dashboard" form picks from here, the
+// dashboard card uses the brand badge, and future per-client filters /
+// access rules will hang off this row. Seeded with "Noise" (slug `noi`);
+// further clients are added via admin paths.
+
+Table clients {
+  id            uuid         [pk, default: `uuid_generate_v4()`]
+  slug          text         [not null, unique]
+  name          text         [not null]
+  initials      text         [not null, default: "''"]
+  accent_color  text         [not null, default: "'#10b981'"]
+  logo_path     text         [note: 'public-served path, e.g. /noise_N.PNG']
+  created_at    timestamptz  [not null, default: `now()`]
+
+  Note: 'Per-client branding + identity — used by dashboard cards and the New Dashboard picker.'
+}
+
+// ─── Share links ──────────────────────────────────────────────────────────
+// External share tokens for client-shareable dashboards. Soft-delete via
+// `revoked_at` so disabling a link is auditable, not a hard delete.
+
+Table share_links {
+  id            uuid         [pk, default: `uuid_generate_v4()`]
+  dashboard_id  text         [not null]
+  share_token   text         [not null, unique]
+  created_by    text         [not null, note: 'creator uid']
+  expires_at    timestamptz  [note: 'null = no expiry']
+  revoked_at    timestamptz  [note: 'null = active']
+  created_at    timestamptz  [not null, default: `now()`]
+
+  indexes {
+    dashboard_id [name: 'idx_share_links_dashboard', note: 'partial: WHERE revoked_at IS NULL']
+  }
+  Note: 'Persisted share tokens for client dashboards.'
+}

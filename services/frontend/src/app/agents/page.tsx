@@ -9,11 +9,11 @@ export default function AgentsPage() {
   const { availableApps, isLoadingApps } = useChat();
 
   const handleSelectAgent = (app: string) => {
-    router.push(`/chat/${app}?new=1`);
+    router.push(`/chat/${app}`);
   };
 
   return (
-    <div className="flex h-screen bg-black">
+    <div className="flex flex-1 h-full">
       <AgentLibrary
         availableApps={availableApps}
         isLoadingApps={isLoadingApps}

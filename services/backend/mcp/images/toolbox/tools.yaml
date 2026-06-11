@@ -3,7 +3,11 @@ name: my-bq-source
 type: bigquery
 project: nd-agentspace-sbx
 ---
-# TODO: Rewrite toolset for Noise's media data model and to be better for visualizations
+# ─────────────────────────────────────────────────────────────────────────────
+# Public BigQuery sample tool — feeds the GCP release-notes example agent.
+# Kept tiny and read-only: it's a separate playground from the media-performance
+# toolset below and is loaded via its own `public_bq_toolset`.
+# ─────────────────────────────────────────────────────────────────────────────
 kind: tool
 name: search_release_notes_bq
 type: bigquery-sql
@@ -20,186 +24,99 @@ statement: |
 description: |
   Use this tool to get information on Google Cloud Release Notes.
 ---
+# ─────────────────────────────────────────────────────────────────────────────
+# Media-performance toolset — the canonical query surface for the
+# media_performance_agent. Each tool returns CHART-READY rows: a `name` and
+# `value` column (and sometimes additional dimensions) the agent can drop into
+# a Vega-Lite spec without reshaping.
+#
+# All tools query `media_campaign_performance_NOI` — the current schema.
+# Columns of note:
+#   date_time, line_id, creative_id_name, campaign_phase, campaign,
+#   market_group, publisher, platform, objective, marketing_objective,
+#   creative_format, creative_name, kpi_goal, budget,
+#   total_spend, impressions, clicks, completed_views, landing_page_views,
+#   engaged_visits
+#
+# Conventions:
+# - `date_from` / `date_to` are YYYY-MM-DD strings with broad defaults that
+#   expand to "all time" — the toolbox can't pass nil for an optional param.
+# - Filters use `IN UNNEST(SPLIT(LOWER(@val), '|'))` so the value is matched
+#   exactly (case-insensitive) AND multiple values can be passed in one
+#   pipe-delimited string (e.g. "Meta|Google|Amazon"). Empty = no filter.
+# - Every tool returning a series for charting names its columns `name` and
+#   `value` so VegaChartsAgent doesn't need to remember per-tool field names.
+# ─────────────────────────────────────────────────────────────────────────────
 kind: tool
-name: analyze_media_performance
+name: performance_trend
 type: bigquery-sql
 source: my-bq-source
 parameters:
+  - name: metric
+    type: string
+    description: Metric to trend (total_spend, impressions, clicks, landing_page_views, engaged_visits, completed_views). Defaults to total_spend.
+    required: false
+    default: total_spend
   - name: date_from
     type: string
-    description: Start date for analysis. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2000-01-01"
   - name: date_to
     type: string
-    description: End date for analysis. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2999-12-31"
   - name: campaign_phase_filter
     type: string
-    description: Filter by campaign phase (optional)
+    description: Filter by campaign phase. Omit (empty) for no filter.
     required: false
-  - name: publisher_filter
-    type: string
-    description: Filter by publisher (optional)
-    required: false
+    default: ""
 statement: |
+  -- A time-series trend that always spans the FULL requested range. The window
+  -- is split into at most 48 equal-width buckets, so the result never exceeds
+  -- the data layer's 50-row cap and even "all time" charts show every period.
+  WITH filtered AS (
+    SELECT
+      DATE(date_time) AS d,
+      total_spend, impressions, clicks, landing_page_views, engaged_visits, completed_views
+    FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+    WHERE date_time >= PARSE_DATE('%Y-%m-%d', @date_from)
+      AND date_time <= PARSE_DATE('%Y-%m-%d', @date_to)
+      AND (@campaign_phase_filter = ''
+           OR LOWER(campaign_phase) IN UNNEST(SPLIT(LOWER(@campaign_phase_filter), '|')))
+  ),
+  bounds AS (
+    SELECT
+      MIN(d) AS d0,
+      GREATEST(1, CAST(CEIL((DATE_DIFF(MAX(d), MIN(d), DAY) + 1) / 48) AS INT64)) AS bucket_days
+    FROM filtered
+  )
   SELECT
-    date_time as date,
-    campaign_phase,
-    publisher,
-    platform,
-    SUM(impressions) AS total_impressions,
-    SUM(spend) AS total_spend,
-    SUM(clicks) AS total_clicks,
-    SAFE_DIVIDE(SUM(clicks), NULLIF(SUM(impressions), 0)) AS click_through_rate,
-    SAFE_DIVIDE(SUM(spend), NULLIF(SUM(impressions), 0)) AS cost_per_impression
-  FROM
-    `nd-agentspace-sbx.media_performance.performance`
-  WHERE
-    (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
-    AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
-    AND (@campaign_phase_filter IS NULL OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', @campaign_phase_filter, '%')))
-    AND (@publisher_filter IS NULL OR LOWER(publisher) LIKE LOWER(CONCAT('%', @publisher_filter, '%')))
-  GROUP BY date_time, campaign_phase, publisher, platform
-  ORDER BY date_time DESC, total_spend DESC
+    FORMAT_DATE('%Y-%m-%d',
+      DATE_ADD(b.d0,
+        INTERVAL DIV(DATE_DIFF(f.d, b.d0, DAY), b.bucket_days) * b.bucket_days DAY)) AS name,
+    CASE @metric
+      WHEN 'total_spend' THEN CAST(SUM(f.total_spend) AS FLOAT64)
+      WHEN 'impressions' THEN CAST(SUM(f.impressions) AS FLOAT64)
+      WHEN 'clicks' THEN CAST(SUM(f.clicks) AS FLOAT64)
+      WHEN 'landing_page_views' THEN CAST(SUM(f.landing_page_views) AS FLOAT64)
+      WHEN 'engaged_visits' THEN CAST(SUM(f.engaged_visits) AS FLOAT64)
+      WHEN 'completed_views' THEN CAST(SUM(f.completed_views) AS FLOAT64)
+      ELSE CAST(SUM(f.total_spend) AS FLOAT64)
+    END AS value
+  FROM filtered f
+  CROSS JOIN bounds b
+  GROUP BY name
+  ORDER BY name
 description: |
-  Analyze media performance by campaign phase, publisher and platform, with optional date and filter parameters.
----
-kind: tool
-name: summarize_media_performance
-type: bigquery-sql
-source: my-bq-source
-parameters:
-  - name: date_from
-    type: string
-    description: Start date for summary. Must be a YYYY-MM-DD string; omit this parameter if unknown.
-    required: false
-  - name: date_to
-    type: string
-    description: End date for summary. Must be a YYYY-MM-DD string; omit this parameter if unknown.
-    required: false
-statement: |
-  SELECT
-    SUM(impressions) AS total_impressions,
-    SUM(spend) AS total_spend,
-    SUM(clicks) AS total_clicks,
-    SUM(landing_page_views) AS total_landing_page_views,
-    SUM(brochure_views) AS total_brochure_views,
-    SUM(completed_views) AS total_completed_views,
-    COUNT(DISTINCT campaign_phase) AS campaign_phase_count,
-    COUNT(DISTINCT publisher) AS publisher_count,
-    COUNT(DISTINCT platform) AS platform_count,
-    SAFE_DIVIDE(SUM(clicks), NULLIF(SUM(impressions), 0)) AS overall_ctr,
-    SAFE_DIVIDE(SUM(spend), NULLIF(SUM(clicks), 0)) AS avg_cost_per_click
-  FROM `nd-agentspace-sbx.media_performance.performance`
-  WHERE
-    (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
-    AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
-description: |
-  Summarize overall media performance: total metrics, campaign phases, publishers, platforms and key ratios.
----
-kind: tool
-name: top_campaigns_by_sales
-type: bigquery-sql
-source: my-bq-source
-statement: |
-  SELECT
-    ad_campaign,
-    SUM(impressions) AS total_impressions,
-    SUM(sales) AS total_sales
-  FROM `nd-agentspace-sbx.media_performance.performance`
-  GROUP BY ad_campaign
-  ORDER BY total_sales DESC
-  LIMIT 10
-description: |
-  List the top 10 campaigns by total sales.
----
-kind: tool
-name: platform_performance_breakdown
-type: bigquery-sql
-source: my-bq-source
-statement: |
-  SELECT
-    platform,
-    SUM(impressions) AS total_impressions,
-    SUM(sales) AS total_sales,
-    SAFE_DIVIDE(SUM(sales), NULLIF(SUM(impressions), 0)) AS sales_per_impression
-  FROM `nd-agentspace-sbx.media_performance.performance`
-  GROUP BY platform
-  ORDER BY total_sales DESC
-description: |
-  Show performance breakdown by platform, including sales per impression.
----
-kind: tool
-name: daily_performance_trend
-type: bigquery-sql
-source: my-bq-source
-statement: |
-  SELECT
-    date,
-    SUM(impressions) AS total_impressions,
-    SUM(sales) AS total_sales
-  FROM `nd-agentspace-sbx.media_performance.performance`
-  GROUP BY date
-  ORDER BY date DESC
-description: |
-  Show daily trend of impressions and sales.
----
-kind: tool
-name: campaign_details
-type: bigquery-sql
-source: my-bq-source
-parameters:
-  - name: campaign_filter
-    type: string
-    description: Filter by campaign phase (optional)
-    required: false
-statement: |
-  SELECT
-    date_time as date,
-    line_id,
-    campaign_phase,
-    publisher,
-    platform,
-    spend,
-    impressions,
-    clicks,
-    landing_page_views,
-    brochure_views,
-    completed_views
-  FROM `nd-agentspace-sbx.media_performance.performance`
-  WHERE
-    (@campaign_filter IS NULL OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', @campaign_filter, '%')))
-  ORDER BY date_time DESC, campaign_phase
-  LIMIT 100
-description: |
-  Show detailed records for recent campaign performance with optional campaign filter (last 100 rows).
----
-# Recharts-friendly visualization tools
-kind: tool
-name: daily_spend_trend
-type: bigquery-sql
-source: my-bq-source
-parameters:
-  - name: days_back
-    type: integer
-    description: Number of days to look back (default 30)
-    required: false
-  - name: campaign_phase_filter
-    type: string
-    description: Filter by campaign phase (optional)
-    required: false
-statement: |
-  SELECT
-    date_time as name,
-    SUM(spend) as value
-  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
-  WHERE
-    date_time >= DATE_SUB(CURRENT_DATE(), INTERVAL COALESCE(@days_back, 30) DAY)
-    AND (@campaign_phase_filter IS NULL OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', @campaign_phase_filter, '%')))
-  GROUP BY date_time
-  ORDER BY date_time
-description: |
-  Returns daily spend trend in Recharts format with 'name' (date) and 'value' (spend) columns for line charts.
+  Returns a time-series trend for the chosen metric in chart-ready format with
+  'name' (the period's start date, YYYY-MM-DD) and 'value'. The requested date
+  range is divided into at most 48 equal-width buckets, so the result always
+  covers the WHOLE range. Call it once with the user's date range (or omit the
+  dates for all-time) and chart every point — never drop or trim points. Use
+  this for any "trend", "over time", "daily/weekly/monthly", or
+  "spend since <year>" request.
 ---
 kind: tool
 name: publisher_spend_breakdown
@@ -208,25 +125,51 @@ source: my-bq-source
 parameters:
   - name: date_from
     type: string
-    description: Start date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2000-01-01"
   - name: date_to
     type: string
-    description: End date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2999-12-31"
+  - name: campaign_phase_filter
+    type: string
+    description: Filter by campaign phase. Empty = no filter.
+    required: false
+    default: ""
+  - name: market_group_filter
+    type: string
+    description: Filter by market group. Empty = no filter.
+    required: false
+    default: ""
+  - name: creative_format_filter
+    type: string
+    description: Filter by creative format. Empty = no filter.
+    required: false
+    default: ""
+  - name: kpi_goal_filter
+    type: string
+    description: Filter by KPI goal. Empty = no filter.
+    required: false
+    default: ""
 statement: |
   SELECT
     publisher as name,
-    SUM(spend) as value
-  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
-  WHERE
-    (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
-    AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
+    CAST(SUM(total_spend) AS FLOAT64) as value
+  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+  WHERE date_time >= PARSE_DATE('%Y-%m-%d', @date_from)
+    AND date_time <= PARSE_DATE('%Y-%m-%d', @date_to)
+    AND publisher IS NOT NULL
+    AND (@campaign_phase_filter = '' OR LOWER(campaign_phase) IN UNNEST(SPLIT(LOWER(@campaign_phase_filter), '|')))
+    AND (@market_group_filter = ''    OR LOWER(market_group)    IN UNNEST(SPLIT(LOWER(@market_group_filter), '|')))
+    AND (@creative_format_filter = '' OR LOWER(creative_format) IN UNNEST(SPLIT(LOWER(@creative_format_filter), '|')))
+    AND (@kpi_goal_filter = ''        OR LOWER(kpi_goal)        IN UNNEST(SPLIT(LOWER(@kpi_goal_filter), '|')))
   GROUP BY publisher
   ORDER BY value DESC
   LIMIT 10
 description: |
-  Returns publisher spend breakdown in Recharts format with 'name' (publisher) and 'value' (spend) for bar/pie charts.
+  Returns publisher spend breakdown in chart-ready format with 'name' (publisher) and 'value' (spend) for bar/pie charts.
 ---
 kind: tool
 name: campaign_performance_comparison
@@ -235,36 +178,70 @@ source: my-bq-source
 parameters:
   - name: metric
     type: string
-    description: Metric to compare (spend, impressions, clicks, landing_page_views)
+    description: Metric to compare (total_spend, impressions, clicks, landing_page_views, engaged_visits, completed_views). Defaults to total_spend.
     required: false
+    default: total_spend
   - name: date_from
     type: string
-    description: Start date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: Start date (YYYY-MM-DD). Omit for full history.
     required: false
+    default: "2000-01-01"
   - name: date_to
     type: string
-    description: End date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: End date (YYYY-MM-DD). Omit for full history.
     required: false
+    default: "2999-12-31"
+  - name: campaign_phase_filter
+    type: string
+    description: Filter by campaign phase. Empty = no filter.
+    required: false
+    default: ""
+  - name: publisher_filter
+    type: string
+    description: Filter by publisher. Empty = no filter.
+    required: false
+    default: ""
+  - name: market_group_filter
+    type: string
+    description: Filter by market group. Empty = no filter.
+    required: false
+    default: ""
+  - name: creative_format_filter
+    type: string
+    description: Filter by creative format. Empty = no filter.
+    required: false
+    default: ""
+  - name: kpi_goal_filter
+    type: string
+    description: Filter by KPI goal. Empty = no filter.
+    required: false
+    default: ""
 statement: |
   SELECT
     campaign_phase as name,
     CASE @metric
-      WHEN 'spend' THEN SUM(spend)
-      WHEN 'impressions' THEN SUM(impressions)
-      WHEN 'clicks' THEN SUM(clicks)
-      WHEN 'landing_page_views' THEN SUM(landing_page_views)
-      ELSE SUM(spend)
+      WHEN 'total_spend' THEN CAST(SUM(total_spend) AS FLOAT64)
+      WHEN 'impressions' THEN CAST(SUM(impressions) AS FLOAT64)
+      WHEN 'clicks' THEN CAST(SUM(clicks) AS FLOAT64)
+      WHEN 'landing_page_views' THEN CAST(SUM(landing_page_views) AS FLOAT64)
+      WHEN 'engaged_visits' THEN CAST(SUM(engaged_visits) AS FLOAT64)
+      WHEN 'completed_views' THEN CAST(SUM(completed_views) AS FLOAT64)
+      ELSE CAST(SUM(total_spend) AS FLOAT64)
     END as value
-  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
-  WHERE
-    (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
-    AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
+  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+  WHERE date_time >= PARSE_DATE('%Y-%m-%d', @date_from)
+    AND date_time <= PARSE_DATE('%Y-%m-%d', @date_to)
     AND campaign_phase IS NOT NULL
+    AND (@campaign_phase_filter = '' OR LOWER(campaign_phase) IN UNNEST(SPLIT(LOWER(@campaign_phase_filter), '|')))
+    AND (@publisher_filter = ''       OR LOWER(publisher)       IN UNNEST(SPLIT(LOWER(@publisher_filter), '|')))
+    AND (@market_group_filter = ''    OR LOWER(market_group)    IN UNNEST(SPLIT(LOWER(@market_group_filter), '|')))
+    AND (@creative_format_filter = '' OR LOWER(creative_format) IN UNNEST(SPLIT(LOWER(@creative_format_filter), '|')))
+    AND (@kpi_goal_filter = ''        OR LOWER(kpi_goal)        IN UNNEST(SPLIT(LOWER(@kpi_goal_filter), '|')))
   GROUP BY campaign_phase
   ORDER BY value DESC
   LIMIT 10
 description: |
-  Returns campaign phase performance comparison in Recharts format with 'name' (campaign) and 'value' (selected metric).
+  Returns campaign phase performance comparison in chart-ready format with 'name' (campaign) and 'value' (selected metric).
 ---
 kind: tool
 name: platform_engagement_metrics
@@ -273,58 +250,58 @@ source: my-bq-source
 parameters:
   - name: date_from
     type: string
-    description: Start date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: Start date (YYYY-MM-DD). Omit for full history.
     required: false
+    default: "2000-01-01"
   - name: date_to
     type: string
-    description: End date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: End date (YYYY-MM-DD). Omit for full history.
     required: false
+    default: "2999-12-31"
+  - name: campaign_phase_filter
+    type: string
+    description: Filter by campaign phase. Empty = no filter.
+    required: false
+    default: ""
+  - name: publisher_filter
+    type: string
+    description: Filter by publisher. Empty = no filter.
+    required: false
+    default: ""
+  - name: market_group_filter
+    type: string
+    description: Filter by market group. Empty = no filter.
+    required: false
+    default: ""
+  - name: creative_format_filter
+    type: string
+    description: Filter by creative format. Empty = no filter.
+    required: false
+    default: ""
+  - name: kpi_goal_filter
+    type: string
+    description: Filter by KPI goal. Empty = no filter.
+    required: false
+    default: ""
 statement: |
   SELECT
     platform as name,
     SAFE_DIVIDE(SUM(clicks), NULLIF(SUM(impressions), 0)) * 100 as value
-  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
-  WHERE
-    (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
-    AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
+  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+  WHERE date_time >= PARSE_DATE('%Y-%m-%d', @date_from)
+    AND date_time <= PARSE_DATE('%Y-%m-%d', @date_to)
     AND platform IS NOT NULL
+    AND (@campaign_phase_filter = '' OR LOWER(campaign_phase) IN UNNEST(SPLIT(LOWER(@campaign_phase_filter), '|')))
+    AND (@publisher_filter = ''       OR LOWER(publisher)       IN UNNEST(SPLIT(LOWER(@publisher_filter), '|')))
+    AND (@market_group_filter = ''    OR LOWER(market_group)    IN UNNEST(SPLIT(LOWER(@market_group_filter), '|')))
+    AND (@creative_format_filter = '' OR LOWER(creative_format) IN UNNEST(SPLIT(LOWER(@creative_format_filter), '|')))
+    AND (@kpi_goal_filter = ''        OR LOWER(kpi_goal)        IN UNNEST(SPLIT(LOWER(@kpi_goal_filter), '|')))
   GROUP BY platform
   HAVING SUM(impressions) > 0
   ORDER BY value DESC
   LIMIT 10
 description: |
-  Returns platform click-through rates in Recharts format with 'name' (platform) and 'value' (CTR %) for comparison charts.
----
-kind: tool
-name: weekly_performance_trend
-type: bigquery-sql
-source: my-bq-source
-parameters:
-  - name: weeks_back
-    type: integer
-    description: Number of weeks to look back (default 12)
-    required: false
-  - name: metric
-    type: string
-    description: Metric to trend (spend, impressions, clicks, landing_page_views)
-    required: false
-statement: |
-  SELECT
-    FORMAT_DATE('%Y-W%U', date_time) as name,
-    CASE @metric
-      WHEN 'spend' THEN SUM(spend)
-      WHEN 'impressions' THEN SUM(impressions)
-      WHEN 'clicks' THEN SUM(clicks)
-      WHEN 'landing_page_views' THEN SUM(landing_page_views)
-      ELSE SUM(spend)
-    END as value
-  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
-  WHERE
-    date_time >= DATE_SUB(CURRENT_DATE(), INTERVAL COALESCE(@weeks_back, 12) * 7 DAY)
-  GROUP BY FORMAT_DATE('%Y-W%U', date_time)
-  ORDER BY name
-description: |
-  Returns weekly performance trend in Recharts format with 'name' (week) and 'value' (selected metric) for line charts.
+  Returns platform click-through rates in chart-ready format with 'name' (platform) and 'value' (CTR %) for comparison charts.
 ---
 kind: tool
 name: top_performing_campaigns
@@ -333,41 +310,46 @@ source: my-bq-source
 parameters:
   - name: metric
     type: string
-    description: Metric to rank by (spend, impressions, clicks, landing_page_views)
+    description: Metric to rank by (total_spend, impressions, clicks, landing_page_views, engaged_visits, completed_views). Defaults to total_spend.
     required: false
+    default: total_spend
   - name: limit_rows
     type: integer
     description: Number of top campaigns to return (default 10)
     required: false
+    default: 10
   - name: date_from
     type: string
-    description: Start date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2000-01-01"
   - name: date_to
     type: string
-    description: End date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2999-12-31"
 statement: |
   SELECT
     CONCAT(campaign_phase, ' (', publisher, ')') as name,
     CASE @metric
-      WHEN 'spend' THEN SUM(spend)
-      WHEN 'impressions' THEN SUM(impressions)
-      WHEN 'clicks' THEN SUM(clicks)
-      WHEN 'landing_page_views' THEN SUM(landing_page_views)
-      ELSE SUM(spend)
+      WHEN 'total_spend' THEN CAST(SUM(total_spend) AS FLOAT64)
+      WHEN 'impressions' THEN CAST(SUM(impressions) AS FLOAT64)
+      WHEN 'clicks' THEN CAST(SUM(clicks) AS FLOAT64)
+      WHEN 'landing_page_views' THEN CAST(SUM(landing_page_views) AS FLOAT64)
+      WHEN 'engaged_visits' THEN CAST(SUM(engaged_visits) AS FLOAT64)
+      WHEN 'completed_views' THEN CAST(SUM(completed_views) AS FLOAT64)
+      ELSE CAST(SUM(total_spend) AS FLOAT64)
     END as value
-  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
-  WHERE
-    (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
-    AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
+  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+  WHERE date_time >= PARSE_DATE('%Y-%m-%d', @date_from)
+    AND date_time <= PARSE_DATE('%Y-%m-%d', @date_to)
     AND campaign_phase IS NOT NULL
     AND publisher IS NOT NULL
   GROUP BY campaign_phase, publisher
   ORDER BY value DESC
-  LIMIT COALESCE(@limit_rows, 10)
+  LIMIT @limit_rows
 description: |
-  Returns top performing campaigns in Recharts format with 'name' (campaign + publisher) and 'value' (selected metric).
+  Returns top performing campaigns in chart-ready format with 'name' (campaign + publisher) and 'value' (selected metric).
 ---
 kind: tool
 name: conversion_funnel_data
@@ -376,63 +358,891 @@ source: my-bq-source
 parameters:
   - name: campaign_phase_filter
     type: string
-    description: Filter by campaign phase (optional)
+    description: Filter by campaign phase. Omit (empty) for no filter.
     required: false
+    default: ""
   - name: date_from
     type: string
-    description: Start date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2000-01-01"
   - name: date_to
     type: string
-    description: End date. Must be a YYYY-MM-DD string; omit this parameter if unknown.
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
     required: false
+    default: "2999-12-31"
 statement: |
-  WITH funnel_data AS (
+  -- Funnel stages live in this schema as parallel counters; we unpivot the
+  -- single totals row into one stage per output row, keeping a stable order
+  -- so the funnel chart can sort by it. Impressions → Clicks → Landing-page
+  -- views → Engaged visits is the canonical drop-off path on this dataset.
+  WITH totals AS (
     SELECT
-      SUM(impressions) as impressions,
-      SUM(clicks) as clicks,
-      SUM(landing_page_views) as landing_page_views,
-      SUM(brochure_views) as brochure_views,
-      SUM(completed_views) as completed_views,
-      SUM(application_page_view) as applications
-    FROM `nd-agentspace-sbx.media_performance.media_campaign_performance`
-    WHERE
-      (@date_from IS NULL OR date_time >= PARSE_DATE('%Y-%m-%d', @date_from))
-      AND (@date_to IS NULL OR date_time <= PARSE_DATE('%Y-%m-%d', @date_to))
-      AND (@campaign_phase_filter IS NULL OR LOWER(campaign_phase) LIKE LOWER(CONCAT('%', @campaign_phase_filter, '%')))
+      SUM(impressions) AS impressions,
+      SUM(clicks) AS clicks,
+      SUM(landing_page_views) AS landing_page_views,
+      SUM(engaged_visits) AS engaged_visits
+    FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+    WHERE date_time >= PARSE_DATE('%Y-%m-%d', @date_from)
+      AND date_time <= PARSE_DATE('%Y-%m-%d', @date_to)
+      AND (@campaign_phase_filter = ''
+           OR LOWER(campaign_phase) IN UNNEST(SPLIT(LOWER(@campaign_phase_filter), '|')))
   )
-  SELECT 'Impressions' as name, impressions as value FROM funnel_data
-  UNION ALL SELECT 'Clicks' as name, clicks as value FROM funnel_data
-  UNION ALL SELECT 'Landing Page Views' as name, landing_page_views as value FROM funnel_data
-  UNION ALL SELECT 'Brochure Views' as name, brochure_views as value FROM funnel_data
-  UNION ALL SELECT 'Completed Views' as name, completed_views as value FROM funnel_data
-  UNION ALL SELECT 'Applications' as name, applications as value FROM funnel_data
+  SELECT 'Impressions'         AS name, impressions          AS value, 0 AS stage_order FROM totals UNION ALL
+  SELECT 'Clicks'               AS name, clicks               AS value, 1 AS stage_order FROM totals UNION ALL
+  SELECT 'Landing Page Views'   AS name, landing_page_views   AS value, 2 AS stage_order FROM totals UNION ALL
+  SELECT 'Engaged Visits'       AS name, engaged_visits       AS value, 3 AS stage_order FROM totals
+  ORDER BY stage_order
+description: |
+  Returns conversion funnel data — chart-ready 'name' (stage) and 'value' (count),
+  plus a 'stage_order' so a funnel chart renders top-down even when stage names
+  are not naturally sortable. The canonical order is
+  Impressions → Clicks → Landing Page Views → Engaged Visits.
+---
+kind: tool
+name: market_group_breakdown
+type: bigquery-sql
+source: my-bq-source
+parameters:
+  - name: metric
+    type: string
+    description: Metric to compare. Defaults to total_spend.
+    required: false
+    default: total_spend
+  - name: date_from
+    type: string
+    description: Start date (YYYY-MM-DD). Omit for full history.
+    required: false
+    default: "2000-01-01"
+  - name: date_to
+    type: string
+    description: End date (YYYY-MM-DD). Omit for full history.
+    required: false
+    default: "2999-12-31"
+  - name: campaign_phase_filter
+    type: string
+    description: Filter by campaign phase. Empty = no filter.
+    required: false
+    default: ""
+  - name: publisher_filter
+    type: string
+    description: Filter by publisher. Empty = no filter.
+    required: false
+    default: ""
+  - name: market_group_filter
+    type: string
+    description: Filter by market group. Empty = no filter.
+    required: false
+    default: ""
+  - name: creative_format_filter
+    type: string
+    description: Filter by creative format. Empty = no filter.
+    required: false
+    default: ""
+  - name: kpi_goal_filter
+    type: string
+    description: Filter by KPI goal. Empty = no filter.
+    required: false
+    default: ""
+statement: |
+  SELECT
+    market_group as name,
+    CASE @metric
+      WHEN 'total_spend' THEN CAST(SUM(total_spend) AS FLOAT64)
+      WHEN 'impressions' THEN CAST(SUM(impressions) AS FLOAT64)
+      WHEN 'clicks' THEN CAST(SUM(clicks) AS FLOAT64)
+      WHEN 'landing_page_views' THEN CAST(SUM(landing_page_views) AS FLOAT64)
+      WHEN 'engaged_visits' THEN CAST(SUM(engaged_visits) AS FLOAT64)
+      ELSE CAST(SUM(total_spend) AS FLOAT64)
+    END as value
+  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+  WHERE date_time >= PARSE_DATE('%Y-%m-%d', @date_from)
+    AND date_time <= PARSE_DATE('%Y-%m-%d', @date_to)
+    AND market_group IS NOT NULL
+    AND (@campaign_phase_filter = '' OR LOWER(campaign_phase) IN UNNEST(SPLIT(LOWER(@campaign_phase_filter), '|')))
+    AND (@publisher_filter = ''       OR LOWER(publisher)       IN UNNEST(SPLIT(LOWER(@publisher_filter), '|')))
+    AND (@market_group_filter = ''    OR LOWER(market_group)    IN UNNEST(SPLIT(LOWER(@market_group_filter), '|')))
+    AND (@creative_format_filter = '' OR LOWER(creative_format) IN UNNEST(SPLIT(LOWER(@creative_format_filter), '|')))
+    AND (@kpi_goal_filter = ''        OR LOWER(kpi_goal)        IN UNNEST(SPLIT(LOWER(@kpi_goal_filter), '|')))
+  GROUP BY market_group
+  ORDER BY value DESC
+  LIMIT 10
+description: |
+  Returns market-group performance breakdown in chart-ready format with 'name' (market group) and 'value' (selected metric).
+---
+kind: tool
+name: creative_format_breakdown
+type: bigquery-sql
+source: my-bq-source
+parameters:
+  - name: metric
+    type: string
+    description: Metric to compare. Defaults to impressions.
+    required: false
+    default: impressions
+  - name: date_from
+    type: string
+    description: Start date (YYYY-MM-DD). Omit for full history.
+    required: false
+    default: "2000-01-01"
+  - name: date_to
+    type: string
+    description: End date (YYYY-MM-DD). Omit for full history.
+    required: false
+    default: "2999-12-31"
+  - name: campaign_phase_filter
+    type: string
+    description: Filter by campaign phase. Empty = no filter.
+    required: false
+    default: ""
+  - name: publisher_filter
+    type: string
+    description: Filter by publisher. Empty = no filter.
+    required: false
+    default: ""
+  - name: market_group_filter
+    type: string
+    description: Filter by market group. Empty = no filter.
+    required: false
+    default: ""
+  - name: creative_format_filter
+    type: string
+    description: Filter by creative format. Empty = no filter.
+    required: false
+    default: ""
+  - name: kpi_goal_filter
+    type: string
+    description: Filter by KPI goal. Empty = no filter.
+    required: false
+    default: ""
+statement: |
+  SELECT
+    creative_format as name,
+    CASE @metric
+      WHEN 'total_spend' THEN CAST(SUM(total_spend) AS FLOAT64)
+      WHEN 'impressions' THEN CAST(SUM(impressions) AS FLOAT64)
+      WHEN 'clicks' THEN CAST(SUM(clicks) AS FLOAT64)
+      WHEN 'landing_page_views' THEN CAST(SUM(landing_page_views) AS FLOAT64)
+      WHEN 'engaged_visits' THEN CAST(SUM(engaged_visits) AS FLOAT64)
+      WHEN 'completed_views' THEN CAST(SUM(completed_views) AS FLOAT64)
+      ELSE CAST(SUM(impressions) AS FLOAT64)
+    END as value
+  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+  WHERE date_time >= PARSE_DATE('%Y-%m-%d', @date_from)
+    AND date_time <= PARSE_DATE('%Y-%m-%d', @date_to)
+    AND creative_format IS NOT NULL
+    AND (@campaign_phase_filter = '' OR LOWER(campaign_phase) IN UNNEST(SPLIT(LOWER(@campaign_phase_filter), '|')))
+    AND (@publisher_filter = ''       OR LOWER(publisher)       IN UNNEST(SPLIT(LOWER(@publisher_filter), '|')))
+    AND (@market_group_filter = ''    OR LOWER(market_group)    IN UNNEST(SPLIT(LOWER(@market_group_filter), '|')))
+    AND (@creative_format_filter = '' OR LOWER(creative_format) IN UNNEST(SPLIT(LOWER(@creative_format_filter), '|')))
+    AND (@kpi_goal_filter = ''        OR LOWER(kpi_goal)        IN UNNEST(SPLIT(LOWER(@kpi_goal_filter), '|')))
+  GROUP BY creative_format
+  ORDER BY value DESC
+  LIMIT 10
+description: |
+  Returns creative-format breakdown in chart-ready format with 'name' (creative format, e.g. Video / Native / Display) and 'value' (selected metric).
+---
+kind: tool
+name: kpi_goal_breakdown
+type: bigquery-sql
+source: my-bq-source
+parameters:
+  - name: metric
+    type: string
+    description: Metric to compare. Defaults to total_spend.
+    required: false
+    default: total_spend
+  - name: date_from
+    type: string
+    description: Start date (YYYY-MM-DD). Omit for full history.
+    required: false
+    default: "2000-01-01"
+  - name: date_to
+    type: string
+    description: End date (YYYY-MM-DD). Omit for full history.
+    required: false
+    default: "2999-12-31"
+  - name: campaign_phase_filter
+    type: string
+    description: Filter by campaign phase. Empty = no filter.
+    required: false
+    default: ""
+  - name: publisher_filter
+    type: string
+    description: Filter by publisher. Empty = no filter.
+    required: false
+    default: ""
+  - name: market_group_filter
+    type: string
+    description: Filter by market group. Empty = no filter.
+    required: false
+    default: ""
+  - name: creative_format_filter
+    type: string
+    description: Filter by creative format. Empty = no filter.
+    required: false
+    default: ""
+  - name: kpi_goal_filter
+    type: string
+    description: Filter by KPI goal. Empty = no filter.
+    required: false
+    default: ""
+statement: |
+  SELECT
+    kpi_goal as name,
+    CASE @metric
+      WHEN 'total_spend' THEN CAST(SUM(total_spend) AS FLOAT64)
+      WHEN 'impressions' THEN CAST(SUM(impressions) AS FLOAT64)
+      WHEN 'clicks' THEN CAST(SUM(clicks) AS FLOAT64)
+      WHEN 'landing_page_views' THEN CAST(SUM(landing_page_views) AS FLOAT64)
+      WHEN 'engaged_visits' THEN CAST(SUM(engaged_visits) AS FLOAT64)
+      WHEN 'completed_views' THEN CAST(SUM(completed_views) AS FLOAT64)
+      ELSE CAST(SUM(total_spend) AS FLOAT64)
+    END as value
+  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+  WHERE date_time >= PARSE_DATE('%Y-%m-%d', @date_from)
+    AND date_time <= PARSE_DATE('%Y-%m-%d', @date_to)
+    AND kpi_goal IS NOT NULL
+    AND (@campaign_phase_filter = '' OR LOWER(campaign_phase) IN UNNEST(SPLIT(LOWER(@campaign_phase_filter), '|')))
+    AND (@publisher_filter = ''       OR LOWER(publisher)       IN UNNEST(SPLIT(LOWER(@publisher_filter), '|')))
+    AND (@market_group_filter = ''    OR LOWER(market_group)    IN UNNEST(SPLIT(LOWER(@market_group_filter), '|')))
+    AND (@creative_format_filter = '' OR LOWER(creative_format) IN UNNEST(SPLIT(LOWER(@creative_format_filter), '|')))
+    AND (@kpi_goal_filter = ''        OR LOWER(kpi_goal)        IN UNNEST(SPLIT(LOWER(@kpi_goal_filter), '|')))
+  GROUP BY kpi_goal
   ORDER BY value DESC
 description: |
-  Returns conversion funnel data in Recharts format with 'name' (funnel stage) and 'value' (count) for funnel visualization.
+  Returns KPI-goal (Awareness / Consideration / Conversion / etc.) breakdown in
+  chart-ready format with 'name' (kpi_goal) and 'value' (selected metric).
+---
+kind: tool
+name: budget_pacing
+type: bigquery-sql
+source: my-bq-source
+parameters:
+  - name: date_from
+    type: string
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
+    required: false
+    default: "2000-01-01"
+  - name: date_to
+    type: string
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
+    required: false
+    default: "2999-12-31"
+  - name: campaign_phase_filter
+    type: string
+    description: Filter by campaign phase. Empty = no filter.
+    required: false
+    default: ""
+  - name: publisher_filter
+    type: string
+    description: Filter by publisher. Empty = no filter.
+    required: false
+    default: ""
+  - name: market_group_filter
+    type: string
+    description: Filter by market group. Empty = no filter.
+    required: false
+    default: ""
+  - name: creative_format_filter
+    type: string
+    description: Filter by creative format. Empty = no filter.
+    required: false
+    default: ""
+  - name: kpi_goal_filter
+    type: string
+    description: Filter by KPI goal. Empty = no filter.
+    required: false
+    default: ""
+statement: |
+  -- Pacing = spent vs. planned. CRITICAL: the schema repeats `budget` on
+  -- every row of a line (per-day × per-creative). A naive SUM(budget)
+  -- multiplies the plan by the row count and inflates the number ~500x.
+  -- We collapse to one budget per line first, then sum.
+  WITH per_line AS (
+    SELECT
+      line_id,
+      MAX(budget) AS line_budget,
+      SUM(total_spend) AS line_spent
+    FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+    WHERE date_time >= PARSE_DATE('%Y-%m-%d', @date_from)
+      AND date_time <= PARSE_DATE('%Y-%m-%d', @date_to)
+      AND (@campaign_phase_filter  = '' OR LOWER(campaign_phase)  IN UNNEST(SPLIT(LOWER(@campaign_phase_filter),  '|')))
+      AND (@publisher_filter       = '' OR LOWER(publisher)       IN UNNEST(SPLIT(LOWER(@publisher_filter),       '|')))
+      AND (@market_group_filter    = '' OR LOWER(market_group)    IN UNNEST(SPLIT(LOWER(@market_group_filter),    '|')))
+      AND (@creative_format_filter = '' OR LOWER(creative_format) IN UNNEST(SPLIT(LOWER(@creative_format_filter), '|')))
+      AND (@kpi_goal_filter        = '' OR LOWER(kpi_goal)        IN UNNEST(SPLIT(LOWER(@kpi_goal_filter),        '|')))
+    GROUP BY line_id
+  )
+  SELECT 'Budget' AS name, CAST(SUM(line_budget) AS FLOAT64) AS value, 0 AS stage_order FROM per_line UNION ALL
+  SELECT 'Spent'  AS name, CAST(SUM(line_spent)  AS FLOAT64) AS value, 1 AS stage_order FROM per_line
+  ORDER BY stage_order
+description: |
+  Returns planned budget vs. actual spend in chart-ready format: two rows
+  with 'name' (Budget / Spent) and 'value'. Budget is aggregated per line
+  (not per row) so it isn't inflated by the per-day repetition in the
+  schema.
+---
+kind: tool
+name: period_over_period
+type: bigquery-sql
+source: my-bq-source
+parameters:
+  - name: metric
+    type: string
+    description: Metric to compare (total_spend, impressions, clicks, landing_page_views, engaged_visits, completed_views). Defaults to total_spend.
+    required: false
+    default: total_spend
+  - name: current_from
+    type: string
+    description: Current-period start (YYYY-MM-DD).
+    required: true
+  - name: current_to
+    type: string
+    description: Current-period end (YYYY-MM-DD).
+    required: true
+  - name: prior_from
+    type: string
+    description: Prior-period start (YYYY-MM-DD).
+    required: true
+  - name: prior_to
+    type: string
+    description: Prior-period end (YYYY-MM-DD).
+    required: true
+statement: |
+  -- Two parallel sums, one per window, then a single row with absolute and
+  -- percentage deltas. Chart-ready as a side-by-side bar (`name` = Prior /
+  -- Current) by selecting just those two cells; the deltas in the same row
+  -- save the agent a calculation.
+  WITH cur AS (
+    SELECT
+      CASE @metric
+        WHEN 'total_spend' THEN CAST(SUM(total_spend) AS FLOAT64)
+        WHEN 'impressions' THEN CAST(SUM(impressions) AS FLOAT64)
+        WHEN 'clicks' THEN CAST(SUM(clicks) AS FLOAT64)
+        WHEN 'landing_page_views' THEN CAST(SUM(landing_page_views) AS FLOAT64)
+        WHEN 'engaged_visits' THEN CAST(SUM(engaged_visits) AS FLOAT64)
+        WHEN 'completed_views' THEN CAST(SUM(completed_views) AS FLOAT64)
+        ELSE CAST(SUM(total_spend) AS FLOAT64)
+      END AS value
+    FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+    WHERE date_time >= PARSE_DATE('%Y-%m-%d', @current_from)
+      AND date_time <= PARSE_DATE('%Y-%m-%d', @current_to)
+  ),
+  pri AS (
+    SELECT
+      CASE @metric
+        WHEN 'total_spend' THEN CAST(SUM(total_spend) AS FLOAT64)
+        WHEN 'impressions' THEN CAST(SUM(impressions) AS FLOAT64)
+        WHEN 'clicks' THEN CAST(SUM(clicks) AS FLOAT64)
+        WHEN 'landing_page_views' THEN CAST(SUM(landing_page_views) AS FLOAT64)
+        WHEN 'engaged_visits' THEN CAST(SUM(engaged_visits) AS FLOAT64)
+        WHEN 'completed_views' THEN CAST(SUM(completed_views) AS FLOAT64)
+        ELSE CAST(SUM(total_spend) AS FLOAT64)
+      END AS value
+    FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+    WHERE date_time >= PARSE_DATE('%Y-%m-%d', @prior_from)
+      AND date_time <= PARSE_DATE('%Y-%m-%d', @prior_to)
+  )
+  SELECT 'Prior'   AS name, pri.value AS value, 0 AS stage_order, pri.value AS prior, cur.value AS current,
+         (cur.value - pri.value) AS delta,
+         SAFE_DIVIDE(cur.value - pri.value, NULLIF(pri.value, 0)) AS pct_change
+    FROM cur, pri
+  UNION ALL
+  SELECT 'Current' AS name, cur.value AS value, 1 AS stage_order, pri.value AS prior, cur.value AS current,
+         (cur.value - pri.value) AS delta,
+         SAFE_DIVIDE(cur.value - pri.value, NULLIF(pri.value, 0)) AS pct_change
+    FROM cur, pri
+  ORDER BY stage_order
+description: |
+  Period-over-period (PoP) comparison for one metric — returns two rows with
+  'name' (Prior / Current) and 'value' for a side-by-side bar, plus per-row
+  'delta' and 'pct_change' so the narrative can quote the lift without recomputing.
+  Use for any "vs. last month / last year / prior period" question.
+---
+kind: tool
+name: metric_totals
+type: bigquery-sql
+source: my-bq-source
+parameters:
+  - name: date_from
+    type: string
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
+    required: false
+    default: "2000-01-01"
+  - name: date_to
+    type: string
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
+    required: false
+    default: "2999-12-31"
+  - name: campaign_phase_filter
+    type: string
+    description: Filter by campaign phase. Omit (empty) for no filter.
+    required: false
+    default: ""
+  - name: publisher_filter
+    type: string
+    description: Filter by publisher (substring match, case-insensitive). Empty = no filter.
+    required: false
+    default: ""
+  - name: market_group_filter
+    type: string
+    description: Filter by market group (substring match). Empty = no filter.
+    required: false
+    default: ""
+  - name: creative_format_filter
+    type: string
+    description: Filter by creative format (substring match). Empty = no filter.
+    required: false
+    default: ""
+  - name: kpi_goal_filter
+    type: string
+    description: Filter by KPI goal (substring match). Empty = no filter.
+    required: false
+    default: ""
+statement: |
+  -- One row of every aggregate the KPI strip cares about, plus the derived
+  -- rates (CTR / CVR / CPM / CPC / CPA / VCR). The agent and the dashboard
+  -- both consume this; both get identical numbers because the SQL is shared.
+  SELECT
+    CAST(SUM(total_spend) AS FLOAT64) AS total_spend,
+    CAST(SUM(impressions) AS FLOAT64) AS impressions,
+    CAST(SUM(clicks) AS FLOAT64) AS clicks,
+    CAST(SUM(landing_page_views) AS FLOAT64) AS landing_page_views,
+    CAST(SUM(engaged_visits) AS FLOAT64) AS engaged_visits,
+    CAST(SUM(completed_views) AS FLOAT64) AS completed_views,
+    CAST(SUM(budget) AS FLOAT64) AS budget,
+    -- SAFE_DIVIDE returns NUMERIC; BigQuery serialises NUMERIC as a JSON
+    -- STRING to preserve precision. The frontend's KPI / pivot / narrative
+    -- tiles call `.toFixed()` on these values, so they must arrive as
+    -- numbers. CAST to FLOAT64 here forces the JSON encoder to emit a
+    -- number — applies to every rate column.
+    CAST(SAFE_DIVIDE(SUM(clicks), NULLIF(SUM(impressions), 0)) AS FLOAT64) AS ctr,
+    CAST(SAFE_DIVIDE(SUM(engaged_visits), NULLIF(SUM(clicks), 0)) AS FLOAT64) AS cvr,
+    CAST(SAFE_DIVIDE(SUM(total_spend) * 1000, NULLIF(SUM(impressions), 0)) AS FLOAT64) AS cpm,
+    CAST(SAFE_DIVIDE(SUM(total_spend), NULLIF(SUM(clicks), 0)) AS FLOAT64) AS cpc,
+    CAST(SAFE_DIVIDE(SUM(total_spend), NULLIF(SUM(engaged_visits), 0)) AS FLOAT64) AS cpa,
+    CAST(SAFE_DIVIDE(SUM(completed_views), NULLIF(SUM(impressions), 0)) AS FLOAT64) AS vcr
+  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+  WHERE date_time >= PARSE_DATE('%Y-%m-%d', @date_from)
+    AND date_time <= PARSE_DATE('%Y-%m-%d', @date_to)
+    AND (@campaign_phase_filter = '' OR LOWER(campaign_phase) IN UNNEST(SPLIT(LOWER(@campaign_phase_filter), '|')))
+    AND (@publisher_filter = ''       OR LOWER(publisher)       IN UNNEST(SPLIT(LOWER(@publisher_filter), '|')))
+    AND (@market_group_filter = ''    OR LOWER(market_group)    IN UNNEST(SPLIT(LOWER(@market_group_filter), '|')))
+    AND (@creative_format_filter = '' OR LOWER(creative_format) IN UNNEST(SPLIT(LOWER(@creative_format_filter), '|')))
+    AND (@kpi_goal_filter = ''        OR LOWER(kpi_goal)        IN UNNEST(SPLIT(LOWER(@kpi_goal_filter), '|')))
+description: |
+  Returns a single row of all key aggregates + derived rates for the requested
+  window — total_spend, impressions, clicks, landing_page_views, engaged_visits,
+  completed_views, budget, ctr, cvr, cpm, cpc, cpa, vcr. Drives the KPI strip
+  and any "what did we do overall in this window?" style summary.
+---
+kind: tool
+name: breakdown_nested
+type: bigquery-sql
+source: my-bq-source
+parameters:
+  - name: outer_dim
+    type: string
+    description: Outer grouping dimension (publisher, platform, campaign_phase, market_group, creative_format, kpi_goal).
+    required: true
+  - name: inner_dim
+    type: string
+    description: Inner grouping dimension (same allowlist as outer_dim).
+    required: true
+  - name: metric
+    type: string
+    description: Metric to aggregate (total_spend, impressions, clicks, landing_page_views, engaged_visits, completed_views). Defaults to total_spend.
+    required: false
+    default: total_spend
+  - name: date_from
+    type: string
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
+    required: false
+    default: "2000-01-01"
+  - name: date_to
+    type: string
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
+    required: false
+    default: "2999-12-31"
+statement: |
+  -- Two-level grouping for pivot tables (e.g. Market Group → Market, or
+  -- Campaign Phase → Publisher). Returns one row per (outer, inner) pair with
+  -- the chosen metric aggregated. The CASE-on-string for the dimensions is
+  -- the bigquery-sql idiom for "switch by parameter" since toolbox can't
+  -- template column names — only the allowlisted dimensions reach SQL.
+  SELECT
+    CASE @outer_dim
+      WHEN 'publisher' THEN publisher
+      WHEN 'platform' THEN platform
+      WHEN 'campaign_phase' THEN campaign_phase
+      WHEN 'market_group' THEN market_group
+      WHEN 'creative_format' THEN creative_format
+      WHEN 'kpi_goal' THEN kpi_goal
+    END AS outer_name,
+    CASE @inner_dim
+      WHEN 'publisher' THEN publisher
+      WHEN 'platform' THEN platform
+      WHEN 'campaign_phase' THEN campaign_phase
+      WHEN 'market_group' THEN market_group
+      WHEN 'creative_format' THEN creative_format
+      WHEN 'kpi_goal' THEN kpi_goal
+    END AS inner_name,
+    CASE @metric
+      WHEN 'total_spend' THEN CAST(SUM(total_spend) AS FLOAT64)
+      WHEN 'impressions' THEN CAST(SUM(impressions) AS FLOAT64)
+      WHEN 'clicks' THEN CAST(SUM(clicks) AS FLOAT64)
+      WHEN 'landing_page_views' THEN CAST(SUM(landing_page_views) AS FLOAT64)
+      WHEN 'engaged_visits' THEN CAST(SUM(engaged_visits) AS FLOAT64)
+      WHEN 'completed_views' THEN CAST(SUM(completed_views) AS FLOAT64)
+      ELSE CAST(SUM(total_spend) AS FLOAT64)
+    END AS value
+  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+  WHERE date_time >= PARSE_DATE('%Y-%m-%d', @date_from)
+    AND date_time <= PARSE_DATE('%Y-%m-%d', @date_to)
+  GROUP BY outer_name, inner_name
+  HAVING outer_name IS NOT NULL AND inner_name IS NOT NULL
+  ORDER BY outer_name, value DESC
+description: |
+  Two-level grouping for a pivot table or grouped bar — returns rows of
+  'outer_name', 'inner_name', and 'value' (the chosen metric). Use when the
+  user asks for one dimension nested under another, e.g. "publisher within
+  campaign phase" or "platform within market group". Both dimensions must be
+  one of: publisher, platform, campaign_phase, market_group, creative_format,
+  kpi_goal.
+---
+kind: tool
+name: breakdown_nested_totals
+type: bigquery-sql
+source: my-bq-source
+parameters:
+  - name: outer_dim
+    type: string
+    description: Outer grouping dimension (publisher, platform, campaign_phase, campaign, market_group, creative_format, kpi_goal).
+    required: true
+  - name: inner_dim
+    type: string
+    description: Inner grouping dimension (same allowlist as outer_dim, or empty string for a single-level grouping by outer_dim only).
+    required: false
+    default: ""
+  - name: date_from
+    type: string
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
+    required: false
+    default: "2000-01-01"
+  - name: date_to
+    type: string
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
+    required: false
+    default: "2999-12-31"
+  - name: campaign_phase_filter
+    type: string
+    description: Filter by campaign phase. Empty = no filter.
+    required: false
+    default: ""
+  - name: publisher_filter
+    type: string
+    description: Filter by publisher. Empty = no filter.
+    required: false
+    default: ""
+  - name: market_group_filter
+    type: string
+    description: Filter by market group. Empty = no filter.
+    required: false
+    default: ""
+  - name: creative_format_filter
+    type: string
+    description: Filter by creative format. Empty = no filter.
+    required: false
+    default: ""
+  - name: kpi_goal_filter
+    type: string
+    description: Filter by KPI goal. Empty = no filter.
+    required: false
+    default: ""
+statement: |
+  -- Multi-metric breakdown: every aggregate the KPI strip cares about, grouped
+  -- by (outer, inner). One BQ call replaces what would otherwise be six
+  -- breakdown_nested calls (one per metric) — the pivot table fans out from
+  -- this single row set. inner_dim may be empty for a single-level grouping.
+  SELECT
+    CASE @outer_dim
+      WHEN 'publisher' THEN publisher
+      WHEN 'platform' THEN platform
+      WHEN 'campaign_phase' THEN campaign_phase
+      WHEN 'campaign' THEN campaign
+      WHEN 'market_group' THEN market_group
+      WHEN 'creative_format' THEN creative_format
+      WHEN 'kpi_goal' THEN kpi_goal
+    END AS outer_name,
+    CASE @inner_dim
+      WHEN '' THEN ''
+      WHEN 'publisher' THEN publisher
+      WHEN 'platform' THEN platform
+      WHEN 'campaign_phase' THEN campaign_phase
+      WHEN 'campaign' THEN campaign
+      WHEN 'market_group' THEN market_group
+      WHEN 'creative_format' THEN creative_format
+      WHEN 'kpi_goal' THEN kpi_goal
+    END AS inner_name,
+    CAST(SUM(total_spend) AS FLOAT64) AS total_spend,
+    CAST(SUM(impressions) AS FLOAT64) AS impressions,
+    CAST(SUM(clicks) AS FLOAT64) AS clicks,
+    CAST(SUM(landing_page_views) AS FLOAT64) AS landing_page_views,
+    CAST(SUM(engaged_visits) AS FLOAT64) AS engaged_visits,
+    CAST(SUM(completed_views) AS FLOAT64) AS completed_views,
+    -- Rate columns cast to FLOAT64 — see the metric_totals tool above for
+    -- the full reasoning. Required for the frontend pivot to consume them
+    -- as numbers without per-cell string-coercion guards.
+    CAST(SAFE_DIVIDE(SUM(clicks), NULLIF(SUM(impressions), 0)) AS FLOAT64) AS ctr,
+    CAST(SAFE_DIVIDE(SUM(engaged_visits), NULLIF(SUM(clicks), 0)) AS FLOAT64) AS cvr,
+    CAST(SAFE_DIVIDE(SUM(total_spend) * 1000, NULLIF(SUM(impressions), 0)) AS FLOAT64) AS cpm,
+    CAST(SAFE_DIVIDE(SUM(total_spend), NULLIF(SUM(clicks), 0)) AS FLOAT64) AS cpc,
+    CAST(SAFE_DIVIDE(SUM(total_spend), NULLIF(SUM(engaged_visits), 0)) AS FLOAT64) AS cpa,
+    CAST(SAFE_DIVIDE(SUM(completed_views), NULLIF(SUM(impressions), 0)) AS FLOAT64) AS vcr
+  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+  WHERE date_time >= PARSE_DATE('%Y-%m-%d', @date_from)
+    AND date_time <= PARSE_DATE('%Y-%m-%d', @date_to)
+    AND (@campaign_phase_filter = '' OR LOWER(campaign_phase) IN UNNEST(SPLIT(LOWER(@campaign_phase_filter), '|')))
+    AND (@publisher_filter = ''       OR LOWER(publisher)       IN UNNEST(SPLIT(LOWER(@publisher_filter), '|')))
+    AND (@market_group_filter = ''    OR LOWER(market_group)    IN UNNEST(SPLIT(LOWER(@market_group_filter), '|')))
+    AND (@creative_format_filter = '' OR LOWER(creative_format) IN UNNEST(SPLIT(LOWER(@creative_format_filter), '|')))
+    AND (@kpi_goal_filter = ''        OR LOWER(kpi_goal)        IN UNNEST(SPLIT(LOWER(@kpi_goal_filter), '|')))
+  GROUP BY outer_name, inner_name
+  HAVING outer_name IS NOT NULL AND (@inner_dim = '' OR inner_name IS NOT NULL)
+  ORDER BY outer_name, total_spend DESC
+description: |
+  Multi-metric two-level breakdown: returns one row per (outer_name, inner_name)
+  pair (or per outer_name when inner_dim is empty) with every aggregate +
+  derived rate that the KPI strip uses. Drives the pivot table. Dimensions
+  allowlisted: publisher, platform, campaign_phase, market_group,
+  creative_format, kpi_goal.
+---
+kind: tool
+name: metric_series
+type: bigquery-sql
+source: my-bq-source
+parameters:
+  - name: date_from
+    type: string
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
+    required: false
+    default: "2000-01-01"
+  - name: date_to
+    type: string
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
+    required: false
+    default: "2999-12-31"
+  - name: campaign_phase_filter
+    type: string
+    description: Filter by campaign phase. Omit (empty) for no filter.
+    required: false
+    default: ""
+  - name: publisher_filter
+    type: string
+    description: Filter by publisher (substring match). Empty = no filter.
+    required: false
+    default: ""
+  - name: market_group_filter
+    type: string
+    description: Filter by market group (substring match). Empty = no filter.
+    required: false
+    default: ""
+  - name: creative_format_filter
+    type: string
+    description: Filter by creative format (substring match). Empty = no filter.
+    required: false
+    default: ""
+  - name: kpi_goal_filter
+    type: string
+    description: Filter by KPI goal (substring match). Empty = no filter.
+    required: false
+    default: ""
+statement: |
+  -- Weekly time-series of every metric in one row set — six KPI sparklines
+  -- and the dual-axis trend chart all read from a SINGLE call instead of
+  -- many round trips. Same 48-bucket spanning rule as `performance_trend`;
+  -- every numeric column is CAST AS FLOAT64 so it serialises as a JSON
+  -- number (BigQuery emits NUMERIC as strings).
+  WITH filtered AS (
+    SELECT
+      DATE(date_time) AS d,
+      total_spend, impressions, clicks, landing_page_views,
+      engaged_visits, completed_views, budget
+    FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+    WHERE date_time >= PARSE_DATE('%Y-%m-%d', @date_from)
+      AND date_time <= PARSE_DATE('%Y-%m-%d', @date_to)
+      AND (@campaign_phase_filter = '' OR LOWER(campaign_phase) IN UNNEST(SPLIT(LOWER(@campaign_phase_filter), '|')))
+      AND (@publisher_filter = ''       OR LOWER(publisher)       IN UNNEST(SPLIT(LOWER(@publisher_filter), '|')))
+      AND (@market_group_filter = ''    OR LOWER(market_group)    IN UNNEST(SPLIT(LOWER(@market_group_filter), '|')))
+      AND (@creative_format_filter = '' OR LOWER(creative_format) IN UNNEST(SPLIT(LOWER(@creative_format_filter), '|')))
+      AND (@kpi_goal_filter = ''        OR LOWER(kpi_goal)        IN UNNEST(SPLIT(LOWER(@kpi_goal_filter), '|')))
+  ),
+  bounds AS (
+    SELECT
+      MIN(d) AS d0,
+      GREATEST(1, CAST(CEIL((DATE_DIFF(MAX(d), MIN(d), DAY) + 1) / 48) AS INT64)) AS bucket_days
+    FROM filtered
+  )
+  SELECT
+    FORMAT_DATE('%Y-%m-%d',
+      DATE_ADD(b.d0,
+        INTERVAL DIV(DATE_DIFF(f.d, b.d0, DAY), b.bucket_days) * b.bucket_days DAY)) AS name,
+    CAST(SUM(f.total_spend) AS FLOAT64) AS total_spend,
+    CAST(SUM(f.impressions) AS FLOAT64) AS impressions,
+    CAST(SUM(f.clicks) AS FLOAT64) AS clicks,
+    CAST(SUM(f.landing_page_views) AS FLOAT64) AS landing_page_views,
+    CAST(SUM(f.engaged_visits) AS FLOAT64) AS engaged_visits,
+    CAST(SUM(f.completed_views) AS FLOAT64) AS completed_views,
+    CAST(SUM(f.budget) AS FLOAT64) AS budget,
+    CAST(SAFE_DIVIDE(SUM(f.clicks), NULLIF(SUM(f.impressions), 0)) AS FLOAT64) AS ctr,
+    CAST(SAFE_DIVIDE(SUM(f.engaged_visits), NULLIF(SUM(f.clicks), 0)) AS FLOAT64) AS cvr,
+    CAST(SAFE_DIVIDE(SUM(f.total_spend) * 1000, NULLIF(SUM(f.impressions), 0)) AS FLOAT64) AS cpm,
+    CAST(SAFE_DIVIDE(SUM(f.total_spend), NULLIF(SUM(f.clicks), 0)) AS FLOAT64) AS cpc,
+    CAST(SAFE_DIVIDE(SUM(f.total_spend), NULLIF(SUM(f.engaged_visits), 0)) AS FLOAT64) AS cpa,
+    CAST(SAFE_DIVIDE(SUM(f.completed_views), NULLIF(SUM(f.impressions), 0)) AS FLOAT64) AS vcr
+  FROM filtered f
+  CROSS JOIN bounds b
+  GROUP BY name
+  ORDER BY name
+description: |
+  Weekly time-series of every aggregate + derived rate the dashboard cares
+  about — one row per bucket, all metrics as columns. Drives the KPI strip
+  sparklines (one BQ call covers every card on the strip).
+---
+kind: tool
+name: dimension_values
+type: bigquery-sql
+source: my-bq-source
+parameters:
+  - name: dimension
+    type: string
+    description: Column to list distinct values for (publisher, platform, campaign_phase, campaign, market_group, creative_format, kpi_goal, objective, marketing_objective).
+    required: true
+  - name: limit_rows
+    type: integer
+    description: Cap on values returned (sorted by impressions desc, so the busiest live values come first). Defaults to 50.
+    required: false
+    default: 50
+statement: |
+  -- Distinct values for one dimension column, ranked by impressions so the
+  -- options the user actually sees are the ones with real traffic. The
+  -- CASE-on-string for the dimension is the bigquery-sql idiom for "switch
+  -- by parameter" — toolbox can't template column names, so only the
+  -- allowlisted dimensions reach SQL.
+  SELECT
+    CASE @dimension
+      WHEN 'publisher' THEN publisher
+      WHEN 'platform' THEN platform
+      WHEN 'campaign_phase' THEN campaign_phase
+      WHEN 'campaign' THEN campaign
+      WHEN 'market_group' THEN market_group
+      WHEN 'creative_format' THEN creative_format
+      WHEN 'kpi_goal' THEN kpi_goal
+      WHEN 'objective' THEN objective
+      WHEN 'marketing_objective' THEN marketing_objective
+    END AS name,
+    CAST(SUM(impressions) AS FLOAT64) AS value
+  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+  GROUP BY name
+  HAVING name IS NOT NULL
+  ORDER BY value DESC
+  LIMIT @limit_rows
+description: |
+  Returns distinct values for one categorical dimension on the NOI dataset,
+  ranked by impressions so the most-used options appear first. Columns
+  allowlisted: publisher, platform, campaign_phase, campaign, market_group,
+  creative_format, kpi_goal, objective, marketing_objective. Feeds the
+  dashboard filter dropdowns and grounds the agent's clarifying questions.
+---
+kind: tool
+name: available_date_range
+type: bigquery-sql
+source: my-bq-source
+statement: |
+  SELECT
+    FORMAT_DATE('%Y-%m-%d', DATE(MIN(date_time))) AS earliest_date,
+    FORMAT_DATE('%Y-%m-%d', DATE(MAX(date_time))) AS latest_date,
+    COUNT(DISTINCT DATE(date_time)) AS distinct_days
+  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+description: |
+  Returns the date range available in the media performance data: earliest_date,
+  latest_date and distinct_days. Call this before asking the user to clarify a
+  time period, so the options offered are grounded in the real available dates.
+---
+kind: tool
+name: campaign_windows
+type: bigquery-sql
+source: my-bq-source
+parameters:
+  - name: date_from
+    type: string
+    description: Start date as a YYYY-MM-DD string. Omit for the full available history.
+    required: false
+    default: "2000-01-01"
+  - name: date_to
+    type: string
+    description: End date as a YYYY-MM-DD string. Omit for the full available history.
+    required: false
+    default: "2999-12-31"
+  - name: campaign_phase_filter
+    type: string
+    description: Filter by campaign phase. Empty = no filter.
+    required: false
+    default: ""
+statement: |
+  -- Per-campaign flight windows derived from the row dates. Each campaign
+  -- becomes one row with start_date / end_date / total_spend, which a
+  -- frontend chart can overlay as a flight band behind a time series.
+  --
+  -- Bounded by the same date window the trend chart uses so a 30-day view
+  -- doesn't drag in 2-year-old campaigns; the overlay should only show
+  -- campaigns that touched the visible window.
+  SELECT
+    campaign AS name,
+    FORMAT_DATE('%Y-%m-%d', MIN(DATE(date_time))) AS start_date,
+    FORMAT_DATE('%Y-%m-%d', MAX(DATE(date_time))) AS end_date,
+    CAST(SUM(total_spend) AS FLOAT64) AS total_spend
+  FROM `nd-agentspace-sbx.media_performance.media_campaign_performance_NOI`
+  WHERE date_time >= PARSE_DATE('%Y-%m-%d', @date_from)
+    AND date_time <= PARSE_DATE('%Y-%m-%d', @date_to)
+    AND (@campaign_phase_filter = ''
+         OR LOWER(campaign_phase) IN UNNEST(SPLIT(LOWER(@campaign_phase_filter), '|')))
+    AND campaign IS NOT NULL
+  GROUP BY campaign
+  ORDER BY total_spend DESC
+description: |
+  Returns one row per campaign that touched the date window, with
+  start_date / end_date and total spend. Drives the flight-band overlay
+  behind the trend chart so a spike or dip can be tied back to a campaign.
 ---
 kind: toolset
 name: public_bq_toolset
 tools:
   - search_release_notes_bq
 ---
+# The canonical media-performance toolset. Loaded by both the root agent and
+# the ChoicesAgent — they need the same data surface (the root queries it for
+# answers; ChoicesAgent calls `available_date_range`, `publisher_spend_breakdown`,
+# etc. to ground its multiple-choice options in REAL values).
 kind: toolset
-name: media_performance_toolset
+name: media_performance_query
 tools:
-  - analyze_media_performance
-  - summarize_media_performance
-  - top_campaigns_by_sales
-  - platform_performance_breakdown
-  - daily_performance_trend
-  - campaign_details
----
-kind: toolset
-name: media_performance_recharts_friendly
-tools:
-  - daily_spend_trend
+  - performance_trend
   - publisher_spend_breakdown
   - campaign_performance_comparison
   - platform_engagement_metrics
-  - weekly_performance_trend
   - top_performing_campaigns
   - conversion_funnel_data
+  - market_group_breakdown
+  - creative_format_breakdown
+  - kpi_goal_breakdown
+  - budget_pacing
+  - period_over_period
+  - metric_totals
+  - metric_series
+  - breakdown_nested
+  - breakdown_nested_totals
+  - dimension_values
+  - available_date_range
+  - campaign_windows

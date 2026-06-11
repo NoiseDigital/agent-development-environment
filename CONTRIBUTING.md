@@ -55,8 +55,9 @@ Use the **service name** as scope, and drill down to the agent if the change is 
 |---|---|
 | `agents` | Changes across the agent service generally |
 | `agents/media-agent` | Changes specific to one agent |
-| `database` | DB schema, init scripts |
-| `mcp` | MCP services/configs (`images/*`, `math`, and toolbox tool definitions) |
+| `gateway` | Gateway service (auth, proxy, future direct routes) |
+| `db` | Alembic migrations + Postgres init scripts |
+| `mcp` | MCP services/configs (`images/*`, `math`, `stats`, and toolbox tool definitions) |
 | `frontend` | Next.js app |
 | `infra` | docker-compose, Dockerfiles, Terraform |
 | `deps` | Dependency bumps |
@@ -106,7 +107,9 @@ All PRs must pass the following checks before merge:
 | Check | What it runs |
 |---|---|
 | `Backend — ruff + mypy` | `ruff check` + `ruff format --check` on `services/backend/agents/` |
-| `Frontend — ESLint + TypeScript` | `next lint` + `tsc --noEmit` on `services/frontend/` |
+| `Backend — pytest` | `pytest -q` on `services/backend/agents/tests/` |
+| `Frontend — ESLint + TypeScript` | `next lint` + `tsc --noEmit` + `vitest run` on `services/frontend/` |
+| `Schema — DDL discipline + migration parity` | static check: no DDL outside `alembic/versions/`; repo-touching PRs must include a migration |
 | `Terraform — fmt + validate` | `terraform fmt -check` + `terraform validate` on `terraform/` |
 | `Docker Compose — config validation` | `docker compose config` on root `docker-compose.yml` |
 
@@ -155,6 +158,25 @@ Other guidelines:
 - Self-review before requesting review — check diffs, remove debug code
 - Link to any agent or tool being meaningfully changed
 
+## Architecture docs
+
+Before adding anything non-trivial, skim the relevant doc in [`docs/`](docs/) —
+they describe the contracts you'll be working against:
+
+- [`docs/agents.md`](docs/agents.md) — agent catalog, root → subagent routing,
+  the editor agent's action contract.
+- [`docs/genui.md`](docs/genui.md) — the `{ text, ui }` envelope, every UI
+  block's props, the parser failure modes the platform tolerates.
+- [`docs/dashboards.md`](docs/dashboards.md) — tile registry, presentation
+  overrides, the grid wiring, known footguns.
+
+The codebase-local docs (kept next to the code so they can't drift) are:
+
+- [`services/frontend/src/components/dashboards/tiles/README.md`](services/frontend/src/components/dashboards/tiles/README.md)
+  — adding a tile type / customizing per dashboard.
+- [`services/backend/agents/tests/README.md`](services/backend/agents/tests/README.md)
+  — the agents.yaml live behavior harness.
+
 ## Adding an Agent
 
 1. Create `services/backend/agents/adk_agents/<agent_name>/`
@@ -164,6 +186,185 @@ Other guidelines:
    - `comingSoon: true` — agent appears in the library as a disabled card with a "Coming soon" badge
    - Omit both (or set neither) for a fully active agent
 4. Document any new env vars in `.env.example`
+
+Demo / reference agents (the ADK example agents) live under
+`adk_agents/.demos/` — the leading dot keeps them out of ADK's auto-discovery
+scan so the catalog stays focused. Copy a `.demos/<name>/` directory back up
+to `adk_agents/` to enable it locally.
+
+## Frontend Styling & Theming
+
+The UI supports light and dark themes via a **class strategy**: `<html>` carries
+`light` or `dark`, and every color resolves through a semantic token. The single
+source of truth is [`src/app/globals.css`](services/frontend/src/app/globals.css),
+which defines the tokens for both themes and maps them to Tailwind utilities.
+
+**The rule: style with semantic tokens, never raw palette classes.** Use
+`bg-surface` / `text-muted` / `border-line` — not `bg-zinc-900` / `text-zinc-400`
+/ `border-zinc-800`. Tokenized classes flip automatically with the theme; raw
+`zinc`/`white`/`black`/hex classes are dark-only and break light mode.
+
+| Need | Token utilities |
+|---|---|
+| Backgrounds (by elevation) | `canvas` → `surface` → `surface-raised`; `surface-sunken` for insets |
+| Text (by emphasis) | `foreground` → `muted` → `subtle` → `faint` → `disabled` |
+| Borders | `line`, `line-strong` |
+| Brand / status | `accent` (+ `accent-100…950`), `positive`, `danger`, `warning` |
+| Flips to contrast the theme (primary buttons) | `inverse`, `inverse-foreground` |
+
+Opacity (`bg-surface/60`) and variants (`hover:bg-surface-raised`) work as usual.
+
+**Deliberate exceptions** (don't tokenize these):
+- **Modal/drawer scrims** stay `bg-black/NN` — a scrim is intentionally dark in
+  both themes.
+- **Text on a solid brand/status fill** (`text-white` on `bg-accent-500`) stays
+  as-is — the background is theme-stable.
+- **Data-viz / categorical colors** are data, not chrome. For a one-off hue with
+  no token (e.g. a phase badge), pair it explicitly: `text-cyan-700 dark:text-cyan-300`.
+- **Markdown** uses `prose dark:prose-invert` (not bare `prose-invert`).
+- **Charts**: Vega config comes from `vegaTheme(theme)` in
+  [`lib/charts/theme.ts`](services/frontend/src/lib/charts/theme.ts) — chrome flips,
+  data colors stay stable.
+
+**Adding or retuning a theme:** edit only `globals.css`. To add a third theme,
+copy a token block, give `<html>` that class, and change the values — no
+component changes required. Reusable gradient surfaces (`bg-card-spotlight`,
+`bg-page-spotlight`) live there too; add a class + `.light` override to extend.
+
+## Frontend Testing
+
+The frontend uses **Vitest + Testing Library**. Tests live next to the code
+they cover (`Foo.tsx` ↔ `Foo.test.tsx`), not in a separate `__tests__/` tree.
+
+| What you're testing | Where it goes | Environment |
+|---|---|---|
+| A pure module (`lib/*.ts`, parser, projection) | `<file>.test.ts` next to it | default `node` — fastest |
+| A React component (RTL render) | `<file>.test.tsx` next to it | `happy-dom` — opt in per-file |
+| A hook (`renderHook` from RTL) | `<file>.test.tsx` next to it | `happy-dom` |
+
+**Per-file environment opt-in:** add this pragma as line 1 of any DOM-using
+test so the cost of bootstrapping happy-dom is only paid where it's needed:
+
+```ts
+// @vitest-environment happy-dom
+```
+
+**Mocking conventions:**
+
+- Mock the module BOUNDARY, not internals. For a hook that calls
+  `feedbackApi.setRating`, mock `feedbackApi`, not `fetch`.
+- Mock factories run before module evaluation, so use
+  `vi.mock('<path>', () => ({ ... }))` at the top of the file. Use
+  `vi.mocked(<fn>).mockResolvedValue(...)` inside tests to set behavior.
+- For hooks that call optimistic + fire-and-forget APIs (`.catch(...)`), the
+  mocked fn must return a Promise — bare `vi.fn()` returns undefined and
+  calling `.catch` on it throws.
+
+**Running tests:**
+
+```bash
+docker compose exec frontend npm test            # whole suite
+docker compose exec frontend npm test -- <path>  # single file
+```
+
+`tsc --noEmit` runs as part of `npm test` in CI and is wired into the
+pre-commit hook for the frontend; both surface issues before the PR review.
+
+## Bundle Size
+
+The frontend has `@next/bundle-analyzer` plumbed in for on-demand analysis.
+It is off in normal dev/CI builds:
+
+```bash
+docker compose exec frontend npm run analyze
+```
+
+Reports drop into `.next/analyze/{client.html,nodejs.html}` — open them in a
+browser to see what's bloating the bundle.
+
+## Schema Migrations
+
+Every platform-owned Postgres table (`session_metadata`, `event_metadata`,
+`sources`, future ones) is owned by **Alembic** in the gateway service. The
+agent service only reads and writes those tables; it never DDLs them. ADK
+manages its own tables and ships its own migrations on version updates —
+nothing in this repo touches those.
+
+### Where migrations live
+
+```
+services/backend/gateway/
+├── alembic.ini
+└── alembic/
+    ├── env.py
+    └── versions/
+        └── <utc_timestamp>_<slug>.py
+```
+
+### How they run
+
+On `docker compose up`, the gateway's entrypoint runs `alembic upgrade head`
+against Postgres and only then starts uvicorn. Its `/healthz` endpoint flips
+green once both steps complete; the agent service waits on
+`gateway: service_healthy` before booting. Migrations are idempotent — a
+restart is a safe no-op. CI applies them to a fresh Postgres on every PR
+and runs an explicit idempotency re-up.
+
+### Why migrations run inside the gateway
+
+Alembic is idempotent, we run a single gateway replica, and the operational
+cost of a separate "migrate" one-shot service outweighs its benefit at this
+scale. If we ever scale to multi-replica gateway with cold-start races, the
+escape hatch is a `gcloud run jobs execute` pre-deploy step in CI — no
+compose change required.
+
+### Adding a migration
+
+```bash
+docker compose exec gateway uv run alembic revision -m "add fk on event_metadata"
+```
+
+Then edit the generated file. The platform uses raw SQL via `asyncpg` (no
+ORM), so migrations use `op.execute("...")` rather than `op.create_table(...)`.
+A typical migration:
+
+```python
+def upgrade() -> None:
+    op.execute("ALTER TABLE event_metadata ADD COLUMN ...")
+
+def downgrade() -> None:
+    op.execute("ALTER TABLE event_metadata DROP COLUMN ...")
+```
+
+Apply it to your running compose:
+
+```bash
+docker compose restart gateway   # the gateway runs `alembic upgrade head` on boot
+```
+
+`alembic upgrade head` is idempotent, so restarting against an already
+migrated database is a safe no-op.
+
+### Don't touch ADK tables
+
+ADK's `sessions` / `events` tables are off-limits — they're its schema and it
+ships its own migrations. If you find yourself wanting to denormalize ADK
+data, add a new platform table for the derived view instead.
+
+## Gateway vs. Agent — where does new code go?
+
+When you add a new HTTP route, ask:
+
+| Concern | Goes in |
+| --- | --- |
+| Anything that needs the ADK runtime (sessions, events, agent run/stream) | Agent (`services/backend/agents/api/`) |
+| Anything that reads/writes ADK-keyed metadata (session names, event ratings) | Agent (it sits next to the data it touches) |
+| Auth, presence, user prefs, anything that doesn't need ADK | Gateway (`services/backend/gateway/api/`) |
+| Platform-owned database schema changes | Gateway (via Alembic) |
+
+The gateway is the **only** service the frontend talks to. Anything in the
+agent service is reached via the gateway's catch-all proxy (`api/proxy.py`),
+including SSE streams.
 
 ## Adding MCP Tools
 

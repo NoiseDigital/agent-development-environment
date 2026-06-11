@@ -57,7 +57,8 @@
                 "bierner.markdown-preview-github-styles",
                 "bierner.github-markdown-preview",
                 "eamodio.gitlens",
-                "DavidAnson.vscode-markdownlint"
+                "DavidAnson.vscode-markdownlint",
+                "Anthropic.claude-code"
             ]
         }
     },

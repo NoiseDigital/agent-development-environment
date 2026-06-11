@@ -1,13 +1,21 @@
-import os
+"""Agent platform backend — the ADK FastAPI app plus the platform's own API."""
 
+import os
 from pathlib import Path
-from typing import List
 
 import uvicorn
-from fastapi import HTTPException
-from pydantic import BaseModel
 from google.adk.cli.fast_api import get_fast_api_app
-from google import genai
+
+from api.pins.routes import router as pins_router
+from api.sources.routes import router as sources_router
+from api.events.routes import router as events_router
+from api.sessions.routes import router as sessions_router
+from api.tools.routes import router as tools_router
+# Note: session naming + dashboard insights are no longer custom routes that
+# build their own genai.Client. They are now real ADK agents (the
+# `session_naming_agent` and `dashboard_insights_agent` apps under adk_agents/),
+# invoked by the frontend through the standard ADK /run endpoint. ONE auth
+# path — ADK + ADC — for every model interaction in the platform.
 
 AGENTS_DIR = str(Path(__file__).resolve().parent / "adk_agents")
 
@@ -19,49 +27,24 @@ app = get_fast_api_app(
     trace_to_cloud=False,
 )
 
-
-_genai_client = genai.Client()
-
-
-class MessageSnippet(BaseModel):
-    content: str
-    role: str
-
-
-class NameSessionRequest(BaseModel):
-    messages: List[MessageSnippet]
+# Platform API — everything ADK's FastAPI app doesn't already provide.
+app.include_router(sources_router)  # uploads + BigQuery catalog
+app.include_router(events_router)  # per-message event metadata
+app.include_router(sessions_router)  # session display names
+app.include_router(tools_router)  # MCP toolbox query catalog (admin)
+# Dashboard query route moved to the gateway — it's a platform-owned BFF
+# concern, not part of the ADK runtime. See services/backend/gateway/api/dashboards.py.
+app.include_router(pins_router)  # pinned charts (FloatingAssistant → dashboard)
 
 
-class NameSessionResponse(BaseModel):
-    name: str
-
-
-@app.post("/name_session", response_model=NameSessionResponse)
-async def name_session(request: NameSessionRequest) -> NameSessionResponse:
-    """Generate a short description name for a chat session based on the messages in the session."""
-    context = "\n".join(
-        f"{m.role.upper()} {m.content[:300]}" for m in request.messages[-8:]
-    )
-
-    prompt = (
-        "You are a helpful assistant for naming chat sessions. "
-        f"Here is the context of the chat session:\n{context}"
-        "Return ONLY the name, no quotes, no explanation, no formatting, just the name. "
-    )
-
-    try:
-        response = _genai_client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-        )
-        name = response.text.strip()
-        if not name:
-            raise ValueError("Generated name is empty")
-        return NameSessionResponse(name=name[:50])
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to generate session name: {str(e)}"
-        )
+# Liveness probe — kept independent of any DB / model dependency so the
+# Cloud Run container health check stays green even if a downstream is
+# misbehaving. The gateway has its own /healthz; this exists so the agent
+# service can be probed directly (private ingress) without going through
+# the gateway, and so docker-compose's healthcheck has a stable target.
+@app.get("/healthz", include_in_schema=False)
+async def healthz() -> dict[str, str]:
+    return {"status": "ok"}
 
 
 if __name__ == "__main__":

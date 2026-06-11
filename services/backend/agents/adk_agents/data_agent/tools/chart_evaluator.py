@@ -19,12 +19,12 @@ from google.genai.types import Content, GenerateContentConfig, Part, SafetySetti
 
 from pydantic import BaseModel
 
-from services.backend.agents.adk_agents.data_agent.prompts.chart_evaluator import (
+from ..prompts.chart_evaluator import (
     prompt as chart_evaluator_prompt,
 )
 
 
-CHART_EVALUATOR_MODEL_ID = "gemini-2.5-flash-001"
+CHART_EVALUATOR_MODEL_ID = ""
 
 
 class EvaluationResult(BaseModel):

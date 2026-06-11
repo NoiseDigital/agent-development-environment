@@ -54,7 +54,8 @@ git config --global user.name "Your Name"
 | URL | Description | Open On Startup |
 |---|---|---|
 | <http://localhost:3000> | Frontend chat UI | true |
-| <http://localhost:8000/dev-ui> | ADK API / dev UI | true |
+| <http://localhost:8080/healthz> | Gateway (public API, proxies the agent) | true |
+| <http://localhost:8000/dev-ui> | ADK dev UI (private — gateway proxies anything the frontend needs) | true |
 | <http://localhost:5000/ui> | MCP Toolbox UI | false |
 | <http://localhost:5001/mcp> | Google Ads MCP (optional profile) | false |
 | <http://localhost:5002/mcp> | Math MCP (optional profile) | false |
@@ -64,33 +65,52 @@ git config --global user.name "Your Name"
 
 ```
 services/
-├── frontend/               # Platform UI
+├── frontend/                       # Next.js 15 platform UI (chat + dashboards + GenUI)
 ├── backend/
-│   ├── agents/             # ADK agents + FastAPI host
-│   │   ├── adk_agents/     # Individual agent packages
-│   │   └── main.py         # get_fast_api_app() entrypoint
-│   ├── mcp/                # MCP servers (image-based + code-based)
-│   │   ├── images/        # Image-based MCP configs and thin-wrapper images
-│   │   └── math/           # Code-based MCP server
-│   └── database/           # Postgres
-terraform/                  # GCP infrastructure
+│   ├── gateway/                    # FastAPI gateway — auth, Alembic, proxy to agent
+│   │   ├── alembic/                #   platform-owned Postgres migrations
+│   │   └── api/                    #   auth, health, agent proxy
+│   ├── agents/                     # ADK agents + FastAPI host
+│   │   ├── adk_agents/             #   one package per agent
+│   │   ├── api/                    #   platform-owned routes (sessions, events, sources, dashboards)
+│   │   └── main.py                 #   get_fast_api_app() entrypoint
+│   ├── mcp/                        # MCP servers (image-based + code-based)
+│   │   ├── images/                 #   image-based MCP configs (toolbox tools.yaml lives here)
+│   │   ├── math/                   #   code-based MCP server
+│   │   └── stats/                  #   code-based MCP server (correlate / regress / QA)
+│   └── database/                   # Postgres init scripts
+terraform/                          # GCP infrastructure
 ```
+
+### Service topology
+
+```text
+browser ─► gateway (8080) ─┬─► agent (8000)            ─► postgres
+                           │     ├─► mcp-toolbox (5000) ─► BigQuery
+                           │     └─► mcp-stats (5003)   ─► uploads
+                           ├─► mcp-toolbox (dashboard query)
+                           └─► mcp-stats   (analyze: correlate / qa / describe)
+
+# Boot: gateway runs `alembic upgrade head` in its entrypoint, then starts
+# uvicorn. Its /healthz turns green only once both have completed; the
+# agent waits on that healthcheck before reading the platform tables.
+```
+
+The frontend talks **only** to the gateway. The gateway is the public seam
+for every backend service:
+- ADK runtime (sessions, `/run_sse`, …) → proxied to `agent` via the catch-all.
+- Dashboard queries → `/api/dashboards/query` calls the MCP Toolbox directly.
+- Analyze stats (correlate / qa / describe) → `/api/stats/<endpoint>` proxies
+  to `mcp-stats`.
+
+This shape matches the GCP deployment: in production the agent, toolbox, and
+stats services run on internal-only Cloud Run ingress, and the gateway is the
+only thing the browser can reach. The platform's Postgres schema is owned by
+**Alembic** in the gateway service.
 
 ## Adding an Agent
 
-The ADK server auto-discovers agents — no registration needed. See [CONTRIBUTING.md](CONTRIBUTING.md) for full steps and `agentConfig.tsx` display flags.
-
-**Minimal `agent.py`:**
-
-```python
-from google.adk.agents import Agent
-
-root_agent = Agent(
-    name="my_agent",
-    model="gemini-2.5-flash",
-    instruction="You are a helpful assistant.",
-)
-```
+The ADK server auto-discovers agents in `services/backend/agents/adk_agents/<name>/agent.py` — define a top-level `root_agent`. See [CONTRIBUTING.md](CONTRIBUTING.md#adding-an-agent) for the full steps including the `agentConfig.tsx` display flags.
 
 ## Using MCP Toolbox
 
@@ -128,15 +148,47 @@ Notes:
   - `GOOGLE_IMPERSONATE_SERVICE_ACCOUNT` (optional; uses IAM impersonation, no local key file)
 - If the current user cannot access the configured secret, the generated `.env` is removed and `mcp-google-ads` cannot be started.
 
+## Schema Migrations
+
+Platform-owned Postgres tables (`session_metadata`, `event_metadata`, `sources`)
+are managed by **Alembic** in the gateway. ADK manages its own tables and
+ships its own migrations on version updates — we never touch those.
+
+On `docker compose up`, the gateway's entrypoint runs `alembic upgrade head`
+against Postgres and only then starts uvicorn — its `/healthz` flips green
+once both steps complete. Any service that touches the platform tables
+(currently just `agent`) waits on `gateway: service_healthy`, so the schema
+is always at head before anyone reads it. Migrations are idempotent, so a
+restart is safe. CI applies them to a fresh Postgres on every PR.
+
+Add a migration:
+
+```bash
+docker compose exec gateway uv run alembic revision -m "short description"
+# edit the generated file in services/backend/gateway/alembic/versions/
+docker compose restart gateway   # gateway re-runs upgrade head on boot
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md#schema-migrations) for the full workflow.
+
+## Architecture docs
+
+Going deeper than this README — agent contracts, the GenUI envelope, the
+dashboard tile registry — see [`docs/`](docs/):
+
+- [`docs/agents.md`](docs/agents.md) — agent catalog + routing + action contract.
+- [`docs/genui.md`](docs/genui.md) — `{ text, ui }` envelope, block catalog, parser failure modes.
+- [`docs/dashboards.md`](docs/dashboards.md) — tile registry, presentation overrides, footguns.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming, commit conventions, CI requirements, and guidelines for adding agents and tools.
 
 ## Deployment
 
-CI runs on every push and PR (`ruff`, `ESLint`, `tsc`, `terraform validate`, `docker compose config`). All checks must pass before merge.
+CI runs on every push and PR (`ruff`, `ESLint`, `tsc`, `vitest`, `pytest`, `alembic upgrade head`, `terraform validate`, `docker compose config`). All checks must pass before merge.
 
-### MCP Toolbox to Cloud Run
+### EX: MCP Toolbox to Cloud Run
 
 ```bash
 export IMAGE=us-central1-docker.pkg.dev/database-toolbox/toolbox/toolbox:1.1.0

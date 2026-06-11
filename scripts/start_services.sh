@@ -166,16 +166,22 @@ docker volume create agent-platform_gcloud_config >/dev/null 2>&1 || true
 # Split into two steps: build first (container path), then start (host path, --no-build).
 # COMPOSE_IGNORE_ORPHANS suppresses the workspace container orphan warning — the
 # workspace service is intentionally absent from this up invocation.
+#
 docker compose \
     --project-directory "$PROJECT_ROOT" \
     -f "$PROJECT_ROOT/docker-compose.yml" \
-    build agent frontend
+    build gateway agent frontend mcp-stats
 
+# Up ordering:
+#   postgres (healthcheck) → gateway (runs `alembic upgrade head` then
+#   uvicorn; healthcheck flips green once /healthz responds) → agent
+#   (waits on gateway: service_healthy) → mcp-stats / frontend. `--wait`
+#   blocks until every named service is healthy.
 COMPOSE_IGNORE_ORPHANS=1 docker compose \
     --project-directory "$HOST_PROJECT_ROOT" \
     -f "$PROJECT_ROOT/docker-compose.yml" \
     up -d --no-build --wait --wait-timeout 120 \
-    postgres mcp-toolbox agent frontend
+    postgres mcp-toolbox gateway agent frontend mcp-stats
 
 echo ""
 echo "✔ All services running."

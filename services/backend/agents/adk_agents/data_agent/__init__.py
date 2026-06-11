@@ -13,12 +13,6 @@
 # limitations under the License.
 """QnA Agent init module"""
 
-import os
-import sys
-
-sys.path.append(".")
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 from .agent import root_agent as root_agent
 
 __version__ = "0.1.0"

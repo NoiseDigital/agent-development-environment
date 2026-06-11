@@ -9,6 +9,9 @@ services:
     volumes:
       - ./services/backend/agents:/workspace
       - gcloud_config:/root/.config/gcloud:ro
+      - uploads:/data/uploads
+      # Read-only: lets the platform API reconstruct the SQL behind tool calls.
+      - ./services/backend/mcp/images/toolbox:/toolbox-config:ro
     ports:
       - "${AGENT_PORT:-8000}:${AGENT_PORT:-8000}"
     environment:
@@ -18,18 +21,34 @@ services:
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://user:password@postgres:5432/postgres}
       - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
       - GOOGLE_GENAI_USE_VERTEXAI=${GOOGLE_GENAI_USE_VERTEXAI:-true}
-      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-nd-agentspace-sbx}
       - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-northamerica-northeast1}
       - TOOLBOX_ENDPOINT=${TOOLBOX_ENDPOINT:-http://mcp-toolbox:5000}
+      - MCP_STATS_URL=${MCP_STATS_URL:-http://mcp-stats:8080/sse}
       - UV_LINK_MODE=copy
+      # Uploaded data sources — local volume in dev, swap to STORAGE_BACKEND=gcs when deployed.
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-local}
+      - STORAGE_LOCAL_PATH=/data/uploads
     depends_on:
       postgres:
+        condition: service_healthy
+      # Gateway owns the platform schema and runs `alembic upgrade head` in
+      # its entrypoint. Waiting on its healthcheck means migrations are done
+      # AND uvicorn is up before the agent starts reading/writing tables.
+      # ADK manages its own tables/migrations and is unaffected by this gate.
+      gateway:
         condition: service_healthy
       mcp-toolbox:
         condition: service_started
     stdin_open: true
     tty: true
     command: uv run uvicorn main:app --host 0.0.0.0 --port ${AGENT_PORT:-8000} --reload
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${AGENT_PORT:-8000}/healthz || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
 
   # ── Image-based MCP servers ────────────────────────────────────────────────
   # These servers are consumed as images — no source code maintained here.
@@ -46,7 +65,7 @@ services:
       - "${MCP_PORT:-5000}:${MCP_PORT:-5000}"
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
-      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-nd-agentspace-sbx}
       - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-northamerica-northeast1}
     depends_on:
       postgres:
@@ -92,15 +111,91 @@ services:
     stdin_open: true
     tty: true
 
+  # Statistics & correlation analysis engine. Resolves data sources via the
+  # agent API and reads uploads from the shared volume.
+  mcp-stats:
+    build:
+      context: ./services/backend/mcp/stats
+    volumes:
+      - uploads:/data/uploads:ro
+      - gcloud_config:/root/.config/gcloud:ro
+    ports:
+      - "${STATS_MCP_PORT:-5003}:8080"
+    environment:
+      - AGENT_URL=${AGENT_URL:-http://agent:8000}
+      - STORAGE_LOCAL_PATH=/data/uploads
+      - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-nd-agentspace-sbx}
+    depends_on:
+      agent:
+        condition: service_started
+    stdin_open: true
+    tty: true
+    healthcheck:
+      # python:3.13-slim has no curl — use urllib instead.
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/health').status==200 else 1)\""]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
   mcp-asana:
     build:
       context: ./services/backend/mcp/asana
     ports:
-      - "${ASANA_MCP_PORT:-5003}:8080"
+      - "${ASANA_MCP_PORT:-5004}:8080"
     profiles:
       - asana
     stdin_open: true
     tty: true
+
+  # ── Gateway — the public entry point for the frontend ─────────────────────
+  # Owns auth, the platform's non-agent HTTP routes, AND the database
+  # schema. Boot order: `alembic upgrade head` → uvicorn → /healthz returns
+  # OK. The agent (and anything else that touches the platform tables)
+  # waits on this service's healthcheck so the schema is always at head.
+  # Everything the gateway doesn't handle directly is proxied to the
+  # private agent service; `/run_sse` streams through unchanged
+  # (see api/proxy.py).
+  #
+  # We keep migrations in the gateway boot (rather than a one-shot service)
+  # because Alembic is idempotent, we run one replica, and the operational
+  # cost of a separate service outweighs its benefit at this scale. If we
+  # ever scale to multi-replica gateway with cold-start migration races,
+  # swap this to a `gcloud run jobs execute` pre-deploy step.
+  gateway:
+    build:
+      context: ./services/backend/gateway
+      dockerfile: Dockerfile
+    volumes:
+      - ./services/backend/gateway:/workspace
+    ports:
+      - "${GATEWAY_PORT:-8080}:${GATEWAY_PORT:-8080}"
+    environment:
+      - PORT=${GATEWAY_PORT:-8080}
+      - AGENT_URL=${AGENT_URL_INTERNAL:-http://agent:8000}
+      - STATS_URL=${STATS_URL_INTERNAL:-http://mcp-stats:8080}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://user:password@postgres:5432/postgres}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost,http://localhost:3000,http://frontend:3000}
+      - UV_LINK_MODE=copy
+    depends_on:
+      postgres:
+        condition: service_healthy
+    stdin_open: true
+    tty: true
+    # Run Alembic to head, THEN start uvicorn. Re-runs are idempotent.
+    command: >
+      sh -c "uv run alembic upgrade head &&
+             exec uv run uvicorn main:app --host 0.0.0.0 --port ${GATEWAY_PORT:-8080} --reload"
+    # Healthcheck flips green only once both migrations finished and uvicorn
+    # is serving /healthz. `start_period` gives the migration step room on a
+    # cold image build (~30s) before the failing probes start counting.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${GATEWAY_PORT:-8080}/healthz || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
 
   frontend:
     build:
@@ -115,13 +210,25 @@ services:
       - "${FRONTEND_PORT:-3000}:${FRONTEND_PORT:-3000}"
     environment:
       - NODE_ENV=${NODE_ENV:-development}
-      - NEXT_PUBLIC_AGENTS_BASE_URL=${NEXT_PUBLIC_AGENTS_BASE_URL:-http://localhost:8000}
+      # The frontend talks to ONLY the gateway. Gateway proxies to the private
+      # agent service (ADK runtime), the MCP Toolbox (dashboards), and
+      # mcp-stats (Analyze page) — none of which the browser reaches directly.
+      - NEXT_PUBLIC_AGENTS_BASE_URL=${NEXT_PUBLIC_AGENTS_BASE_URL:-http://localhost:8080}
     depends_on:
-      agent:
+      gateway:
         condition: service_started
     stdin_open: true
     tty: true
     command: npm run dev
+    healthcheck:
+      # Next.js's dev server responds with HTML on `/`. Bare TCP probe would
+      # be cheaper but doesn't catch a wedged compile, so we hit the route.
+      # node:24-slim has no curl — use Node's native fetch (18+).
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:${FRONTEND_PORT:-3000}').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   postgres:
     image: public.ecr.aws/docker/library/postgres:16
@@ -144,7 +251,9 @@ services:
 # - postgres_data: retains DB data so it survives container recreation
 # - frontend_node_modules: caches node_modules so npm install only runs at build time,
 #   not on every container start (the bind mount would otherwise shadow the image's node_modules)
+# - uploads: stores uploaded analysis data sources; shared with the stats MCP server
 volumes:
   gcloud_config:
   postgres_data:
   frontend_node_modules:
+  uploads:

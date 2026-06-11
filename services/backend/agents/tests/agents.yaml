@@ -1,0 +1,345 @@
+# Per-agent behaviour expectations. The suite (test_agents.py) runs each
+# `message` through the harness and checks the `expect` block — add a case by
+# adding an entry here, no Python needed.
+#
+# expect keys:
+#   ok:              reply is non-empty and error-free (default: true)
+#   ui:              name (or list) of UI components the run must emit. The
+#                    harness scans every event in the turn — so a subagent's
+#                    choices / chart block counts even if the root agent
+#                    paraphrases its text.
+#   no_ui:           true to assert the reply contains NO UI blocks.
+#   forbidden_ui:    name (or list) of UI components that must NOT appear
+#                    while others are allowed (less strict than no_ui).
+#   tools:           true to require at least one tool call, or a list of
+#                    names that must all be present in the run's tool calls.
+#   forbidden_tools: names that must NOT be called — pins "this path skips X"
+#                    contracts (e.g. greeting fast-path must not call
+#                    ChoicesAgent; modify-previous-chart must not call
+#                    VegaChartsAgent).
+# A case may also set `xfail: "reason"` to mark a known-failing behaviour.
+
+
+media_performance_agent:
+  # ── Greeting branch (FAST PATH — no ChoicesAgent round-trip) ────────────
+  # The agent emits the welcome envelope directly, so a "hey" finishes in
+  # one LLM turn instead of two. We assert the UI shape but explicitly
+  # FORBID the ChoicesAgent tool to pin the fast-path contract.
+  - name: bare greeting surfaces clickable starter choices (no subagent)
+    message: "hey"
+    expect:
+      ui: choices
+      forbidden_tools: [ChoicesAgent]
+
+  - name: capability question greets via choices block, not static markdown
+    message: "what can you do?"
+    expect:
+      ui: choices
+      forbidden_tools: [ChoicesAgent]
+
+  # ── Ambiguous-request branch (TEMPLATED FAST PATH — no ChoicesAgent) ──────
+  # Common ambiguous asks now emit a fixed metric/timeframe/visualization
+  # clarification envelope INLINE — saves the 8-15s ChoicesAgent round-trip.
+  # We forbid ChoicesAgent to pin the fast-path contract: a regression that
+  # silently re-routes through the subagent fails the test.
+  - name: vague "how did we do" uses templated clarification
+    message: "How did we do?"
+    expect:
+      ui: choices
+      forbidden_tools: [ChoicesAgent]
+
+  - name: vague performance summary uses templated clarification
+    message: "Give me a performance summary"
+    expect:
+      ui: choices
+      forbidden_tools: [ChoicesAgent]
+
+  - name: vague overview uses templated clarification
+    message: "Just give me an overview"
+    expect:
+      ui: choices
+      forbidden_tools: [ChoicesAgent]
+
+  - name: "'show me what's trending' uses templated clarification"
+    # Specific regression: the starter-prompt-click path. With ChoicesAgent
+    # the second clarification took ~15s; with the templated path it's one LLM
+    # turn — the root emits the choices envelope itself.
+    message: "Show me what's trending"
+    expect:
+      ui: choices
+      forbidden_tools: [ChoicesAgent]
+
+  # The ChoicesAgent must NOT offer a "scalar trap" option. Every option
+  # the user sees should yield a chart — otherwise picking "overall totals"
+  # forces a single-number reply when an analytical chart would be far more
+  # useful. Asserted via the next case (multi-turn replay).
+  - name: choices follow-up still produces a chart, not a scalar
+    # Single-metric weekly trend — goes through the templated fast path,
+    # not VegaChartsAgent. We assert templated_chart + forbid VegaChartsAgent
+    # so a regression that re-routes through the subagent (~1.5-2s LLM call)
+    # is caught here, not in production.
+    message: |
+      Which metric(s) are you interested in? → Spend
+      What time range? → All time (2023-07-10 to 2025-11-01)
+      How would you like to see it? → Trend over time
+    expect:
+      ui: templated_chart
+      forbidden_tools: [VegaChartsAgent]
+
+  # ── Chart branch — TEMPLATED FAST PATH (no VegaChartsAgent) ──────────────
+  # Common shapes go through the templated_chart envelope: one LLM call
+  # total. We pin `forbidden_tools: [VegaChartsAgent]` so a regression that
+  # silently re-routes through the subagent costs both ~1.5-2s AND the test.
+  - name: weekly trend uses templated_chart fast path
+    message: "Plot weekly spend in 2024 as a line chart."
+    expect:
+      ui: [templated_chart, suggestions]
+      tools: [performance_trend]
+      forbidden_tools: [VegaChartsAgent]
+
+  - name: publisher breakdown uses templated_chart fast path
+    message: "Show spend by publisher as a bar chart."
+    expect:
+      ui: [templated_chart, suggestions]
+      tools: [publisher_spend_breakdown]
+      forbidden_tools: [VegaChartsAgent]
+
+  # ── Scalar / text-only branch ──────────────────────────────────────────────
+  - name: capability question returns text only
+    message: "In one sentence, what can you help me with?"
+    expect:
+      ok: true
+      no_ui: true
+
+  # A time-windowed scalar question phrased as a scalar STAYS a scalar.
+  # The user wants the number, not a 30s chart of it. They can ask for a
+  # chart explicitly when they want one — see the next case.
+  - name: time-windowed scalar question returns text only (no chart)
+    message: "What was our total spend in 2024?"
+    expect:
+      no_ui: true
+      tools: true   # data tool to ground the number is fine
+
+  # The same time window, asked WITH a chart-trigger word, DOES get a chart —
+  # via the templated fast path, not VegaChartsAgent.
+  - name: chart-trigger word on a time window promotes to branch 2 (templated)
+    message: "Show me weekly spend in 2024."
+    expect:
+      ui: templated_chart
+      tools: [performance_trend]
+      forbidden_tools: [VegaChartsAgent]
+
+  # An EXPLICIT scalar suppression stays scalar (unchanged).
+  - name: user explicitly requests only the number → scalar
+    message: "Give me just the total spend number for 2024, no chart."
+    expect:
+      no_ui: true
+      tools: true
+
+  - name: definitional question returns text only
+    message: "What does CTR mean in this data?"
+    expect:
+      no_ui: true
+
+  # ── Dashboard-context awareness ────────────────────────────────────────────
+  # The floating assistant prepends a [Dashboard context: ...] preamble in
+  # both view and edit modes. The analyst must:
+  #   - treat the preamble as metadata (not a user request).
+  #   - still answer the user's actual question.
+  #   - not refuse, not echo the preamble back.
+
+  - name: dashboard context preamble is tolerated, not echoed
+    # Identical chart request to the templated case above, just with the
+    # floating-assistant preamble prepended. The agent must IGNORE the
+    # preamble (no echo) and still route through the templated fast path.
+    message: |
+      [Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=view]
+      Active tab: Overall
+      Other tabs: Awareness, Engagement, Conversion
+      Tiles on this tab:
+      - KPI: Spend
+      - KPI: CTR
+      - Trend: total_spend over time
+      - Breakdown: total_spend by publisher
+
+      Plot weekly spend in 2024 as a line chart.
+    expect:
+      ui: templated_chart
+      forbidden_tools: [VegaChartsAgent]
+
+  - name: dashboard context with scalar request still goes scalar
+    message: |
+      [Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=view]
+      Active tab: Overall
+      Tiles on this tab:
+      - KPI: Spend
+
+      Give me just the total spend number for 2024, no chart.
+    expect:
+      no_ui: true
+      tools: true
+
+
+# ── Internal one-shot agents ─────────────────────────────────────────────────
+# These are non-conversational (called once per dashboard refresh / per
+# session). Tests check the contract holds.
+
+dashboard_editor_agent:
+  # All editor cases use the rich multi-line preamble the FloatingAssistant
+  # now emits in BOTH view and edit modes (id+tab+mode on line 1; manifest
+  # lines beneath). The editor's prompt parses id+tab off the first line and
+  # treats the manifest as informational — see prompts/dashboard_editor_agent.py.
+  - name: rename → emits a rename_dashboard action
+    message: |
+      [Dashboard context: id=user-123, tab=overall, name=My Dashboard, mode=edit]
+      Active tab: Overall
+      Tiles on this tab:
+      - KPI: Spend
+
+      Rename this dashboard to Q3 Recap.
+    expect:
+      ui: action
+
+  - name: recolour banner → emits a set_accent action
+    message: |
+      [Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=edit]
+      Active tab: Overall
+      Tiles on this tab:
+      - KPI: Spend
+
+      Make the banner emerald.
+    expect:
+      ui: action
+
+  - name: ask to add a chart → emits chart + pin_chart action (delegates to analyst)
+    # Phrased unambiguously — the editor's prompt requires this, but the
+    # raw message itself also nails down shape + window so the analyst has
+    # zero room to ask for clarification.
+    message: |
+      [Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=edit]
+      Active tab: Overall
+      Other tabs: Awareness, Engagement, Conversion
+      Tiles on this tab:
+      - KPI: Spend [id=kpi-spend]
+      - Trend: total_spend over time [id=trend-spend]
+
+      Add a bar chart of total spend by publisher over all available time to this tab.
+    expect:
+      ui: [chart, action]
+      tools: [MediaPerformanceAgent]
+
+  - name: rename a tile → emits update_tile action with the manifest id
+    # The editor must read the [id=…] from the manifest line and pass it as
+    # tile_id — no fabricated ids. The presentation patch carries ONLY the
+    # field the user mentioned (title).
+    message: |
+      [Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=edit]
+      Active tab: Overall
+      Tiles on this tab:
+      - KPI: Spend [id=kpi-spend]
+      - Trend: total_spend over time [id=trend-spend]
+
+      Rename the Spend KPI to Investment.
+    expect:
+      ui: action
+
+  - name: recolour an existing tile → emits update_tile action
+    message: |
+      [Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=edit]
+      Active tab: Overall
+      Tiles on this tab:
+      - Breakdown: total_spend by publisher [id=breakdown-pub]
+
+      Make the publisher breakdown emerald.
+    expect:
+      ui: action
+
+  - name: remove an existing tile → emits remove_tile action
+    message: |
+      [Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=edit]
+      Active tab: Overall
+      Tiles on this tab:
+      - Pareto: Spend concentration [id=pareto-spend]
+      - Trend: total_spend over time [id=trend-spend]
+
+      Remove the Pareto tile.
+    expect:
+      ui: action
+
+  - name: analytical question → delegates, never emits an action
+    # The editor MAY return a chart or a choices block (depends on whether
+    # the analyst clarifies); the only invariant is "no `action` block,
+    # because the user wasn't asking to edit the dashboard."
+    message: |
+      [Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=edit]
+      Active tab: Overall
+      Other tabs: Awareness, Engagement, Conversion
+      Tiles on this tab:
+      - KPI: Spend
+      - Trend: total_spend over time
+      - Breakdown: total_spend by publisher
+
+      What was our top publisher last quarter?
+    expect:
+      forbidden_ui: action
+      tools: [MediaPerformanceAgent]
+
+
+dashboard_insights_agent:
+  - name: produces structured insight bullets from a totals payload
+    message: |
+      {"window":"Last 90 days","filters":{},"current":{"total_spend":850000,"impressions":120000000,"clicks":350000,"engaged_visits":85000,"ctr":0.0029,"cpc":2.43},"prior":{"total_spend":720000,"impressions":110000000,"clicks":295000,"engaged_visits":68000,"ctr":0.0027,"cpc":2.44},"top_publisher":{"name":"Meta","value":420000}}
+    expect:
+      ok: true
+
+  - name: produces insights grounded in the dashboard tile manifest
+    # Forward-compat: the same payload with an optional `dashboard` field
+    # describing the active tab. The agent should still emit insights, ideally
+    # referencing visible tiles or other tabs.
+    message: |
+      {"window":"Last 90 days","filters":{},"current":{"total_spend":850000,"impressions":120000000,"clicks":350000,"engaged_visits":85000,"ctr":0.0029,"cpc":2.43},"prior":{"total_spend":720000,"impressions":110000000,"clicks":295000,"engaged_visits":68000,"ctr":0.0027,"cpc":2.44},"top_publisher":{"name":"Meta","value":420000},"dashboard":{"dashboard_name":"NOI Performance","tab_label":"Overall","other_tabs":["Awareness","Engagement","Conversion"],"tiles_on_tab":["- KPI: Spend","- KPI: CTR","- Trend: total_spend over time","- Breakdown: total_spend by publisher"]}}
+    expect:
+      ok: true
+
+session_naming_agent:
+  - name: returns a short title from a message dump
+    message: |
+      USER What was our Meta spend in Q3?
+      MODEL Meta spend in Q3 was $420K, up 18% from Q2.
+    expect:
+      ok: true
+
+
+timesheet_agent:
+  - name: capability question returns text
+    message: "What can you help me with?"
+    expect:
+      ok: true
+
+
+analyze_assistant_agent:
+  - name: interprets a top-signals preamble without inventing columns
+    # The analyze page prepends a multi-line "Analyze context" preamble; the
+    # agent should ground its reply in that and respond as plain markdown
+    # (no JSON envelope, no UI blocks).
+    message: |
+      [Analyze context]
+      source: bigquery:media_performance.media_campaign_performance_NOI
+      method: pearson
+      rows_analyzed: 49691
+      set_a: total_spend
+      set_b: impressions, clicks, completed_views, landing_page_views
+      preprocessing: none
+      alpha: 0.05
+      lag_b: 0
+      qa_warnings: (none)
+      top_signals (top 10 by |r|):
+        - A=total_spend B=impressions r=0.473 p=0.0 significant
+        - A=total_spend B=completed_views r=0.322 p=6.2e-81 significant
+        - A=total_spend B=landing_page_views r=0.236 p=2.2e-129 significant
+        - A=total_spend B=clicks r=0.224 p=8.8e-133 significant
+
+      Which of these are worth focusing on?
+    expect:
+      ok: true
+      no_ui: true

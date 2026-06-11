@@ -1,21 +1,24 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { useChat } from '../../../../hooks/useChat';
-import ChatSidebar from '../../../../components/ChatSidebar';
-import ChatHeader from '../../../../components/ChatHeader';
-import MessageList from '../../../../components/MessageList';
-import MessageInput from '../../../../components/MessageInput';
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useChatContext } from '../../../../contexts/ChatContext';
+import ChatSidebar from '../../../../components/chat/ChatSidebar';
+import ChatHeader from '../../../../components/chat/ChatHeader';
+import MessageList from '../../../../components/chat/MessageList';
+import MessageInput from '../../../../components/chat/MessageInput';
+import SourcesSidebar from '../../../../components/SourcesSidebar';
+import type { SourceRef } from '../../../../types/source';
+import { sourceUri, sourceLabel } from '../../../../types/source';
+import { useNeuralThinking } from '../../../../lib/agent/neural-pulse';
 
 export default function ChatSessionPage() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const agentId = typeof params.agentId === 'string' ? params.agentId : '';
   const sessionId = typeof params.sessionId === 'string' ? params.sessionId : '';
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const didInit = useRef(false);
+  const [selectedSources, setSelectedSources] = useState<SourceRef[]>([]);
+  const thinking = useNeuralThinking();
 
   const {
     availableApps,
@@ -25,9 +28,11 @@ export default function ChatSessionPage() {
     messages,
     isLoading,
     isLoadingApps,
-    isLoadingSessions,
     error,
     sessionNames,
+    aiRenamedIds,
+    feedback,
+    rateMessage,
     supportsVisualization,
     sendMessage,
     createNewSession,
@@ -35,7 +40,7 @@ export default function ChatSessionPage() {
     deleteSession,
     renameSession,
     saveSessionName,
-  } = useChat(agentId);
+  } = useChatContext();
 
   // Redirect to library if agentId unknown
   useEffect(() => {
@@ -44,91 +49,98 @@ export default function ChatSessionPage() {
     }
   }, [isLoadingApps, availableApps, agentId, router]);
 
-  // On mount: either honour ?new=1 (create fresh session) or select the sessionId from URL
+  // The URL is the single source of truth for which session is open: load
+  // whatever session the route names. Selecting a conversation or creating one
+  // just navigates — this effect does the loading, so there is one load path.
   useEffect(() => {
-    if (!selectedApp || isLoadingApps || isLoadingSessions || didInit.current) return;
-    didInit.current = true;
-
-    const wantsNew = searchParams.get('new') === '1';
-    if (wantsNew) {
-      createNewSession().then(s => {
-        if (s) router.replace(`/chat/${agentId}/${s.id}`);
-      });
-    } else if (sessionId) {
+    if (selectedApp && sessionId && currentSession?.id !== sessionId) {
       selectSession(sessionId);
     }
-  }, [selectedApp, isLoadingApps, isLoadingSessions]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Keep URL in sync when currentSession changes (e.g. after create)
-  useEffect(() => {
-    if (currentSession && currentSession.id !== sessionId) {
-      router.replace(`/chat/${agentId}/${currentSession.id}`);
-    }
-  }, [currentSession?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedApp, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleNewSession = async () => {
     const s = await createNewSession();
     if (s) router.push(`/chat/${agentId}/${s.id}`);
   };
 
+  // Selecting a conversation just navigates — the URL-driven effect loads it.
   const handleSelectSession = (id: string) => {
-    selectSession(id);
     router.push(`/chat/${agentId}/${id}`);
   };
 
-  const handleSwitchAgent = (app: string) => {
-    if (app && app !== agentId) router.push(`/chat/${app}?new=1`);
-  };
-
-  const handleBackToLibrary = () => router.push('/agents');
+  // Sources sidebar is temporarily hidden — keeping the supporting code so
+  // we can re-enable it cleanly when the uploaded-sources workflow lands.
+  // Flip this back to `getAgentConfiguration(agentId).supportsSources ?? false`
+  // to restore.
+  const showSources = false;
+  // Compact manifest prepended (agent-side only) so the analyst knows which
+  // data sources to run the stats tools against.
+  const sourceManifest = selectedSources.length
+    ? `[Active data sources: ${selectedSources
+        .map((s) => `"${sourceLabel(s)}" (source: ${sourceUri(s)})`)
+        .join(', ')}]`
+    : undefined;
 
   return (
-    <div className="flex h-screen bg-black">
-      {/* Sidebar */}
-      <div
-        className={`bg-black border-r border-zinc-800 flex flex-col overflow-hidden transition-[width] duration-300 ease-in-out ${
-          isSidebarOpen ? 'w-80' : 'w-0'
-        }`}
-      >
-        <ChatSidebar
-          availableApps={availableApps}
-          selectedApp={selectedApp}
-          setSelectedApp={handleSwitchAgent}
-          sessions={sessions}
-          currentSession={currentSession}
-          isLoadingApps={isLoadingApps}
-          createNewSession={handleNewSession}
-          selectSession={handleSelectSession}
-          deleteSession={deleteSession}
-          renameSession={renameSession}
-          saveSessionName={saveSessionName}
-          sessionNames={sessionNames}
-          onBackToLibrary={handleBackToLibrary}
-        />
-      </div>
+    <div className="flex flex-1 h-full bg-canvas">
+      <ChatSidebar
+        selectedApp={selectedApp}
+        sessions={sessions}
+        currentSession={currentSession}
+        createNewSession={handleNewSession}
+        selectSession={handleSelectSession}
+        deleteSession={deleteSession}
+        renameSession={renameSession}
+        saveSessionName={saveSessionName}
+        sessionNames={sessionNames}
+        aiRenamedIds={aiRenamedIds}
+      />
 
       {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <ChatHeader
-          selectedApp={selectedApp}
-          currentSession={currentSession}
-          error={error}
-          isSidebarOpen={isSidebarOpen}
-          onToggleSidebar={() => setIsSidebarOpen(o => !o)}
-          sessionNames={sessionNames}
-        />
-        <MessageList
-          messages={messages}
-          selectedApp={selectedApp}
-          supportsVisualization={supportsVisualization}
-        />
-        <MessageInput
-          selectedApp={selectedApp}
-          currentSession={currentSession}
-          isLoading={isLoading}
-          onSendMessage={sendMessage}
-        />
+      <div className="relative flex-1 flex flex-col min-w-0">
+        {/* Soft animated radial wash behind the chat column (pointer-events:
+            none so it never intercepts clicks). Shares the neural-expressive
+            `--energy` ramp: while the agent is thinking the wash brightens and
+            saturates, then eases back — so the conversation surface itself
+            "breathes with you". Pure CSS; all motion lives in globals.css. */}
+        <div
+          aria-hidden
+          data-thinking={thinking ? 'true' : undefined}
+          className="neural-wash pointer-events-none absolute inset-0 overflow-hidden"
+        >
+          <div className="neural-wash-orb neural-wash-a" />
+          <div className="neural-wash-orb neural-wash-b" />
+          <div className="neural-wash-orb neural-wash-c" />
+        </div>
+        <div className="relative z-10 flex flex-1 flex-col min-h-0">
+          <ChatHeader
+            selectedApp={selectedApp}
+            currentSession={currentSession}
+            error={error}
+            sessionNames={sessionNames}
+            aiRenamedIds={aiRenamedIds}
+          />
+          <MessageList
+            messages={messages}
+            selectedApp={selectedApp}
+            supportsVisualization={supportsVisualization}
+            feedback={feedback}
+            onRate={rateMessage}
+            onAction={(text) => sendMessage(text, sourceManifest)}
+          />
+          <MessageInput
+            selectedApp={selectedApp}
+            currentSession={currentSession}
+            isLoading={isLoading}
+            onSendMessage={(text) => sendMessage(text, sourceManifest)}
+          />
+        </div>
       </div>
+
+      {/* Right-hand data sources panel — agents with supportsSources only */}
+      {showSources && (
+        <SourcesSidebar selected={selectedSources} onChange={setSelectedSources} />
+      )}
     </div>
   );
 }

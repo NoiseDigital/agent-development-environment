@@ -7,6 +7,7 @@ services:
     volumes:
       - .:/workspaces/agent-platform
       - gcloud_config:/root/.config/gcloud
+      - claude_config:/root/.claude
       - /var/run/docker.sock:/var/run/docker.sock
     command: sleep infinity
     tty: true
@@ -19,3 +20,4 @@ services:
 
 volumes:
   gcloud_config:
+  claude_config:
