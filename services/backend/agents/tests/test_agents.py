@@ -7,12 +7,30 @@ container:
     docker compose exec agent uv run pytest tests -v
 """
 
+import os
 from pathlib import Path
 
 import pytest
 import yaml
 
 from tests.harness import get_harness
+
+# These are REAL agent runs (live Gemini + MCP). Skip the whole suite where no
+# model backend is configured (e.g. plain CI) so missing credentials read as
+# "skipped" rather than "failed". Run it in the agent container, or set
+# GOOGLE_API_KEY / GEMINI_API_KEY (AI Studio) or GOOGLE_GENAI_USE_VERTEXAI=1
+# (+ GOOGLE_CLOUD_PROJECT) for Vertex.
+_LIVE_BACKEND = bool(
+    os.getenv("GOOGLE_API_KEY")
+    or os.getenv("GEMINI_API_KEY")
+    or os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in {"1", "true"}
+)
+
+pytestmark = pytest.mark.skipif(
+    not _LIVE_BACKEND,
+    reason="live agent E2E (Gemini + MCP) — no model backend configured; set "
+    "GOOGLE_API_KEY/GEMINI_API_KEY or GOOGLE_GENAI_USE_VERTEXAI to run.",
+)
 
 _CASES_FILE = Path(__file__).parent / "agents.yaml"
 
