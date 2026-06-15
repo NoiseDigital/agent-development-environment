@@ -39,6 +39,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Only build/deploy services whose source changed since the previous commit
+      # (a manual workflow_dispatch forces a full deploy — see the `force` exprs).
+      # The migrate job runs when the gateway changed (Alembic migrations live there).
+      - uses: dorny/paths-filter@v3
+        id: changed
+        with:
+          filters: |
+            gateway: ['services/backend/gateway/**']
+            agents: ['services/backend/agents/**']
+            mcp_stats: ['services/backend/mcp/stats/**']
+            mcp_toolbox: ['services/backend/mcp/images/toolbox/**']
+
       - id: auth
         uses: google-github-actions/auth@v2
         with:
@@ -48,25 +60,35 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
 
       - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
-
-      # ── Build + push (gateway/agent use the prod stage; source baked in) ────
-      - name: Build & push images
         run: |
-          set -euo pipefail
-          SHA=${GITHUB_SHA::12}
-          docker build --target prod -t "$AR/gateway:$SHA"     services/backend/gateway
-          docker build --target prod -t "$AR/agents:$SHA"       services/backend/agents
-          docker build               -t "$AR/mcp-stats:$SHA"   services/backend/mcp/stats
-          docker build               -t "$AR/mcp-toolbox:$SHA" services/backend/mcp/images/toolbox
-          docker push "$AR/gateway:$SHA"
-          docker push "$AR/agents:$SHA"
-          docker push "$AR/mcp-stats:$SHA"
-          docker push "$AR/mcp-toolbox:$SHA"
-          echo "SHA=$SHA" >> "$GITHUB_ENV"
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          echo "SHA=${GITHUB_SHA::12}" >> "$GITHUB_ENV"
 
-      # ── Migrate FIRST — schema is at head before any new API revision ───────
+      # ── Build + push (only changed services; gateway/agent use the prod stage) ─
+      - name: Build & push gateway
+        if: ${{ steps.changed.outputs.gateway == 'true' || github.event_name == 'workflow_dispatch' }}
+        run: |
+          docker build --target prod -t "$AR/gateway:$SHA" services/backend/gateway
+          docker push "$AR/gateway:$SHA"
+      - name: Build & push agents
+        if: ${{ steps.changed.outputs.agents == 'true' || github.event_name == 'workflow_dispatch' }}
+        run: |
+          docker build --target prod -t "$AR/agents:$SHA" services/backend/agents
+          docker push "$AR/agents:$SHA"
+      - name: Build & push mcp-stats
+        if: ${{ steps.changed.outputs.mcp_stats == 'true' || github.event_name == 'workflow_dispatch' }}
+        run: |
+          docker build -t "$AR/mcp-stats:$SHA" services/backend/mcp/stats
+          docker push "$AR/mcp-stats:$SHA"
+      - name: Build & push mcp-toolbox
+        if: ${{ steps.changed.outputs.mcp_toolbox == 'true' || github.event_name == 'workflow_dispatch' }}
+        run: |
+          docker build -t "$AR/mcp-toolbox:$SHA" services/backend/mcp/images/toolbox
+          docker push "$AR/mcp-toolbox:$SHA"
+
+      # ── Migrate FIRST (only when the gateway/migrations changed) ─────────────
       - name: Run DB migrations (one-shot job)
+        if: ${{ steps.changed.outputs.gateway == 'true' || github.event_name == 'workflow_dispatch' }}
         run: |
           set -euo pipefail
           gcloud run jobs update "migrate" \
@@ -74,15 +96,16 @@ jobs:
           gcloud run jobs execute "migrate" \
             --region "$REGION" --project "$PROJECT" --wait
 
-      # ── Roll the services (private ones first, gateway last) ────────────────
-      - name: Deploy Cloud Run services
-        run: |
-          set -euo pipefail
-          gcloud run deploy "mcp-toolbox" \
-            --image "$AR/mcp-toolbox:$SHA" --region "$REGION" --project "$PROJECT"
-          gcloud run deploy "agents" \
-            --image "$AR/agents:$SHA" --region "$REGION" --project "$PROJECT"
-          gcloud run deploy "mcp-stats" \
-            --image "$AR/mcp-stats:$SHA" --region "$REGION" --project "$PROJECT"
-          gcloud run deploy "gateway" \
-            --image "$AR/gateway:$SHA" --region "$REGION" --project "$PROJECT"
+      # ── Roll the changed services (private ones first, gateway last) ─────────
+      - name: Deploy mcp-toolbox
+        if: ${{ steps.changed.outputs.mcp_toolbox == 'true' || github.event_name == 'workflow_dispatch' }}
+        run: gcloud run deploy "mcp-toolbox" --image "$AR/mcp-toolbox:$SHA" --region "$REGION" --project "$PROJECT"
+      - name: Deploy agents
+        if: ${{ steps.changed.outputs.agents == 'true' || github.event_name == 'workflow_dispatch' }}
+        run: gcloud run deploy "agents" --image "$AR/agents:$SHA" --region "$REGION" --project "$PROJECT"
+      - name: Deploy mcp-stats
+        if: ${{ steps.changed.outputs.mcp_stats == 'true' || github.event_name == 'workflow_dispatch' }}
+        run: gcloud run deploy "mcp-stats" --image "$AR/mcp-stats:$SHA" --region "$REGION" --project "$PROJECT"
+      - name: Deploy gateway
+        if: ${{ steps.changed.outputs.gateway == 'true' || github.event_name == 'workflow_dispatch' }}
+        run: gcloud run deploy "gateway" --image "$AR/gateway:$SHA" --region "$REGION" --project "$PROJECT"
