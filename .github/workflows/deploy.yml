@@ -3,28 +3,30 @@ name: Deploy (backend)
 # Backend deploy: build images, run DB migrations, roll Cloud Run. The frontend
 # is NOT here — Firebase App Hosting builds & rolls it out from git natively.
 #
-# Auth is keyless via Workload Identity Federation (no JSON keys). The provider
-# + CI service account come from infra/bootstrap; wire them as repo variables:
+# Auth is keyless via Workload Identity Federation (no JSON keys).
+#
+# Single-tenant model: each client gets a dedicated GCP project, and each
+# tenant-stack is a GitHub *Environment* (e.g. `noise-sbx`) holding that
+# stack's deploy vars. Selecting the environment makes vars.* resolve to that
+# tenant's values, so adding a client = one new environment, no workflow edit.
+# Per environment, from that tenant's infra/bootstrap outputs:
 #   vars.GCP_WORKLOAD_IDENTITY_PROVIDER  vars.GCP_CI_SERVICE_ACCOUNT
 #   vars.GCP_REGION  vars.DEPLOY_PROJECT  vars.ARTIFACT_REGISTRY
 
 on:
   push:
-    branches: [main] # main → sbx
+    branches: [main] # main → noise-sbx (default environment)
   workflow_dispatch:
     inputs:
-      stage:
-        description: Stage to deploy
-        type: choice
-        options: [sbx, dev, uat, prod]
-        default: sbx
+      environment:
+        description: Tenant-stack to deploy (GitHub Environment, e.g. noise-sbx)
+        default: noise-sbx
 
 permissions:
   contents: read
   id-token: write # required for WIF
 
 env:
-  STAGE: ${{ github.event.inputs.stage || 'sbx' }}
   REGION: ${{ vars.GCP_REGION }}
   PROJECT: ${{ vars.DEPLOY_PROJECT }}
   AR: ${{ vars.ARTIFACT_REGISTRY }} # e.g. us-central1-docker.pkg.dev/<proj>/platform
@@ -32,6 +34,8 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Scopes vars.* to this tenant-stack's environment (push → noise-sbx).
+    environment: ${{ github.event.inputs.environment || 'noise-sbx' }}
     steps:
       - uses: actions/checkout@v4
 

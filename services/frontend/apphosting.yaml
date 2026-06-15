@@ -51,7 +51,7 @@ env:
     value: nd-agentspace-sbx.firebaseapp.com
     availability: [BUILD, RUNTIME]
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: SET_FROM_TF_OUTPUT
+    value: "1:192748761045:web:a56c925c4f60cb28ddd75c"
     availability: [BUILD, RUNTIME]
 
   # Not a hard secret, but kept in Secret Manager so it isn't committed. Create:
