@@ -16,17 +16,16 @@ future `/api/v2` is an additive change, never a rename). Mounts:
   pins, etc). UNVERSIONED — the agent runtime owns its own contract. MUST be
   mounted last so it doesn't shadow the routes above.
 
-CORS is permissive in dev (the frontend runs on localhost:3000); tighten via
-the ALLOWED_ORIGINS env var when deploying.
+No CORS: the browser only ever calls the same-origin Next.js BFF (`/gw`), which
+proxies here server-side; in prod the gateway is internal-ingress + IAM, so no
+browser reaches it directly. There is no cross-origin caller to allow.
 """
 
 from __future__ import annotations
 
-import os
-
 from fastapi import APIRouter, FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
+from api.access import router as access_router
 from api.clients import router as clients_router
 from api.dashboards import router as dashboards_router
 from api.health import router as health_router
@@ -37,22 +36,6 @@ from api.users import router as users_router
 
 app = FastAPI(title="NoiseOS Gateway", version="0.1.0")
 
-origins = [
-    o.strip()
-    for o in os.getenv(
-        "ALLOWED_ORIGINS",
-        "http://localhost,http://localhost:3000,http://frontend:3000",
-    ).split(",")
-    if o.strip()
-]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # The platform's versioned JSON API. The version lives in ONE place (this
 # parent prefix), so bumping to v2 — or mounting v1 and v2 side by side during a
 # migration window — is a single change here, not a rename across every router.
@@ -62,6 +45,7 @@ api_v1.include_router(stats_router)
 api_v1.include_router(clients_router)
 api_v1.include_router(me_router)
 api_v1.include_router(users_router)
+api_v1.include_router(access_router)
 
 # Order matters — the proxy is a catch-all and must be the LAST router added,
 # so explicit gateway-owned routes match before falling through to the agent.

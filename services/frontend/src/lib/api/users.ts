@@ -1,7 +1,7 @@
-// Admin user-management API — the gateway's /api/v1/users endpoints. Admin-only
-// server-side (require_role("admin")); the UI hides it for non-admins too.
+// Admin user-directory API — the gateway's /api/v1/users endpoints (people who
+// have signed in). Admin-only. Who is *allowed* lives in lib/api/access.ts.
 import { gatewayBase } from "./gateway";
-import { apiRequest, postJson } from "./http";
+import { apiRequest } from "./http";
 
 const base = () => `${gatewayBase()}/api/v1/users`;
 
@@ -19,13 +19,9 @@ export interface UserRecord {
 }
 
 export const usersApi = {
-  /** Every directory row. */
+  /** Every directory row (people who've signed in). */
   list: () =>
     apiRequest<{ users: UserRecord[] }>(base()).then((d) => d.users ?? []),
-
-  /** Invite (or re-activate) a user by email. */
-  invite: (email: string, role: Role) =>
-    postJson<UserRecord>(base(), { email, role }),
 
   /** Change a user's role and/or active state. */
   update: (id: string, patch: { role?: Role; is_active?: boolean }) =>

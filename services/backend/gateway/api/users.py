@@ -1,9 +1,9 @@
-"""Admin user management — the provisioning + RBAC surface (`/api/v1/users`).
+"""Admin user directory — the people who've actually signed in (`/api/v1/users`).
 
-Every route is admin-only (`require_role("admin")`). Admins invite users by
-email (a row with no uid yet — bound on first sign-in, see auth.py), set roles,
-and activate/deactivate access. This is the management side of the allowlist the
-gateway enforces in production.
+Every route is admin-only. Rows are JIT-created on first sign-in from the
+matching access rule (see api/access.py + auth.py). Admins can override a
+person's role and deactivate them here (an override/disable beats their domain
+rule). Who is *allowed* (emails + domains) lives in api/access.py.
 """
 
 from __future__ import annotations
@@ -27,21 +27,6 @@ def _validate_role(v: str | None) -> str | None:
     return v
 
 
-def _validate_email(v: str) -> str:
-    v = v.strip().lower()
-    if "@" not in v or "." not in v.split("@")[-1]:
-        raise ValueError("invalid email")
-    return v
-
-
-class InviteBody(BaseModel):
-    email: str
-    role: str = "member"
-
-    _ck_email = field_validator("email")(_validate_email)
-    _ck_role = field_validator("role")(_validate_role)
-
-
 class UpdateBody(BaseModel):
     role: str | None = None
     is_active: bool | None = None
@@ -51,30 +36,10 @@ class UpdateBody(BaseModel):
 
 @router.get("")
 async def list_users(_: CurrentUser = Depends(require_role("admin"))):
-    """Every directory row — the user-management list."""
+    """Every directory row — people who have signed in."""
     pool = await get_pool()
     rows = await pool.fetch(f"SELECT {_COLS} FROM users ORDER BY created_at")
     return {"users": [dict(r) for r in rows]}
-
-
-@router.post("", status_code=201)
-async def invite_user(
-    body: InviteBody,
-    _: CurrentUser = Depends(require_role("admin")),
-):
-    """Invite (or re-activate) a user by email. Re-inviting updates the role."""
-    pool = await get_pool()
-    row = await pool.fetchrow(
-        f"""
-        INSERT INTO users (email, role) VALUES ($1, $2)
-        ON CONFLICT (email) DO UPDATE
-          SET role = EXCLUDED.role, is_active = true, updated_at = now()
-        RETURNING {_COLS}
-        """,
-        body.email,
-        body.role,
-    )
-    return dict(row)
 
 
 @router.patch("/{user_id}")

@@ -35,12 +35,9 @@ env:
     value: https://gateway-192748761045.us-central1.run.app
     availability: [RUNTIME]
 
-  # Access control: only these email domains may start a session (comma-
-  # separated). Enforced server-side in the BFF session route. Belt-and-suspenders
-  # with an Identity Platform blocking function (see infra/README.md follow-ups).
-  - variable: ALLOWED_EMAIL_DOMAINS
-    value: noisedigital.com
-    availability: [RUNTIME]
+  # Access control is the gateway's access_rules allowlist (emails + domains,
+  # admin-managed in the DB/UI) — bootstrapped by admin_emails (cloudrun.tf). No
+  # domain env var here anymore.
 
   # Firebase web app config (client SDK, runs in the browser — legitimately
   # public). From `terraform output firebase_web_config`.

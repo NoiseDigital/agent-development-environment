@@ -27,4 +27,6 @@ FROM base AS prod
 COPY . .
 RUN uv sync --frozen
 
-CMD ["sh", "-c", "uv run uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
+# --no-sync: run the venv baked at build time; never re-resolve from PyPI at
+# startup (the container has no internet under locked-down VPC egress).
+CMD ["sh", "-c", "uv run --no-sync uvicorn main:app --host 0.0.0.0 --port ${PORT}"]

@@ -50,6 +50,16 @@ class FakePool:
         self._row_set = True
 
 
+@pytest.fixture(autouse=True)
+def _dev_auth(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Default every test to dev-auth (permissive admin), matching local dev.
+    The access-gate tests override `api.auth.DEV_AUTH = False` to exercise the
+    enforced path."""
+    import api.auth
+
+    monkeypatch.setattr(api.auth, "DEV_AUTH", True)
+
+
 @pytest.fixture
 def fake_pool() -> FakePool:
     """Override the DB pool with an in-memory fake. Each test gets a fresh
@@ -72,6 +82,7 @@ def client(
     async def _get_pool() -> FakePool:
         return fake_pool
 
+    import api.access
     import api.auth
     import api.clients
     import api.db
@@ -82,6 +93,7 @@ def client(
     monkeypatch.setattr(api.clients, "get_pool", _get_pool)
     monkeypatch.setattr(api.me, "get_pool", _get_pool)
     monkeypatch.setattr(api.users, "get_pool", _get_pool)
+    monkeypatch.setattr(api.access, "get_pool", _get_pool)
     monkeypatch.setattr(api.auth, "get_pool", _get_pool)
 
     from main import app

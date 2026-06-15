@@ -199,7 +199,10 @@ services:
       - AGENT_URL=${AGENT_URL_INTERNAL:-http://agent:8000}
       - STATS_URL=${STATS_URL_INTERNAL:-http://mcp-stats:8080}
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://user:password@postgres:5432/postgres}
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost,http://localhost:3000,http://frontend:3000}
+      # Local-only: permissive auth (every request is admin) so the stack runs
+      # without a login. Enforcement is the default everywhere this is UNSET —
+      # Cloud Run never sets it, so prod is invite-only + RBAC by default.
+      - GATEWAY_DEV_AUTH=${GATEWAY_DEV_AUTH:-1}
       - UV_LINK_MODE=copy
       # No Firebase here: identity is verified at the BFF (frontend) and forwarded
       # as X-User-* over the gateway's IAM-gated channel; the gateway trusts it.
@@ -274,10 +277,8 @@ services:
       # the docker network, not the browser's localhost. Unset in prod → the
       # Admin SDK uses ADC (the App Hosting service account).
       - FIREBASE_AUTH_EMULATOR_HOST=${FIREBASE_AUTH_EMULATOR_HOST:-firebase-emulator:9099}
-      # Access control: only these email domains may start a session (comma-
-      # separated). Empty = allow any (dev default). Set to your org domains in
-      # prod, e.g. "noisedigital.com,havas.com". Enforced in the session route.
-      - ALLOWED_EMAIL_DOMAINS=${ALLOWED_EMAIL_DOMAINS:-}
+      # Access control lives in the gateway's access_rules allowlist (DB/UI);
+      # local dev is permissive (GATEWAY_DEV_AUTH on the gateway → admin).
     depends_on:
       gateway:
         condition: service_started

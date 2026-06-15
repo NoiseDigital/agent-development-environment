@@ -229,13 +229,9 @@ resource "google_cloud_run_v2_service" "gateway" {
         name  = "STATS_URL"
         value = local.run_url["mcp-stats"]
       }
-      # Access control: enforce the invite-only allowlist + DB-resolved roles in
-      # prod (off in local dev, where every user is admin). Bootstrap admins
+      # Access control is enforced by default (the gateway only relaxes when
+      # GATEWAY_DEV_AUTH is set, which Cloud Run never does). Bootstrap admins
       # auto-provision on first sign-in so there's an admin to invite the rest.
-      env {
-        name  = "REQUIRE_PROVISIONED_USERS"
-        value = "true"
-      }
       env {
         name  = "BOOTSTRAP_ADMIN_EMAILS"
         value = join(",", var.admin_emails)
@@ -298,7 +294,8 @@ resource "google_cloud_run_v2_service_iam_member" "gateway_from_bff" {
   location = var.region
   name     = google_cloud_run_v2_service.gateway.name
   role     = "roles/run.invoker"
-  member   = "serviceAccount:${google_service_account.app_hosting.email}"
+  # App Hosting's compute SA — the identity the BFF actually runs as.
+  member = "serviceAccount:${local.app_hosting_sa}"
 }
 
 # Deep internal services (agent / mcp-stats / mcp-toolbox): reachable only from

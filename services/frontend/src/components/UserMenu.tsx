@@ -59,7 +59,7 @@ export default function UserMenu() {
               }}
               className="block w-full px-3 py-2 text-left text-[12.5px] text-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
             >
-              User management
+              Access &amp; users
             </button>
           )}
           <button
