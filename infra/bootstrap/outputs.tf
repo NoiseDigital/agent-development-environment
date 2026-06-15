@@ -1,6 +1,6 @@
-output "state_bucket" {
-  description = "GCS bucket for Terraform state. Reference it in each env's backend.tf."
-  value       = google_storage_bucket.tfstate.name
+output "state_buckets" {
+  description = "Per-project Terraform state buckets (<project>-tfstate). Each env's backend references its own."
+  value       = { for k, b in google_storage_bucket.tfstate : k => b.name }
 }
 
 output "artifact_registry" {

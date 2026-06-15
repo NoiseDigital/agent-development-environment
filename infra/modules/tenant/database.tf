@@ -10,7 +10,7 @@ resource "random_password" "db" {
 
 resource "google_sql_database_instance" "postgres" {
   project          = local.project_id
-  name             = "${local.name_prefix}-pg"
+  name             = "platform-db"
   region           = var.region
   database_version = var.db_version
 
@@ -18,7 +18,10 @@ resource "google_sql_database_instance" "postgres" {
   deletion_protection = local.is_protected
 
   settings {
-    tier              = var.db_tier
+    tier = var.db_tier
+    # ENTERPRISE supports shared-core tiers (db-f1-micro); the project otherwise
+    # defaults to ENTERPRISE_PLUS, which rejects them.
+    edition           = "ENTERPRISE"
     availability_type = local.is_protected ? "REGIONAL" : "ZONAL"
 
     ip_configuration {
@@ -37,7 +40,7 @@ resource "google_sql_database_instance" "postgres" {
 
 resource "google_sql_database" "app" {
   project  = local.project_id
-  name     = "postgres"
+  name     = "platform"
   instance = google_sql_database_instance.postgres.name
 }
 

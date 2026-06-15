@@ -80,7 +80,7 @@ resource "google_identity_platform_default_supported_idp_config" "google" {
 # secret referenced in apphosting.yaml.
 resource "google_service_account" "app_hosting" {
   project      = local.project_id
-  account_id   = "${var.stage}-apphosting"
+  account_id   = "apphosting"
   display_name = "Firebase App Hosting (${local.name_prefix})"
 }
 
@@ -100,7 +100,7 @@ resource "google_firebase_app_hosting_backend" "frontend" {
 
   project          = local.project_id
   location         = var.region
-  backend_id       = "${var.stage}-frontend"
+  backend_id       = "frontend"
   app_id           = google_firebase_web_app.this.app_id
   serving_locality = "GLOBAL_ACCESS"
   service_account  = google_service_account.app_hosting.email

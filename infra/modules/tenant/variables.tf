@@ -46,7 +46,7 @@ variable "db_tier" {
 variable "db_version" {
   type        = string
   description = "Cloud SQL Postgres version."
-  default     = "POSTGRES_16"
+  default     = "POSTGRES_18"
 }
 
 # ── Container images ────────────────────────────────────────────────────────

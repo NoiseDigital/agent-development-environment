@@ -30,9 +30,14 @@ resource "google_project_service" "bootstrap" {
   disable_on_destroy = false
 }
 
-# ── Terraform state bucket ──────────────────────────────────────────────────
+# ── Terraform state buckets — one per tenant-stage project ──────────────────
+# Named "<project>-tfstate" so each tenant-stage keeps fully isolated, globally
+# unique state (a prod apply can never touch sbx state). Add a project to
+# target_projects and it gets its own bucket. Centralised in the automation
+# project, off the tenant projects' blast radius.
 resource "google_storage_bucket" "tfstate" {
-  name                        = var.state_bucket_name
+  for_each                    = toset(var.target_projects)
+  name                        = "${each.value}-tfstate"
   project                     = var.project_id
   location                    = var.region
   uniform_bucket_level_access = true

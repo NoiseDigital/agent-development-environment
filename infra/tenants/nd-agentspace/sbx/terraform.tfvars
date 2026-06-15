@@ -1,5 +1,6 @@
 # nd-agentspace / sbx. Most values come from variable defaults; set the few here.
 github_owner = "NoiseDigital"
+github_repo  = "agent-platform"
 
 # Flip on once the Developer Connect GitHub link exists (see infra/README.md):
 #   enable_app_hosting     = true

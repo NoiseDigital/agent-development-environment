@@ -16,10 +16,11 @@ terraform {
     }
   }
 
-  # Per-(tenant,stage) state isolation: a prod apply can never touch sbx state.
-  # Bucket comes from infra/bootstrap (var.state_bucket_name).
+  # Per-(tenant,stage) state isolation: this stage's own bucket (created by
+  # infra/bootstrap as "<project>-tfstate"), so a prod apply can never touch
+  # sbx state.
   backend "gcs" {
-    bucket = "nd-agentspace-tfstate"
+    bucket = "nd-agentspace-sbx-tfstate"
     prefix = "tenants/nd-agentspace/sbx"
   }
 }

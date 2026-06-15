@@ -11,13 +11,8 @@ variable "project_id" {
 
 variable "region" {
   type        = string
-  description = "Region for the Artifact Registry repo and state bucket."
+  description = "Region for the Artifact Registry repo and state buckets."
   default     = "us-central1"
-}
-
-variable "state_bucket_name" {
-  type        = string
-  description = "Globally-unique name for the GCS bucket holding Terraform state for all envs."
 }
 
 variable "artifact_repo_id" {

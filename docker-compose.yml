@@ -297,7 +297,7 @@ services:
       start_period: 30s
 
   postgres:
-    image: public.ecr.aws/docker/library/postgres:16
+    image: public.ecr.aws/docker/library/postgres:18
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-user}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
@@ -306,7 +306,9 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ./services/backend/database/init:/docker-entrypoint-initdb.d:ro
-      - postgres_data:/var/lib/postgresql/data
+      # Postgres 18+ stores data under /var/lib/postgresql/<major>/ and rejects a
+      # mount at /var/lib/postgresql/data — mount the parent. (docker-library/postgres#1259)
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-postgres}"]
       interval: 5s

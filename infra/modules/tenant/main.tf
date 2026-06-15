@@ -27,7 +27,6 @@ resource "google_project_service" "services" {
     "artifactregistry.googleapis.com",
     "compute.googleapis.com",
     "servicenetworking.googleapis.com",
-    "vpcaccess.googleapis.com",
     "aiplatform.googleapis.com",
     "bigquery.googleapis.com",
     "firebase.googleapis.com",

@@ -29,10 +29,12 @@ The browser reaches **only** the Next.js frontend (App Hosting). Its `/gw` proxy
 forwards to the gateway server-side. Nothing in the backend is public:
 
 - **gateway** — `INGRESS_TRAFFIC_INTERNAL_ONLY`; `run.invoker` granted only to
-  the **App Hosting service account** (the BFF reaches it over a VPC connector,
+  the **App Hosting service account** (the BFF reaches it via Direct VPC egress,
   authenticating with a Cloud Run IAM ID token).
-- **agent / mcp-stats** — `INGRESS_TRAFFIC_INTERNAL_ONLY`; `run.invoker` granted
-  only to the gateway SA (and, for stats, the agent SA).
+- **agent / mcp-stats / mcp-toolbox** — `INGRESS_TRAFFIC_INTERNAL_ONLY`; invoker
+  is `allUsers`, so the network is the boundary. This is a single-tenant project
+  (only this tenant's own services are in the VPC), so internal ingress alone is
+  sufficient; tighten to per-SA IAM if tenants are ever co-located.
 
 No CORS anywhere (same-origin BFF). See `modules/tenant/cloudrun.tf` and
 `services/frontend/src/app/gw/[...path]/route.ts`.
@@ -45,12 +47,12 @@ Run by someone with project IAM admin, using their own credentials.
 
 ```bash
 cd infra/bootstrap
-cp terraform.tfvars.example terraform.tfvars   # fill project, bucket, github_*, target_projects
-terraform init        # local state — it's creating the state bucket
+cp terraform.tfvars.example terraform.tfvars   # fill project, github_*, target_projects
+terraform init        # local state — it's creating the state buckets
 terraform apply
 ```
 
-Note the outputs (`state_bucket`, `artifact_registry`, `ci_deployer_sa_email`,
+Note the outputs (`state_buckets`, `artifact_registry`, `ci_deployer_sa_email`,
 `workload_identity_provider`) — they feed the env backends and the GitHub repo
 variables below.
 

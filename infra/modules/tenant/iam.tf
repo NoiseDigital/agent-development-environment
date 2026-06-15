@@ -6,25 +6,25 @@
 
 resource "google_service_account" "gateway" {
   project      = local.project_id
-  account_id   = "${var.stage}-gateway"
+  account_id   = "gateway"
   display_name = "Gateway runtime (${local.name_prefix})"
 }
 
 resource "google_service_account" "agent" {
   project      = local.project_id
-  account_id   = "${var.stage}-agent"
+  account_id   = "agents"
   display_name = "Agent runtime (${local.name_prefix})"
 }
 
 resource "google_service_account" "mcp_stats" {
   project      = local.project_id
-  account_id   = "${var.stage}-mcp-stats"
+  account_id   = "mcp-stats"
   display_name = "MCP stats runtime (${local.name_prefix})"
 }
 
 resource "google_service_account" "toolbox" {
   project      = local.project_id
-  account_id   = "${var.stage}-mcp-toolbox"
+  account_id   = "mcp-toolbox"
   display_name = "MCP toolbox runtime (${local.name_prefix})"
 }
 

@@ -24,19 +24,19 @@ gateway over the VPC. Nothing in the backend is public.
 - The GCP project `nd-agentspace-sbx` exists with **billing enabled**, and you
   have Project IAM Admin (+ rights to create service accounts and WIF pools).
 - `gcloud auth application-default login` as that account.
-- A **globally-unique** name for the Terraform state bucket.
+- (state buckets are auto-named `<project>-tfstate` — nothing to choose).
 
 ## 1. Bootstrap (one-time foundation)
 
-Creates the TF state bucket, Artifact Registry, the Workload Identity pool, and
-the CI deployer service account.
+Creates the per-tenant TF state buckets, Artifact Registry, the Workload
+Identity pool, and the CI deployer service account.
 
 ```bash
 cd infra/bootstrap
-# edit terraform.tfvars: set state_bucket_name (unique) and github_owner
-terraform init      # local state — it's creating the state bucket
+# edit terraform.tfvars: set github_owner (state buckets auto-named <project>-tfstate)
+terraform init      # local state — it's creating the state buckets
 terraform apply
-terraform output    # note: state_bucket, artifact_registry, ci_deployer_sa_email, workload_identity_provider
+terraform output    # note: state_buckets, artifact_registry, ci_deployer_sa_email, workload_identity_provider
 ```
 
 Then set these **GitHub repo variables** (Settings → Secrets and variables →
@@ -102,7 +102,7 @@ Link a GA4 property in the Firebase console; `measurementId` then flows through
 From `terraform output firebase_web_config` and `gateway_url`, fill the real
 values in [services/frontend/apphosting.yaml](services/frontend/apphosting.yaml):
 `NEXT_PUBLIC_FIREBASE_*`, `GATEWAY_URL` + `GATEWAY_AUDIENCE` (the gateway's
-internal URL), the VPC connector path, and `ALLOWED_EMAIL_DOMAINS`.
+internal URL), the VPC network/subnetwork, and `ALLOWED_EMAIL_DOMAINS`.
 
 Create the web API key secret:
 
@@ -138,7 +138,7 @@ deploy — check them first:
 
 1. **Service-to-service networking.** Backend services are internal-ingress;
    callers use `ALL_TRAFFIC` VPC egress so calls to a sibling's `*.run.app` route
-   through the connector and count as internal. If gateway→agent or agent→toolbox
+   through the VPC (Direct VPC egress) and count as internal. If gateway→agent or agent→toolbox
    calls fail, this is the place to look.
 2. **Deterministic Cloud Run URLs.** Env vars use
    `https://<name>-<projectNumber>.<region>.run.app` (to avoid a Terraform cycle).

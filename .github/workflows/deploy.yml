@@ -52,11 +52,11 @@ jobs:
           set -euo pipefail
           SHA=${GITHUB_SHA::12}
           docker build --target prod -t "$AR/gateway:$SHA"     services/backend/gateway
-          docker build --target prod -t "$AR/agent:$SHA"       services/backend/agents
+          docker build --target prod -t "$AR/agents:$SHA"       services/backend/agents
           docker build               -t "$AR/mcp-stats:$SHA"   services/backend/mcp/stats
           docker build               -t "$AR/mcp-toolbox:$SHA" services/backend/mcp/images/toolbox
           docker push "$AR/gateway:$SHA"
-          docker push "$AR/agent:$SHA"
+          docker push "$AR/agents:$SHA"
           docker push "$AR/mcp-stats:$SHA"
           docker push "$AR/mcp-toolbox:$SHA"
           echo "SHA=$SHA" >> "$GITHUB_ENV"
@@ -65,20 +65,20 @@ jobs:
       - name: Run DB migrations (one-shot job)
         run: |
           set -euo pipefail
-          gcloud run jobs update "${STAGE}-migrate" \
+          gcloud run jobs update "migrate" \
             --image "$AR/gateway:$SHA" --region "$REGION" --project "$PROJECT"
-          gcloud run jobs execute "${STAGE}-migrate" \
+          gcloud run jobs execute "migrate" \
             --region "$REGION" --project "$PROJECT" --wait
 
       # ── Roll the services (private ones first, gateway last) ────────────────
       - name: Deploy Cloud Run services
         run: |
           set -euo pipefail
-          gcloud run deploy "${STAGE}-mcp-toolbox" \
+          gcloud run deploy "mcp-toolbox" \
             --image "$AR/mcp-toolbox:$SHA" --region "$REGION" --project "$PROJECT"
-          gcloud run deploy "${STAGE}-agent" \
-            --image "$AR/agent:$SHA" --region "$REGION" --project "$PROJECT"
-          gcloud run deploy "${STAGE}-mcp-stats" \
+          gcloud run deploy "agents" \
+            --image "$AR/agents:$SHA" --region "$REGION" --project "$PROJECT"
+          gcloud run deploy "mcp-stats" \
             --image "$AR/mcp-stats:$SHA" --region "$REGION" --project "$PROJECT"
-          gcloud run deploy "${STAGE}-gateway" \
+          gcloud run deploy "gateway" \
             --image "$AR/gateway:$SHA" --region "$REGION" --project "$PROJECT"

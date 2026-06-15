@@ -8,12 +8,12 @@ terraform {
     }
   }
 
-  # Bootstrap creates the state bucket it would otherwise live in, so it runs on
-  # LOCAL state for the first apply. To move state into the bucket afterwards,
+  # Bootstrap creates the state buckets it would otherwise live in, so it runs on
+  # LOCAL state for the first apply. To move state into a bucket afterwards,
   # uncomment this block and run `terraform init -migrate-state`.
   #
   # backend "gcs" {
-  #   bucket = "nd-agentspace-tfstate"   # = var.state_bucket_name
+  #   bucket = "nd-agentspace-sbx-tfstate"   # one of the buckets it created
   #   prefix = "bootstrap"
   # }
 }

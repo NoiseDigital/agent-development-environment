@@ -9,10 +9,12 @@
 #
 # Nothing here is public — every service is internal-ingress (off the internet).
 # The gateway additionally requires IAM (only the BFF SA can invoke it; the BFF
-# mints the ID token). The deeper services (agent/stats/toolbox) use the network
-# boundary alone (allUsers invoker) so the existing service-to-service calls work
-# without threading ID tokens through every client. Hardening those to full IAM
-# is a follow-up (would add ID-token minting to the gateway/agent HTTP clients).
+# mints the ID token). The deeper services (agent/stats/toolbox) rely on the
+# network boundary alone (allUsers invoker): this is a SINGLE-TENANT project, so
+# the only thing inside the VPC that can reach them is this tenant's own
+# services — internal ingress is a sound boundary here. (If a future shared
+# project ever co-located tenants, tighten to per-SA IAM with ID tokens minted in
+# the gateway/agent HTTP clients.)
 #
 # Images: seeded with a placeholder; CI rolls real revisions. `ignore_changes`
 # on the image keeps `terraform apply` from reverting CI deploys.
@@ -23,37 +25,37 @@ data "google_project" "this" {
 }
 
 locals {
-  vpc_access = {
-    connector = google_vpc_access_connector.connector.id
-    # ALL_TRAFFIC (not PRIVATE_RANGES_ONLY): calls to a sibling's *.run.app go to
-    # a public IP, so they must route through the connector to be recognised as
-    # internal — otherwise internal-ingress blocks them. Also covers the private
-    # Cloud SQL IP.
-    egress = "ALL_TRAFFIC"
-  }
   db_secret = google_secret_manager_secret.database_url.secret_id
 
   # Deterministic Cloud Run v2 URLs. Used in env vars so services can address
   # each other WITHOUT a Terraform dependency cycle (agent↔mcp-stats reference
   # each other). This is the canonical v2 URL form and equals each service `.uri`.
   run_url = {
-    for svc in ["gateway", "agent", "mcp-stats", "mcp-toolbox"] :
-    svc => "https://${var.stage}-${svc}-${data.google_project.this.number}.${var.region}.run.app"
+    for svc in ["gateway", "agents", "mcp-stats", "mcp-toolbox"] :
+    svc => "https://${svc}-${data.google_project.this.number}.${var.region}.run.app"
   }
 }
 
 # ── Agent (private) ─────────────────────────────────────────────────────────
 resource "google_cloud_run_v2_service" "agent" {
-  project  = local.project_id
-  name     = "${var.stage}-agent"
-  location = var.region
-  ingress  = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  project             = local.project_id
+  name                = "agents"
+  location            = var.region
+  ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  deletion_protection = local.is_protected
 
   template {
     service_account = google_service_account.agent.email
     vpc_access {
-      connector = local.vpc_access.connector
-      egress    = local.vpc_access.egress
+      # Direct VPC egress (no Serverless connector) — the GCP-recommended default:
+      # simpler, cheaper, faster. ALL_TRAFFIC so calls to a sibling's *.run.app
+      # route through the VPC and count as internal, and to reach the private
+      # Cloud SQL IP.
+      network_interfaces {
+        network    = google_compute_network.vpc.name
+        subnetwork = google_compute_subnetwork.subnet.name
+      }
+      egress = "ALL_TRAFFIC"
     }
     containers {
       image = var.placeholder_image
@@ -103,28 +105,36 @@ resource "google_cloud_run_v2_service" "agent" {
   lifecycle {
     ignore_changes = [template[0].containers[0].image, client, client_version]
   }
-  depends_on = [google_project_service.services]
+  depends_on = [google_project_service.services, google_secret_manager_secret_version.database_url]
 }
 
 # ── MCP stats (private) ─────────────────────────────────────────────────────
 resource "google_cloud_run_v2_service" "mcp_stats" {
-  project  = local.project_id
-  name     = "${var.stage}-mcp-stats"
-  location = var.region
-  ingress  = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  project             = local.project_id
+  name                = "mcp-stats"
+  location            = var.region
+  ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  deletion_protection = local.is_protected
 
   template {
     service_account = google_service_account.mcp_stats.email
     vpc_access {
-      connector = local.vpc_access.connector
-      egress    = local.vpc_access.egress
+      # Direct VPC egress (no Serverless connector) — the GCP-recommended default:
+      # simpler, cheaper, faster. ALL_TRAFFIC so calls to a sibling's *.run.app
+      # route through the VPC and count as internal, and to reach the private
+      # Cloud SQL IP.
+      network_interfaces {
+        network    = google_compute_network.vpc.name
+        subnetwork = google_compute_subnetwork.subnet.name
+      }
+      egress = "ALL_TRAFFIC"
     }
     containers {
       image = var.placeholder_image
       ports { container_port = 8080 }
       env {
         name  = "AGENT_URL"
-        value = local.run_url["agent"]
+        value = local.run_url["agents"]
       }
       env {
         name  = "STORAGE_BACKEND"
@@ -140,7 +150,7 @@ resource "google_cloud_run_v2_service" "mcp_stats" {
   lifecycle {
     ignore_changes = [template[0].containers[0].image, client, client_version]
   }
-  depends_on = [google_project_service.services]
+  depends_on = [google_project_service.services, google_secret_manager_secret_version.database_url]
 }
 
 # ── MCP toolbox (private) ───────────────────────────────────────────────────
@@ -148,10 +158,11 @@ resource "google_cloud_run_v2_service" "mcp_stats" {
 # (the upstream toolbox image with tools.yaml baked in). Seeded with the
 # placeholder; CI rolls the real image.
 resource "google_cloud_run_v2_service" "mcp_toolbox" {
-  project  = local.project_id
-  name     = "${var.stage}-mcp-toolbox"
-  location = var.region
-  ingress  = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  project             = local.project_id
+  name                = "mcp-toolbox"
+  location            = var.region
+  ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  deletion_protection = local.is_protected
 
   template {
     service_account = google_service_account.toolbox.email
@@ -170,24 +181,32 @@ resource "google_cloud_run_v2_service" "mcp_toolbox" {
   lifecycle {
     ignore_changes = [template[0].containers[0].image, client, client_version]
   }
-  depends_on = [google_project_service.services]
+  depends_on = [google_project_service.services, google_secret_manager_secret_version.database_url]
 }
 
 # ── Gateway (public entry point) ────────────────────────────────────────────
 resource "google_cloud_run_v2_service" "gateway" {
   project  = local.project_id
-  name     = "${var.stage}-gateway"
+  name     = "gateway"
   location = var.region
   # Internal ingress only — the browser never reaches the gateway. The Next.js
-  # BFF (App Hosting, over its VPC connector) is the sole caller; auth is also
+  # BFF (App Hosting, via Direct VPC egress) is the sole caller; auth is also
   # enforced in app. This is the BFF posture (no public gateway, no CORS).
-  ingress = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  deletion_protection = local.is_protected
 
   template {
     service_account = google_service_account.gateway.email
     vpc_access {
-      connector = local.vpc_access.connector
-      egress    = local.vpc_access.egress
+      # Direct VPC egress (no Serverless connector) — the GCP-recommended default:
+      # simpler, cheaper, faster. ALL_TRAFFIC so calls to a sibling's *.run.app
+      # route through the VPC and count as internal, and to reach the private
+      # Cloud SQL IP.
+      network_interfaces {
+        network    = google_compute_network.vpc.name
+        subnetwork = google_compute_subnetwork.subnet.name
+      }
+      egress = "ALL_TRAFFIC"
     }
     containers {
       image = var.placeholder_image
@@ -204,7 +223,7 @@ resource "google_cloud_run_v2_service" "gateway" {
       }
       env {
         name  = "AGENT_URL"
-        value = local.run_url["agent"]
+        value = local.run_url["agents"]
       }
       env {
         name  = "STATS_URL"
@@ -218,21 +237,25 @@ resource "google_cloud_run_v2_service" "gateway" {
   lifecycle {
     ignore_changes = [template[0].containers[0].image, client, client_version]
   }
-  depends_on = [google_project_service.services]
+  depends_on = [google_project_service.services, google_secret_manager_secret_version.database_url]
 }
 
 # ── migrate job — `alembic upgrade head`, run by CI before each deploy ───────
 resource "google_cloud_run_v2_job" "migrate" {
-  project  = local.project_id
-  name     = "${var.stage}-migrate"
-  location = var.region
+  project             = local.project_id
+  name                = "migrate"
+  deletion_protection = local.is_protected
+  location            = var.region
 
   template {
     template {
       service_account = google_service_account.gateway.email
       vpc_access {
-        connector = local.vpc_access.connector
-        egress    = local.vpc_access.egress
+        network_interfaces {
+          network    = google_compute_network.vpc.name
+          subnetwork = google_compute_subnetwork.subnet.name
+        }
+        egress = "ALL_TRAFFIC"
       }
       containers {
         image   = var.placeholder_image
@@ -253,7 +276,7 @@ resource "google_cloud_run_v2_job" "migrate" {
   lifecycle {
     ignore_changes = [template[0].template[0].containers[0].image, client, client_version]
   }
-  depends_on = [google_project_service.services]
+  depends_on = [google_project_service.services, google_secret_manager_secret_version.database_url]
 }
 
 # ── Invoker boundary: who may call each service ─────────────────────────────
