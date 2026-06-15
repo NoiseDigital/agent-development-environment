@@ -47,15 +47,6 @@ api_v1.include_router(me_router)
 api_v1.include_router(users_router)
 api_v1.include_router(access_router)
 
-# The platform's versioned JSON API. The version lives in ONE place (this
-# parent prefix), so bumping to v2 — or mounting v1 and v2 side by side during a
-# migration window — is a single change here, not a rename across every router.
-api_v1 = APIRouter(prefix="/api/v1")
-api_v1.include_router(dashboards_router)
-api_v1.include_router(stats_router)
-api_v1.include_router(clients_router)
-api_v1.include_router(me_router)
-
 # Order matters — the proxy is a catch-all and must be the LAST router added,
 # so explicit gateway-owned routes match before falling through to the agent.
 # `/healthz` and the agent passthrough are deliberately UNVERSIONED.
