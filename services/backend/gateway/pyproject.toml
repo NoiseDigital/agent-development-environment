@@ -15,7 +15,7 @@ dependencies = [
     # Schema migrations for every platform-owned Postgres table. ADK manages
     # its own tables and ships its own migrations; we never touch those.
     "alembic>=1.13.0",
-    "psycopg[binary]>=3.2.0",
+    "psycopg[binary]>=3.3.4",
     # Async driver for the platform's own runtime DB access (clients,
     # user_dashboards, share_links). Sync psycopg above is Alembic-only.
     "asyncpg>=0.30.0",
