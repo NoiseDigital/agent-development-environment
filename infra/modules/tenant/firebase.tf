@@ -46,11 +46,18 @@ resource "google_identity_platform_config" "auth" {
     }
   }
 
-  authorized_domains = [
-    "localhost",
-    "${local.project_id}.firebaseapp.com",
-    "${local.project_id}.web.app",
-  ]
+  # Default Firebase domains + (when App Hosting is on) the live frontend domain,
+  # pulled straight from the backend so login works on the deployed URL with no
+  # manual "add authorized domain" step in the console.
+  authorized_domains = concat(
+    [
+      "localhost",
+      "${local.project_id}.firebaseapp.com",
+      "${local.project_id}.web.app",
+    ],
+    var.enable_app_hosting && var.developer_connect_repo != "" ?
+    [trimprefix(google_firebase_app_hosting_backend.frontend[0].uri, "https://")] : []
+  )
 
   depends_on = [google_firebase_project.this]
 }
@@ -111,4 +118,21 @@ resource "google_firebase_app_hosting_backend" "frontend" {
   }
 
   depends_on = [google_firebase_project.this]
+}
+
+# Live branch + automatic rollouts. Setting this in TF means App Hosting builds
+# services/frontend and rolls a new revision on every push to app_hosting_branch
+# — no "set live branch / trigger first rollout" step in the console.
+resource "google_firebase_app_hosting_traffic" "frontend" {
+  count    = var.enable_app_hosting && var.developer_connect_repo != "" ? 1 : 0
+  provider = google-beta
+
+  project  = local.project_id
+  location = var.region
+  backend  = google_firebase_app_hosting_backend.frontend[0].backend_id
+
+  rollout_policy {
+    codebase_branch = var.app_hosting_branch
+    disabled        = false
+  }
 }

@@ -2,11 +2,10 @@
 github_owner = "NoiseDigital"
 github_repo  = "agent-platform"
 
-# Flip on once the Developer Connect GitHub link exists (see infra/README.md):
-#   enable_app_hosting     = true
-#   developer_connect_repo = "projects/<p>/locations/<r>/connections/<c>/gitRepositoryLinks/<link>"
-enable_app_hosting     = false
-developer_connect_repo = ""
+# App Hosting frontend (git-connected). Developer Connect link created in
+# us-central1 against NoiseDigital/agent-platform.
+enable_app_hosting     = true
+developer_connect_repo = "projects/nd-agentspace-sbx/locations/us-central1/connections/agent-platform/gitRepositoryLinks/NoiseDigital-agent-platform"
 
 # Google Workspace SSO — set after creating an OAuth Web client (consent screen
 # → Internal). Leaving these empty keeps Google sign-in disabled (email/password

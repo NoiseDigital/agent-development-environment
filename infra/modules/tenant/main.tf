@@ -33,6 +33,8 @@ resource "google_project_service" "services" {
     "identitytoolkit.googleapis.com",
     "firebasehosting.googleapis.com",
     "firebaseapphosting.googleapis.com",
+    "developerconnect.googleapis.com", # App Hosting git connection (frontend deploy)
+    "cloudbuild.googleapis.com",       # App Hosting builds the frontend via Cloud Build
     "iam.googleapis.com",
   ])
   project            = local.project_id
