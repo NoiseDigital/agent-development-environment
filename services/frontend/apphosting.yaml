@@ -51,9 +51,10 @@ env:
     value: "1:192748761045:web:a56c925c4f60cb28ddd75c"
     availability: [BUILD, RUNTIME]
 
-  # Not a hard secret, but kept in Secret Manager so it isn't committed. Create:
-  #   gcloud secrets create firebase-web-api-key --data-file=- (paste the key)
-  # then grant the App Hosting service account secretAccessor.
+  # Kept in Secret Manager (no keys in the repo — our policy). The 3 IAM grants
+  # App Hosting needs (compute-SA accessor + viewer, service-agent versionManager)
+  # are provisioned in Terraform — see infra/modules/tenant/secrets.tf. That's
+  # exactly what `firebase apphosting:secrets:grantaccess` sets, as code.
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
     secret: firebase-web-api-key
     availability: [BUILD, RUNTIME]
