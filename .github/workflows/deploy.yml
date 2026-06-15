@@ -37,7 +37,7 @@ jobs:
     # Scopes vars.* to this tenant-stack's environment (push → noise-sbx).
     environment: ${{ github.event.inputs.environment || 'noise-sbx' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # Only build/deploy services whose source changed since the previous commit
       # (a manual workflow_dispatch forces a full deploy — see the `force` exprs).
