@@ -266,7 +266,7 @@ resource "google_cloud_run_v2_job" "migrate" {
       }
       containers {
         image   = var.placeholder_image
-        command = ["uv", "run", "alembic", "upgrade", "head"]
+        command = ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
         env {
           name = "DATABASE_URL"
           value_source {

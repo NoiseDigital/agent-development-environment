@@ -18,6 +18,14 @@ resource "google_compute_subnetwork" "subnet" {
   region        = var.region
   network       = google_compute_network.vpc.id
   ip_cidr_range = "10.20.0.0/24"
+
+  # Cloud Run uses Direct VPC egress with ALL_TRAFFIC (so sibling *.run.app calls
+  # route through the VPC as internal). With no Cloud NAT, this lets the services
+  # still reach Google APIs (Vertex AI, BigQuery, Secret Manager, Artifact
+  # Registry) over private.googleapis.com — without exposing them to the public
+  # internet. External (non-Google) calls would need a Cloud NAT (add when an
+  # integration requires it).
+  private_ip_google_access = true
 }
 
 # Reserved range Google's managed services (Cloud SQL) peer into.
