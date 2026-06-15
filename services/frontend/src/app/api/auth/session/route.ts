@@ -22,22 +22,27 @@ export async function POST(req: NextRequest) {
   try {
     const decoded = await adminAuth.verifyIdToken(idToken);
 
-    // Access gate (invite/permit model): only allowed email domains may start a
-    // session. Empty list = allow any (dev). This rejects e.g. a random Google
-    // account whose domain isn't ours, even though Firebase authenticated it.
-    const allowedDomains = (process.env.ALLOWED_EMAIL_DOMAINS ?? "")
-      .split(",")
-      .map((d) => d.trim().toLowerCase())
-      .filter(Boolean);
-    const email = (decoded.email ?? "").toLowerCase();
-    const domain = email.includes("@") ? email.split("@")[1] : "";
-    if (allowedDomains.length > 0 && !allowedDomains.includes(domain)) {
+    // Local dev runs against the Auth emulator, which doesn't reliably set
+    // email_verified (and there's no real inbox) — skip the verification gate
+    // there so "Continue with Google" works. The gateway makes every local user
+    // admin (GATEWAY_DEV_AUTH). Prod has no emulator host, so the gate applies.
+    const isEmulator = !!process.env.FIREBASE_AUTH_EMULATOR_HOST;
+
+    // The email must be verified. Otherwise an email/password sign-up could
+    // claim any address in our domain — including an admin's — without owning
+    // the inbox, and bind to that user's invite/role. Workspace SSO emails are
+    // always verified; this only gates unverified email/password accounts.
+    if (!isEmulator && decoded.email && decoded.email_verified !== true) {
       return NextResponse.json(
-        { error: "This account isn't permitted to access NoiseOS." },
+        { error: "Please verify your email address before signing in." },
         { status: 403 },
       );
     }
 
+    // Authorization is NOT decided here — it lives in the gateway's access_rules
+    // allowlist (emails + domains, admin-managed). We mint a session for any
+    // authenticated, verified user; the gateway returns 403 from /me if they're
+    // not provisioned, and the app shows an "access denied" state + signs out.
     const sessionCookie = await adminAuth.createSessionCookie(idToken, {
       expiresIn: SESSION_MAX_AGE_MS,
     });

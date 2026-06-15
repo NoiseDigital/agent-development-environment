@@ -42,6 +42,8 @@ module "tenant" {
   google_oauth_client_id     = var.google_oauth_client_id
   google_oauth_client_secret = var.google_oauth_client_secret
 
+  admin_emails = var.admin_emails
+
   # sbx is a sandbox — keep it cheap.
   db_tier = "db-f1-micro"
 }

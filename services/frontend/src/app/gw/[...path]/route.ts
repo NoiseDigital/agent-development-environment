@@ -75,7 +75,9 @@ async function handle(
       const decoded = await adminAuth.verifySessionCookie(session, true);
       headers.set("x-user-id", decoded.uid);
       if (decoded.email) headers.set("x-user-email", decoded.email);
-      headers.set("x-user-role", (decoded.role as string) || "member");
+      // Role is resolved from the users table in the gateway (DB-authoritative);
+      // we forward identity only. x-user-role stays in the strip list above so a
+      // client can never inject one.
     } catch {
       // Invalid/expired session — forward without identity; the gateway gates
       // protected routes (require_role) and returns 401 there.

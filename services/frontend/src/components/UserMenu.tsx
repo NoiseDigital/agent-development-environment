@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/firebase/auth-context";
 
 export default function UserMenu() {
-  const { user, signOut } = useAuth();
+  const { user, isAdmin, signOut } = useAuth();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -50,6 +50,18 @@ export default function UserMenu() {
           >
             Account settings
           </button>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                router.push("/settings/users");
+              }}
+              className="block w-full px-3 py-2 text-left text-[12.5px] text-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
+            >
+              Access &amp; users
+            </button>
+          )}
           <button
             type="button"
             onClick={() => signOut()}

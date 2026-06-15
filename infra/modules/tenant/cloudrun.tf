@@ -229,6 +229,13 @@ resource "google_cloud_run_v2_service" "gateway" {
         name  = "STATS_URL"
         value = local.run_url["mcp-stats"]
       }
+      # Access control is enforced by default (the gateway only relaxes when
+      # GATEWAY_DEV_AUTH is set, which Cloud Run never does). Bootstrap admins
+      # auto-provision on first sign-in so there's an admin to invite the rest.
+      env {
+        name  = "BOOTSTRAP_ADMIN_EMAILS"
+        value = join(",", var.admin_emails)
+      }
       # No Firebase here (the BFF verifies identity and forwards X-User-*), and
       # no ALLOWED_ORIGINS / CORS — the only caller is the same-origin BFF.
     }
@@ -259,7 +266,7 @@ resource "google_cloud_run_v2_job" "migrate" {
       }
       containers {
         image   = var.placeholder_image
-        command = ["uv", "run", "alembic", "upgrade", "head"]
+        command = ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
         env {
           name = "DATABASE_URL"
           value_source {
@@ -287,7 +294,8 @@ resource "google_cloud_run_v2_service_iam_member" "gateway_from_bff" {
   location = var.region
   name     = google_cloud_run_v2_service.gateway.name
   role     = "roles/run.invoker"
-  member   = "serviceAccount:${google_service_account.app_hosting.email}"
+  # App Hosting's compute SA — the identity the BFF actually runs as.
+  member = "serviceAccount:${local.app_hosting_sa}"
 }
 
 # Deep internal services (agent / mcp-stats / mcp-toolbox): reachable only from

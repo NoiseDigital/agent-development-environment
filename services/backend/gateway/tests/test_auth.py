@@ -22,19 +22,18 @@ async def _resolve(
     *,
     x_user_id=None,
     x_user_email=None,
-    x_user_role=None,
     x_dev_user=None,
 ) -> CurrentUser:
     return await current_user(
         x_user_id=x_user_id,
         x_user_email=x_user_email,
-        x_user_role=x_user_role,
         x_dev_user=x_dev_user,
     )
 
 
 @pytest.mark.asyncio
 async def test_default_user_when_no_identity() -> None:
+    # Gate off (REQUIRE_PROVISIONED_USERS unset) → local dev user is admin.
     user = await _resolve()
     assert user.uid == DEV_UID
     assert user.role == "admin"
@@ -42,12 +41,12 @@ async def test_default_user_when_no_identity() -> None:
 
 @pytest.mark.asyncio
 async def test_forwarded_identity_is_used() -> None:
-    user = await _resolve(
-        x_user_id="alice", x_user_email="alice@noisedigital.com", x_user_role="member"
-    )
+    # Identity (uid/email) comes from the BFF headers; role is no longer trusted
+    # from a header — in dev (gate off) it's admin, in prod it's DB-resolved.
+    user = await _resolve(x_user_id="alice", x_user_email="alice@noisedigital.com")
     assert user.uid == "alice"
     assert user.email == "alice@noisedigital.com"
-    assert user.role == "member"
+    assert user.role == "admin"
 
 
 @pytest.mark.asyncio

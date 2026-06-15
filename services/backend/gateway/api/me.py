@@ -1,8 +1,10 @@
-"""GET /api/v1/me — the current user, upserting the directory row on read.
+"""GET /api/v1/me — the current user (identity + role).
 
-The frontend calls this after sign-in to register the user in the `users`
-directory (the RBAC / user-management source of truth) and to read its role.
-Identity comes from `current_user` (the BFF-forwarded, verified Firebase user).
+The frontend calls this after sign-in to read its role and confirm access.
+`current_user` already authorized the request (and, in prod, bound the Firebase
+uid to the invite), so this just reads back the directory row and stamps
+last_seen. In dev (gate off) there may be no row — we synthesize from the
+resolved identity so the local stack still works.
 """
 
 from __future__ import annotations
@@ -17,19 +19,24 @@ router = APIRouter(prefix="/me", tags=["me"])
 
 @router.get("")
 async def me(user: CurrentUser = Depends(current_user)):
-    """Return the current user; upsert email + last_seen into the directory."""
+    """Return the current user; stamp last_seen on the directory row."""
     pool = await get_pool()
     row = await pool.fetchrow(
         """
-        INSERT INTO users (uid, email, last_seen_at)
-        VALUES ($1, $2, now())
-        ON CONFLICT (uid) DO UPDATE
-          SET email        = COALESCE(EXCLUDED.email, users.email),
-              last_seen_at = now(),
-              updated_at   = now()
-        RETURNING uid, email, display_name, role
+        UPDATE users SET last_seen_at = now()
+         WHERE uid = $1
+        RETURNING uid, email, display_name, role, is_active
         """,
         user.uid,
-        user.email,
     )
-    return dict(row)
+    if row is not None:
+        return dict(row)
+
+    # Dev / gate-off: no provisioned row — reflect the resolved identity.
+    return {
+        "uid": user.uid,
+        "email": user.email,
+        "display_name": None,
+        "role": user.role,
+        "is_active": True,
+    }

@@ -17,5 +17,6 @@ RUN uv sync
 ENV PORT=8080
 EXPOSE 8080
 
-# Run the MCP server.
-CMD ["uv", "run", "server.py"]
+# Run the MCP server. --no-sync: use the venv baked at build time; no PyPI at
+# startup (the container has no internet under locked-down VPC egress).
+CMD ["uv", "run", "--no-sync", "server.py"]

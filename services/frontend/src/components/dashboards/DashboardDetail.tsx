@@ -351,7 +351,7 @@ export default function DashboardDetail({
   // can ground its answers in the tiles + cross-reference other tabs. The
   // `canGenerate` flag still gates the editor-agent routing + save-to-
   // dashboard affordance, so view mode stays read-only.
-  const canGenerate = editing && isPinnable(dashboard) && isAdmin;
+  const canGenerate = editing && isPinnable(dashboard) && isAdmin();
   const editContext = activeTab
     ? {
         dashboardId: dashboard.id,
@@ -412,7 +412,7 @@ export default function DashboardDetail({
                   input with a starter prompt, and surfaces one-click suggestion
                   chips so the workflow is discoverable on click rather than
                   buried in a hint. */}
-              {isAdmin && (
+              {isAdmin() && (
                 <button
                   type="button"
                   onClick={() =>

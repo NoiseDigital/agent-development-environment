@@ -14,29 +14,54 @@ import {
 import { onAuthStateChanged, signOut as fbSignOut, type User } from "firebase/auth";
 
 import { auth } from "./client";
-import { setCurrentUserCache } from "@/lib/auth";
+import { setCurrentUserCache, setCurrentUserRole, type Role } from "@/lib/auth";
+import { meApi, type MeRecord } from "@/lib/api/me";
 
 interface AuthState {
   user: User | null;
+  /** DB-authoritative directory record (role, etc.) from GET /api/v1/me. */
+  me: MeRecord | null;
+  isAdmin: boolean;
+  /** Signed in to Firebase but the gateway won't authorize (not in the
+   * allowlist). The shell shows an access-denied screen. */
+  accessDenied: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState>({
   user: null,
+  me: null,
+  isAdmin: false,
+  accessDenied: false,
   loading: true,
   signOut: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [me, setMe] = useState<MeRecord | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    return onAuthStateChanged(auth, (u) => {
+    return onAuthStateChanged(auth, async (u) => {
       setUser(u);
       setCurrentUserCache(u);
       setLoading(false);
+      setAccessDenied(false);
+      // Resolve the DB-authoritative role from /me regardless of a Firebase
+      // user: local dev has no login but the gateway still returns the dev
+      // admin; a logged-out prod request 403s and clears it.
+      try {
+        const record = await meApi.get();
+        setMe(record);
+        setCurrentUserRole(record.role as Role);
+      } catch {
+        setMe(null);
+        // Logged in but the gateway denied (not provisioned) → access denied.
+        if (u) setAccessDenied(true);
+      }
     });
   }, []);
 
@@ -47,7 +72,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        me,
+        isAdmin: me?.role === "admin",
+        accessDenied,
+        loading,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

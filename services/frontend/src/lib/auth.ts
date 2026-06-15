@@ -21,22 +21,23 @@ export interface CurrentUser {
 
 // Fallback before auth resolves / during SSR. uid 'user-1' keeps existing
 // locally-keyed dev data resolving until it's migrated to real Firebase uids.
+// Admin so the local stack (no login) stays fully usable.
 const ANON: CurrentUser = { uid: "user-1", email: null, role: "admin" };
 
 let _current: CurrentUser = ANON;
 
-/** Called by AuthProvider on every Firebase auth-state change. */
+/** Called by AuthProvider on every Firebase auth-state change. A freshly
+ * signed-in user starts at least-privilege ('member') until `/me` resolves the
+ * real role (see setCurrentUserRole), so admin UI never flashes for non-admins. */
 export function setCurrentUserCache(user: User | null): void {
   _current = user
-    ? { uid: user.uid, email: user.email, role: roleFromUser() }
+    ? { uid: user.uid, email: user.email, role: "member" }
     : ANON;
 }
 
-function roleFromUser(): Role {
-  // Role will come from a custom claim once the gateway's `users` table owns it.
-  // Default 'admin' in this single-tenant early phase so nothing is gated yet.
-  // TODO(rbac): read the `role` custom claim and default to 'member'.
-  return "admin";
+/** Called by AuthProvider once GET /api/v1/me returns the DB-authoritative role. */
+export function setCurrentUserRole(role: Role): void {
+  _current = { ..._current, role };
 }
 
 /** The current user. Sync; backed by the auth-state cache above. */
@@ -53,5 +54,8 @@ export function authHeaders(): Record<string, string> {
   return {};
 }
 
-/** Coarse role gate for admin-only UI (e.g. the SQL-query inspector). */
-export const isAdmin = getCurrentUser().role === "admin";
+/** Coarse role gate for admin-only UI (e.g. the SQL-query inspector). A live
+ * function (not a const) so it reflects the role once `/me` resolves. */
+export function isAdmin(): boolean {
+  return _current.role === "admin";
+}
