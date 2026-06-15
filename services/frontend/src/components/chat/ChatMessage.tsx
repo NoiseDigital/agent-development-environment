@@ -154,7 +154,7 @@ export default function ChatMessage({
             )}
 
             {/* Admin-only: the SQL behind this turn's MCP-toolbox tool calls. */}
-            {isAdmin && !message.isStreaming && message.toolCalls && message.toolCalls.length > 0 && (
+            {isAdmin() && !message.isStreaming && message.toolCalls && message.toolCalls.length > 0 && (
               <ToolQueries calls={message.toolCalls} />
             )}
 
