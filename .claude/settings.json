@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(grep -v \"^\\\\$\")",
-      "Bash(docker compose *)"
+      "Bash(docker compose *)",
+      "WebSearch"
     ]
   }
 }

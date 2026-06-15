@@ -95,8 +95,7 @@ locals {
 
 resource "google_project_iam_member" "app_hosting_runner" {
   for_each = var.enable_app_hosting && var.developer_connect_repo != "" ? toset([
-    "roles/secretmanager.secretAccessor", # apphosting.yaml secret env (web API key)
-    "roles/artifactregistry.reader",      # pull the build it produces
+    "roles/artifactregistry.reader", # pull the build image it produces
   ]) : toset([])
   project = local.project_id
   role    = each.value
