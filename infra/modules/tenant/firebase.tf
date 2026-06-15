@@ -46,18 +46,14 @@ resource "google_identity_platform_config" "auth" {
     }
   }
 
-  # Default Firebase domains + (when App Hosting is on) the live frontend domain,
-  # pulled straight from the backend so login works on the deployed URL with no
-  # manual "add authorized domain" step in the console.
-  authorized_domains = concat(
-    [
-      "localhost",
-      "${local.project_id}.firebaseapp.com",
-      "${local.project_id}.web.app",
-    ],
-    var.enable_app_hosting && var.developer_connect_repo != "" ?
-    [trimprefix(google_firebase_app_hosting_backend.frontend[0].uri, "https://")] : []
-  )
+  # Default Firebase domains + the frontend Cloud Run URL, so login works on the
+  # deployed app with no manual "add authorized domain" step.
+  authorized_domains = [
+    "localhost",
+    "${local.project_id}.firebaseapp.com",
+    "${local.project_id}.web.app",
+    trimprefix(google_cloud_run_v2_service.frontend.uri, "https://"),
+  ]
 
   depends_on = [google_firebase_project.this]
 }
@@ -78,64 +74,6 @@ resource "google_identity_platform_default_supported_idp_config" "google" {
   depends_on = [google_identity_platform_config.auth]
 }
 
-# ── App Hosting backend (git-connected frontend) ────────────────────────────
-# Builds services/frontend on push to app_hosting_branch and rolls out a Cloud
-# Run revision Firebase manages for you. Gated on the Developer Connect link
-# (one-time interactive GitHub authorization — see infra/README.md).
-
-# App Hosting runs the build + frontend as Firebase's auto-provisioned compute
-# SA (created with the backend, pre-wired with App Hosting runtime roles). We
-# grant it only the app-specific extras: read the web API key secret
-# (apphosting.yaml) and pull the build image. A custom SA would also need a
-# serviceAccountUser grant for the App Hosting service agent — using the native
-# one avoids that fragility.
-locals {
-  app_hosting_sa = "firebase-app-hosting-compute@${local.project_id}.iam.gserviceaccount.com"
-}
-
-resource "google_project_iam_member" "app_hosting_runner" {
-  for_each = var.enable_app_hosting && var.developer_connect_repo != "" ? toset([
-    "roles/artifactregistry.reader", # pull the build image it produces
-  ]) : toset([])
-  project = local.project_id
-  role    = each.value
-  member  = "serviceAccount:${local.app_hosting_sa}"
-}
-
-resource "google_firebase_app_hosting_backend" "frontend" {
-  count    = var.enable_app_hosting && var.developer_connect_repo != "" ? 1 : 0
-  provider = google-beta
-
-  project    = local.project_id
-  location   = var.region
-  backend_id = "agent-platform" # matches the console-created backend (App Hosting's
-  # git connection must use the Firebase GitHub App, which is set up interactively in
-  # the console; TF then owns the backend + rollout policy via the link below).
-  app_id           = google_firebase_web_app.this.app_id
-  serving_locality = "GLOBAL_ACCESS"
-  service_account  = local.app_hosting_sa
-
-  codebase {
-    repository     = var.developer_connect_repo
-    root_directory = "services/frontend"
-  }
-
-  depends_on = [google_firebase_project.this]
-}
-
-# Live branch + automatic rollouts. Setting this in TF means App Hosting builds
-# services/frontend and rolls a new revision on every push to app_hosting_branch
-# — no "set live branch / trigger first rollout" step in the console.
-resource "google_firebase_app_hosting_traffic" "frontend" {
-  count    = var.enable_app_hosting && var.developer_connect_repo != "" ? 1 : 0
-  provider = google-beta
-
-  project  = local.project_id
-  location = var.region
-  backend  = google_firebase_app_hosting_backend.frontend[0].backend_id
-
-  rollout_policy {
-    codebase_branch = var.app_hosting_branch
-    disabled        = false
-  }
-}
+# The frontend is a regular Cloud Run service we own (cloudrun.tf) — built +
+# deployed by our CI, not Firebase App Hosting. Firebase here provides Auth only
+# (project, web app config, Identity Platform). No App Hosting backend.

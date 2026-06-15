@@ -44,9 +44,9 @@ output "service_accounts" {
   }
 }
 
-# ── Firebase web config — feeds the frontend's NEXT_PUBLIC_* values ─────────
+# ── Firebase web config — feeds the frontend's NEXT_PUBLIC_* build args ─────
 output "firebase_web_config" {
-  description = "Drop these into services/frontend/apphosting.yaml (apiKey via Secret Manager)."
+  description = "Firebase web config (apiKey kept in Secret Manager; CI passes it as a build arg)."
   value = {
     project_id          = local.project_id
     app_id              = google_firebase_web_app.this.app_id
@@ -61,7 +61,7 @@ output "firebase_web_config" {
   sensitive = true # api_key is not a hard secret, but keep it out of plain logs
 }
 
-output "app_hosting_backend" {
-  description = "App Hosting backend id (empty until enable_app_hosting + Developer Connect link)."
-  value       = var.enable_app_hosting && var.developer_connect_repo != "" ? google_firebase_app_hosting_backend.frontend[0].backend_id : ""
+output "frontend_url" {
+  description = "Public URL of the frontend Cloud Run service."
+  value       = google_cloud_run_v2_service.frontend.uri
 }

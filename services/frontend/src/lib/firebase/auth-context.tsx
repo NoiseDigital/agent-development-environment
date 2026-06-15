@@ -25,6 +25,9 @@ interface AuthState {
   /** Signed in to Firebase but the gateway won't authorize (not in the
    * allowlist). The shell shows an access-denied screen. */
   accessDenied: boolean;
+  /** Sign-out is in flight — the shell renders nothing so the app never flashes
+   * between clearing the session and the redirect to /login. */
+  signingOut: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
 }
@@ -34,6 +37,7 @@ const AuthContext = createContext<AuthState>({
   me: null,
   isAdmin: false,
   accessDenied: false,
+  signingOut: false,
   loading: true,
   signOut: async () => {},
 });
@@ -42,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [me, setMe] = useState<MeRecord | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -66,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function signOut() {
+    setSigningOut(true); // blank the shell immediately — no app flash before redirect
     await fbSignOut(auth);
     await fetch("/api/auth/session", { method: "DELETE" });
     window.location.href = "/login";
@@ -78,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         me,
         isAdmin: me?.role === "admin",
         accessDenied,
+        signingOut,
         loading,
         signOut,
       }}

@@ -195,6 +195,12 @@ resource "google_cloud_run_v2_service" "gateway" {
   ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"
   deletion_protection = local.is_protected
 
+  # The BFF authenticates with an ID token whose audience is the gateway's
+  # deterministic URL (stable + constructible per tenant — see run_url). That URL
+  # is an alias, not the service's primary .uri, so Cloud Run won't accept it as
+  # an audience by default. Register it explicitly as a custom audience.
+  custom_audiences = [local.run_url["gateway"]]
+
   template {
     service_account = google_service_account.gateway.email
     vpc_access {
@@ -286,16 +292,77 @@ resource "google_cloud_run_v2_job" "migrate" {
   depends_on = [google_project_service.services, google_secret_manager_secret_version.database_url]
 }
 
+# ── Frontend (the Next.js app + BFF) ────────────────────────────────────────
+# Public ingress (user-facing). Direct VPC egress so its /gw proxy can reach the
+# INTERNAL-ingress gateway. Image seeded with a placeholder; CI rolls the real
+# build (NEXT_PUBLIC_* baked at build time — see deploy.yml + the Dockerfile).
+resource "google_cloud_run_v2_service" "frontend" {
+  project             = local.project_id
+  name                = "frontend"
+  location            = var.region
+  ingress             = "INGRESS_TRAFFIC_ALL"
+  deletion_protection = local.is_protected
+
+  template {
+    service_account = google_service_account.frontend.email
+    vpc_access {
+      network_interfaces {
+        network    = google_compute_network.vpc.name
+        subnetwork = google_compute_subnetwork.subnet.name
+      }
+      egress = "ALL_TRAFFIC"
+    }
+    containers {
+      image = var.placeholder_image
+      ports { container_port = 8080 }
+
+      # Server-only: the /gw proxy's target + the audience for the Cloud Run IAM
+      # ID token it mints (the gateway's deterministic URL = its custom audience).
+      env {
+        name  = "GATEWAY_URL"
+        value = local.run_url["gateway"]
+      }
+      env {
+        name  = "GATEWAY_AUDIENCE"
+        value = local.run_url["gateway"]
+      }
+      # Firebase project for the Admin SDK (session cookies) + the client SDK
+      # (the public NEXT_PUBLIC_* are also baked at build; set here for server use).
+      env {
+        name  = "NEXT_PUBLIC_FIREBASE_PROJECT_ID"
+        value = local.project_id
+      }
+      env {
+        name  = "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"
+        value = "${local.project_id}.firebaseapp.com"
+      }
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [template[0].containers[0].image, client, client_version]
+  }
+  depends_on = [google_project_service.services]
+}
+
+# Public: anyone can load the app (auth happens in-app via Firebase + the gateway).
+resource "google_cloud_run_v2_service_iam_member" "frontend_public" {
+  project  = local.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.frontend.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
 # ── Invoker boundary: who may call each service ─────────────────────────────
-# Gateway is internal-ingress; the Next.js BFF (App Hosting SA) is the ONLY
-# caller. The browser never reaches it directly.
+# Gateway is internal-ingress; the frontend (BFF) is the ONLY caller, via an ID
+# token minted as the frontend SA. The browser never reaches it directly.
 resource "google_cloud_run_v2_service_iam_member" "gateway_from_bff" {
   project  = local.project_id
   location = var.region
   name     = google_cloud_run_v2_service.gateway.name
   role     = "roles/run.invoker"
-  # App Hosting's compute SA — the identity the BFF actually runs as.
-  member = "serviceAccount:${local.app_hosting_sa}"
+  member   = "serviceAccount:${google_service_account.frontend.email}"
 }
 
 # Deep internal services (agent / mcp-stats / mcp-toolbox): reachable only from

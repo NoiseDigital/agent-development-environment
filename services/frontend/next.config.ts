@@ -11,6 +11,8 @@ import type { NextConfig } from "next";
 // completion.
 
 const nextConfig: NextConfig = {
+  // Self-contained server bundle for Cloud Run (.next/standalone → `node server.js`).
+  output: "standalone",
   serverExternalPackages: [],
   webpack: (config) => {
     // `canvas` is an optional native dependency of vega-canvas, used only for

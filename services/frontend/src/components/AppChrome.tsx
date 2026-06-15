@@ -17,7 +17,7 @@ export default function AppChrome({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const { accessDenied, user, signOut } = useAuth();
+  const { accessDenied, signingOut, user, signOut } = useAuth();
 
   if (pathname === "/login") {
     return (
@@ -27,6 +27,10 @@ export default function AppChrome({
       </>
     );
   }
+
+  // Sign-out in flight — render nothing so the app never flashes between
+  // clearing the session and the redirect to /login.
+  if (signingOut) return null;
 
   // Authenticated to Firebase but not in the gateway's allowlist.
   if (accessDenied) {
