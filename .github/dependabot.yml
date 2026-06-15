@@ -1,0 +1,43 @@
+# Dependabot — automated dependency update PRs. Catches CVEs like the Next.js
+# one before they reach a deploy. Security updates also require Dependabot alerts
+# enabled in repo Settings → Code security.
+version: 2
+updates:
+  # ── Frontend (npm) — the highest-value one; would have caught the Next.js CVE.
+  - package-ecosystem: npm
+    directory: /services/frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      # One PR for routine minor/patch bumps to cut noise; majors stay separate.
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  # ── Python backends (uv / pyproject.toml).
+  - package-ecosystem: uv
+    directories:
+      - /services/backend/gateway
+      - /services/backend/agents
+      - /services/backend/mcp/stats
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  # ── Container base images (postgres, python, node, etc.).
+  - package-ecosystem: docker
+    directories:
+      - /services/backend/gateway
+      - /services/backend/agents
+      - /services/backend/mcp/stats
+      - /services/backend/database
+    schedule:
+      interval: weekly
+
+  # ── GitHub Actions (keep the CI/deploy actions current + patched).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
