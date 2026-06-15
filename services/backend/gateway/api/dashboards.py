@@ -29,7 +29,7 @@ from pydantic import BaseModel, Field
 from .auth import CurrentUser, current_user
 from .toolbox import get_toolbox_client, normalise_rows
 
-router = APIRouter(prefix="/api/dashboards", tags=["dashboards"])
+router = APIRouter(prefix="/dashboards", tags=["dashboards"])
 
 # The only toolbox tools dashboards may invoke. Mirrors the
 # `media_performance_query` toolset in services/backend/mcp/images/toolbox/tools.yaml.

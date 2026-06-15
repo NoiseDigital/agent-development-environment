@@ -3,8 +3,9 @@
 
 import type { Upload, BigQueryTableRef } from '../../types/source';
 import { apiRequest } from './http';
+import { gatewayBase } from '@/lib/api/gateway';
 
-const BASE_URL = process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'http://localhost:8000';
+const BASE_URL = gatewayBase();
 
 export const sourcesApi = {
   // ── Uploads ──────────────────────────────────────────────────────────────

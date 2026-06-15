@@ -69,7 +69,7 @@ class TestAllowlist:
         fake = FakeToolboxClient(tool_result=[])
         patch_toolbox(monkeypatch, fake)
         r = dashboards_client.post(
-            "/api/dashboards/query",
+            "/api/v1/dashboards/query",
             json={"tool": "DROP_TABLE_users", "params": {}},
         )
         assert r.status_code == 400
@@ -82,7 +82,7 @@ class TestAllowlist:
         fake = FakeToolboxClient(tool_result=[{"k": "v"}])
         patch_toolbox(monkeypatch, fake)
         r = dashboards_client.post(
-            "/api/dashboards/query",
+            "/api/v1/dashboards/query",
             json={"tool": "performance_trend", "params": {"date_from": "2024-01-01"}},
         )
         assert r.status_code == 200
@@ -99,7 +99,7 @@ class TestResponseShape:
         rows = [{"name": "a", "spend": "100.5"}, {"name": "b", "spend": "75"}]
         patch_toolbox(monkeypatch, FakeToolboxClient(tool_result=json.dumps(rows)))
         r = dashboards_client.post(
-            "/api/dashboards/query",
+            "/api/v1/dashboards/query",
             json={"tool": "metric_totals", "params": {}},
         )
         assert r.status_code == 200
@@ -116,7 +116,7 @@ class TestResponseShape:
     ) -> None:
         patch_toolbox(monkeypatch, FakeToolboxClient(tool_result=None))
         r = dashboards_client.post(
-            "/api/dashboards/query",
+            "/api/v1/dashboards/query",
             json={"tool": "metric_totals", "params": {}},
         )
         assert r.status_code == 200
@@ -131,7 +131,7 @@ class TestUpstreamErrorMapping:
             monkeypatch, FakeToolboxClient(load_raises=RuntimeError("mcp down"))
         )
         r = dashboards_client.post(
-            "/api/dashboards/query",
+            "/api/v1/dashboards/query",
             json={"tool": "metric_totals", "params": {}},
         )
         assert r.status_code == 502
@@ -147,7 +147,7 @@ class TestUpstreamErrorMapping:
             monkeypatch, FakeToolboxClient(call_raises=ValueError("bad date"))
         )
         r = dashboards_client.post(
-            "/api/dashboards/query",
+            "/api/v1/dashboards/query",
             json={"tool": "metric_totals", "params": {"date_from": "garbage"}},
         )
         assert r.status_code == 400
@@ -156,7 +156,7 @@ class TestUpstreamErrorMapping:
 
 class TestBadRequest:
     def test_missing_tool_field_is_a_422(self, dashboards_client: TestClient) -> None:
-        r = dashboards_client.post("/api/dashboards/query", json={"params": {}})
+        r = dashboards_client.post("/api/v1/dashboards/query", json={"params": {}})
         assert r.status_code == 422
 
     def test_params_defaults_to_empty_dict(
@@ -165,7 +165,7 @@ class TestBadRequest:
         fake = FakeToolboxClient(tool_result=[{"v": 1}])
         patch_toolbox(monkeypatch, fake)
         r = dashboards_client.post(
-            "/api/dashboards/query",
+            "/api/v1/dashboards/query",
             json={"tool": "metric_totals"},
         )
         assert r.status_code == 200

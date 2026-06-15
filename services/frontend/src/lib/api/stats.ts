@@ -1,11 +1,12 @@
 // Client for the statistics REST API. The frontend never talks to mcp-stats
-// directly — requests route through the gateway's `/api/stats/<endpoint>`
+// directly — requests route through the gateway's `/api/v1/stats/<endpoint>`
 // proxy. In dev that's a thin pass-through; in production mcp-stats sits
 // behind internal-only ingress and the gateway is the only public seam.
 
 import { postJson } from './http';
+import { gatewayBase } from '@/lib/api/gateway';
 
-const BASE_URL = process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'http://localhost:8080';
+const BASE_URL = gatewayBase();
 
 export interface CorrelateParams {
   /** Source URI — "upload:<id>" or "bigquery:<dataset>.<table>". */
@@ -65,9 +66,9 @@ export interface DescribeResult {
 
 export const statsApi = {
   correlate: (params: CorrelateParams) =>
-    postJson<CorrelateResult>(`${BASE_URL}/api/stats/correlate`, params),
+    postJson<CorrelateResult>(`${BASE_URL}/api/v1/stats/correlate`, params),
   qa: (source: string, sheet?: string) =>
-    postJson<QaResult>(`${BASE_URL}/api/stats/qa`, { source, sheet }),
+    postJson<QaResult>(`${BASE_URL}/api/v1/stats/qa`, { source, sheet }),
   describe: (source: string, sheet?: string) =>
-    postJson<DescribeResult>(`${BASE_URL}/api/stats/describe`, { source, sheet }),
+    postJson<DescribeResult>(`${BASE_URL}/api/v1/stats/describe`, { source, sheet }),
 };

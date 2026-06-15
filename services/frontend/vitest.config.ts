@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
@@ -8,6 +9,12 @@ import react from '@vitejs/plugin-react';
 //   so the DOM bootstrap only pays its cost where it's actually needed.
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    // Match the tsconfig `@/*` → `src/*` path alias so tests resolve it too.
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
   test: {
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     environment: 'node',

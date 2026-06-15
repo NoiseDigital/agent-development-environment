@@ -1,0 +1,12 @@
+# Terraform — never commit state, provider binaries, or plans.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+.terraform.tfstate.lock.info
+
+# Commit lock files (.terraform.lock.hcl) and *.tfvars templates.
+# Real per-env secrets in tfvars should NOT be committed:
+bootstrap/terraform.tfvars

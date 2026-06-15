@@ -1,0 +1,84 @@
+name: Deploy (backend)
+
+# Backend deploy: build images, run DB migrations, roll Cloud Run. The frontend
+# is NOT here — Firebase App Hosting builds & rolls it out from git natively.
+#
+# Auth is keyless via Workload Identity Federation (no JSON keys). The provider
+# + CI service account come from infra/bootstrap; wire them as repo variables:
+#   vars.GCP_WORKLOAD_IDENTITY_PROVIDER  vars.GCP_CI_SERVICE_ACCOUNT
+#   vars.GCP_REGION  vars.DEPLOY_PROJECT  vars.ARTIFACT_REGISTRY
+
+on:
+  push:
+    branches: [main] # main → sbx
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: Stage to deploy
+        type: choice
+        options: [sbx, dev, uat, prod]
+        default: sbx
+
+permissions:
+  contents: read
+  id-token: write # required for WIF
+
+env:
+  STAGE: ${{ github.event.inputs.stage || 'sbx' }}
+  REGION: ${{ vars.GCP_REGION }}
+  PROJECT: ${{ vars.DEPLOY_PROJECT }}
+  AR: ${{ vars.ARTIFACT_REGISTRY }} # e.g. us-central1-docker.pkg.dev/<proj>/platform
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_CI_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      # ── Build + push (gateway/agent use the prod stage; source baked in) ────
+      - name: Build & push images
+        run: |
+          set -euo pipefail
+          SHA=${GITHUB_SHA::12}
+          docker build --target prod -t "$AR/gateway:$SHA"     services/backend/gateway
+          docker build --target prod -t "$AR/agent:$SHA"       services/backend/agents
+          docker build               -t "$AR/mcp-stats:$SHA"   services/backend/mcp/stats
+          docker build               -t "$AR/mcp-toolbox:$SHA" services/backend/mcp/images/toolbox
+          docker push "$AR/gateway:$SHA"
+          docker push "$AR/agent:$SHA"
+          docker push "$AR/mcp-stats:$SHA"
+          docker push "$AR/mcp-toolbox:$SHA"
+          echo "SHA=$SHA" >> "$GITHUB_ENV"
+
+      # ── Migrate FIRST — schema is at head before any new API revision ───────
+      - name: Run DB migrations (one-shot job)
+        run: |
+          set -euo pipefail
+          gcloud run jobs update "${STAGE}-migrate" \
+            --image "$AR/gateway:$SHA" --region "$REGION" --project "$PROJECT"
+          gcloud run jobs execute "${STAGE}-migrate" \
+            --region "$REGION" --project "$PROJECT" --wait
+
+      # ── Roll the services (private ones first, gateway last) ────────────────
+      - name: Deploy Cloud Run services
+        run: |
+          set -euo pipefail
+          gcloud run deploy "${STAGE}-mcp-toolbox" \
+            --image "$AR/mcp-toolbox:$SHA" --region "$REGION" --project "$PROJECT"
+          gcloud run deploy "${STAGE}-agent" \
+            --image "$AR/agent:$SHA" --region "$REGION" --project "$PROJECT"
+          gcloud run deploy "${STAGE}-mcp-stats" \
+            --image "$AR/mcp-stats:$SHA" --region "$REGION" --project "$PROJECT"
+          gcloud run deploy "${STAGE}-gateway" \
+            --image "$AR/gateway:$SHA" --region "$REGION" --project "$PROJECT"

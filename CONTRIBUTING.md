@@ -11,6 +11,82 @@ git config --global user.email "you@example.com"
 git config --global user.name "Your Name"
 ```
 
+## Local development environment
+
+The stack is **two Compose files with distinct jobs**, merged by
+`.devcontainer/devcontainer.json` (which lists both and attaches the IDE to the
+`workspace` service):
+
+- **`docker-compose.yml`** — the **application stack** (`gateway`, `agent`,
+  `migrate`, `mcp-*`, `frontend`, `postgres`, `firebase-emulator`).
+  Environment-agnostic and usable standalone (`docker compose up`); the closest
+  local mirror of production.
+- **`.devcontainer/docker-compose.devcontainer.yml`** — the **dev-environment
+  overlay**. Adds only the `workspace` container your IDE attaches to, the repo
+  bind-mount, the Docker socket, and the persisted `gcloud_config` /
+  `claude_config` volumes. Keeping dev-only tooling out of the app stack keeps
+  the latter portable and prod-representative.
+
+The integration point is the shared **`gcloud_config`** volume: run
+`gcloud auth application-default login` once in `workspace` and the app services
+read those ADC credentials read-only.
+
+### Service topology
+
+The browser talks to **only the Next.js frontend** (same origin). It never holds
+a backend URL. All backend calls go to the frontend's **BFF proxy at `/gw`**
+([`src/app/gw/[...path]/route.ts`](services/frontend/src/app/gw/%5B...path%5D/route.ts)),
+which forwards them to the gateway **server-side** via the server-only
+`GATEWAY_URL` (streaming passthrough, so `/run_sse` and uploads work unbuffered).
+
+The **gateway** owns auth + the platform's HTTP routes and proxies everything
+else to the **private** `agent` (ADK runtime), the MCP Toolbox (dashboards), and
+`mcp-stats` (Analyze). It is **not** browser-reachable:
+
+- **Prod** — gateway has internal-ingress only; the BFF reaches it over a VPC
+  connector and authenticates as the App Hosting SA (Cloud Run IAM). No CORS
+  (same-origin), no public gateway, no backend URL in the client bundle.
+- **Dev** — the frontend container reaches `http://gateway:8080` over the Compose
+  network; the browser only ever hits `localhost:3000/gw/*`.
+
+Frontend API clients resolve their base through `gatewayBase()`
+([`src/lib/api/gateway.ts`](services/frontend/src/lib/api/gateway.ts)): `/gw` in
+the browser, direct `GATEWAY_URL` during SSR.
+
+### API versioning
+
+The platform's own JSON API is versioned with **URL-path versioning** under
+`/api/v1` (`/api/v1/clients`, `/api/v1/dashboards/query`, `/api/v1/stats/...`).
+The version lives in **one place** — a parent `APIRouter(prefix="/api/v1")` in
+[main.py](services/backend/gateway/main.py) — so each resource router declares
+only its own prefix (`/clients`, …) and a future `/api/v2` is additive (mount a
+second parent; run both during a migration window) rather than a rename.
+
+Deliberately **unversioned**: `/healthz` (a stable probe path for Cloud Run /
+load balancers) and the agent passthrough (`/run_sse`, sessions, sources, … —
+the ADK runtime owns its own contract). Frontend callers live in
+[services/frontend/src/lib/api/](services/frontend/src/lib/api/); bump them in
+lockstep with the gateway since both ship in the same tenant deploy.
+
+### `migrate` service
+
+Database migrations run **once, in a dedicated one-shot `migrate` service**
+(`alembic upgrade head`), not on app boot. The gateway and the agent both wait
+on it (`service_completed_successfully`) so the schema is always at head before
+anything serves. See **Schema Migrations** below.
+
+### `firebase-emulator` service
+
+Firebase Auth runs locally via the **`firebase-emulator`** service (Auth on
+`9099`, emulator UI on `4000`; config in `firebase.json`). The frontend's client
+SDK signs in against it (browser → `localhost:9099`) and the gateway's Admin SDK
+verifies the resulting ID tokens (server → `firebase-emulator:9099`). No real
+Firebase project is touched in dev.
+
+Its build context lives under **`tooling/`**, not `services/` — it's dev-only
+infrastructure (replaced by Google-managed Firebase in production, never built
+or deployed by us), so it sits apart from the deployable application services.
+
 ## Branching Strategy
 
 We follow **trunk-based development**. All work flows through `main`.
@@ -285,8 +361,9 @@ browser to see what's bloating the bundle.
 ## Schema Migrations
 
 Every platform-owned Postgres table (`session_metadata`, `event_metadata`,
-`sources`, future ones) is owned by **Alembic** in the gateway service. The
-agent service only reads and writes those tables; it never DDLs them. ADK
+`sources`, future ones) is owned by **Alembic** in the gateway package (applied
+by the one-shot `migrate` service). The agent service only reads and writes
+those tables; it never DDLs them. ADK
 manages its own tables and ships its own migrations on version updates —
 nothing in this repo touches those.
 
@@ -303,20 +380,22 @@ services/backend/gateway/
 
 ### How they run
 
-On `docker compose up`, the gateway's entrypoint runs `alembic upgrade head`
-against Postgres and only then starts uvicorn. Its `/healthz` endpoint flips
-green once both steps complete; the agent service waits on
-`gateway: service_healthy` before booting. Migrations are idempotent — a
-restart is a safe no-op. CI applies them to a fresh Postgres on every PR
-and runs an explicit idempotency re-up.
+Migrations run in a dedicated one-shot **`migrate`** service (it reuses the
+gateway image, which owns the schema): on `docker compose up` it runs
+`alembic upgrade head` against Postgres and exits. The gateway and the agent
+both wait on `migrate: service_completed_successfully`, so neither serves
+against an out-of-date schema. Migrations are idempotent — a re-run is a safe
+no-op. CI applies them to a fresh Postgres on every PR and runs an explicit
+idempotency re-up; on deploy the same step runs as a pre-deploy job before new
+API revisions take traffic.
 
-### Why migrations run inside the gateway
+### Why migrations are a separate one-shot
 
-Alembic is idempotent, we run a single gateway replica, and the operational
-cost of a separate "migrate" one-shot service outweighs its benefit at this
-scale. If we ever scale to multi-replica gateway with cold-start races, the
-escape hatch is a `gcloud run jobs execute` pre-deploy step in CI — no
-compose change required.
+Running migrations on app boot races across replicas (every cold start re-runs
+them) and couples "schema is ready" to "this API is up." The one-shot `migrate`
+step decouples the two, and is the local mirror of the CI/CD pre-deploy job
+(`gcloud run jobs execute migrate`) that runs before new Cloud Run revisions
+take traffic.
 
 ### Adding a migration
 
@@ -339,11 +418,11 @@ def downgrade() -> None:
 Apply it to your running compose:
 
 ```bash
-docker compose restart gateway   # the gateway runs `alembic upgrade head` on boot
+docker compose run --rm migrate   # runs `alembic upgrade head` and exits
 ```
 
-`alembic upgrade head` is idempotent, so restarting against an already
-migrated database is a safe no-op.
+`alembic upgrade head` is idempotent, so re-running against an already migrated
+database is a safe no-op.
 
 ### Don't touch ADK tables
 

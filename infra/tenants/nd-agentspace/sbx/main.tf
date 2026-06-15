@@ -1,0 +1,54 @@
+# nd-agentspace, stage = sbx → project nd-agentspace-sbx.
+# Copy this directory to add a stage (envs/nd-agentspace-prod/), flip `stage`
+# and the backend prefix, and add the .firebaserc alias.
+
+locals {
+  tenant_id  = "nd-agentspace"
+  stage      = "sbx"
+  project_id = "${local.tenant_id}-${local.stage}"
+}
+
+provider "google" {
+  project = local.project_id
+  region  = var.region
+}
+
+provider "google-beta" {
+  project = local.project_id
+  region  = var.region
+}
+
+module "tenant" {
+  source = "../../../modules/tenant"
+
+  tenant_id          = local.tenant_id
+  stage              = local.stage
+  region             = var.region
+  vertex_location    = "northamerica-northeast1" # Vertex stays in Montreal
+  app_hosting_branch = "main"
+
+  github_owner = var.github_owner
+  github_repo  = var.github_repo
+
+  enable_app_hosting     = var.enable_app_hosting
+  developer_connect_repo = var.developer_connect_repo
+
+  google_oauth_client_id     = var.google_oauth_client_id
+  google_oauth_client_secret = var.google_oauth_client_secret
+
+  # sbx is a sandbox — keep it cheap.
+  db_tier = "db-f1-micro"
+}
+
+output "gateway_url" {
+  value = module.tenant.gateway_url
+}
+
+output "migrate_job" {
+  value = module.tenant.migrate_job
+}
+
+output "firebase_web_config" {
+  value     = module.tenant.firebase_web_config
+  sensitive = true
+}

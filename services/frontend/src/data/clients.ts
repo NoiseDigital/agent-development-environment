@@ -1,7 +1,7 @@
 // Client directory — the read surface every UI uses to look up a client by
 // id (badge / logo / accent color). Re-exports the in-memory list from
 // media-model so existing data stays the source of truth; once the gateway
-// exposes /api/clients backed by Postgres, this module becomes a hook that
+// exposes /api/v1/clients backed by Postgres, this module becomes a hook that
 // reads from there and the rest of the UI is unchanged.
 
 import { clients, type Client } from './media-model';

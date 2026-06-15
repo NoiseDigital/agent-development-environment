@@ -75,19 +75,46 @@ class LocalStorage(Storage):
         return str(self._full(key))
 
 
-# GCS backend — implement when deploying:
-#
-# class GcsStorage(Storage):
-#     def __init__(self, bucket: str): ...
-#     def resolve_uri(self, key): return f"gs://{self.bucket}/{key}"
-#
-# Switch via STORAGE_BACKEND=gcs + GCS_BUCKET. Callers stay unchanged.
+class GcsStorage(Storage):
+    """Stores files in a GCS bucket — the deployed backend. Auth via ADC (the
+    Cloud Run runtime service account, which has objectAdmin on the bucket)."""
+
+    def __init__(self, bucket: str):
+        from google.cloud import storage as gcs
+
+        self._bucket_name = bucket
+        self._bucket = gcs.Client().bucket(bucket)
+
+    def save(self, data: bytes, filename: str) -> str:
+        safe_name = os.path.basename(filename) or "upload"
+        key = f"{uuid.uuid4().hex}/{safe_name}"
+        self._bucket.blob(key).upload_from_string(data)
+        return key
+
+    def read_bytes(self, key: str) -> bytes:
+        return self._bucket.blob(key).download_as_bytes()
+
+    def delete(self, key: str) -> None:
+        from google.api_core.exceptions import NotFound
+
+        try:
+            self._bucket.blob(key).delete()
+        except NotFound:
+            pass  # already gone — match LocalStorage's no-op semantics
+
+    def exists(self, key: str) -> bool:
+        return self._bucket.blob(key).exists()
+
+    def resolve_uri(self, key: str) -> str:
+        # gs:// URI a pandas/BigQuery reader (with gcsfs) can consume directly.
+        return f"gs://{self._bucket_name}/{key}"
 
 
 def get_storage() -> Storage:
     backend = os.environ.get("STORAGE_BACKEND", "local").lower()
     if backend == "gcs":
-        raise NotImplementedError(
-            "GCS storage backend is not implemented yet. Use STORAGE_BACKEND=local."
-        )
+        bucket = os.environ.get("GCS_BUCKET")
+        if not bucket:
+            raise RuntimeError("STORAGE_BACKEND=gcs requires GCS_BUCKET")
+        return GcsStorage(bucket)
     return LocalStorage(os.environ.get("STORAGE_LOCAL_PATH", "/data/uploads"))

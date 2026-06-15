@@ -1,4 +1,5 @@
 import React from 'react';
+import { gatewayBase } from '@/lib/api/gateway';
 
 // Comprehensive agent configuration including endpoints and display info
 export interface AgentConfig {
@@ -30,7 +31,7 @@ export const agentConfigurations: Record<string, AgentConfig> = {
     name: 'media_performance_agent',
     displayName: 'Media Analyst',
     description: 'I\'m here to help you analyze media content, unlock performance insights, examine data trends, and assist with your media analytics tasks.',
-    url: process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'https://agent-media-performance-192748761045.us-central1.run.app',
+    url: gatewayBase(),
     supportsVisualization: true,
     supportsSources: true,
     icon: React.createElement('svg', {
@@ -53,7 +54,7 @@ export const agentConfigurations: Record<string, AgentConfig> = {
     name: 'dashboard_insights_agent',
     displayName: 'Dashboard Insights (internal)',
     description: 'Generates Noise Analyst bullets from a totals payload.',
-    url: process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'http://localhost:8080',
+    url: gatewayBase(),
     hidden: true,
     icon: React.createElement('svg', { className: 'w-8 h-8', key: 'internal-insights' }),
   },
@@ -61,7 +62,7 @@ export const agentConfigurations: Record<string, AgentConfig> = {
     name: 'session_naming_agent',
     displayName: 'Session Naming (internal)',
     description: 'Generates a short title for a chat session.',
-    url: process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'http://localhost:8080',
+    url: gatewayBase(),
     hidden: true,
     icon: React.createElement('svg', { className: 'w-8 h-8', key: 'internal-naming' }),
   },
@@ -69,7 +70,7 @@ export const agentConfigurations: Record<string, AgentConfig> = {
     name: 'dashboard_editor_agent',
     displayName: 'Dashboard Editor (internal)',
     description: 'Acts on a dashboard — pin charts, recolour, rename. Delegates analysis to media-performance.',
-    url: process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'http://localhost:8080',
+    url: gatewayBase(),
     // Streams charts as `{text, ui}` envelopes the same way the analyst does.
     supportsVisualization: true,
     hidden: true,
@@ -79,7 +80,7 @@ export const agentConfigurations: Record<string, AgentConfig> = {
     name: 'analyze_assistant_agent',
     displayName: 'Analyze Assistant (internal)',
     description: 'Reads the current correlation result + top signals and explains what to focus on.',
-    url: process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'http://localhost:8080',
+    url: gatewayBase(),
     // Plain markdown replies — no chart envelopes here; the chart it discusses
     // is rendered by the page, not by the agent.
     supportsVisualization: false,
@@ -90,7 +91,7 @@ export const agentConfigurations: Record<string, AgentConfig> = {
     name: 'timesheet_agent',
     displayName: 'Timesheet Agent',
     description: 'I help you populate and submit your timesheets efficiently. Track time, categorize work, and ensure accurate timesheet completion.',
-    url: process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'https://agent-timesheets-192748761045.us-central1.run.app',
+    url: gatewayBase(),
     icon: React.createElement('svg', {
       className: 'w-8 h-8',
       fill: 'none',
