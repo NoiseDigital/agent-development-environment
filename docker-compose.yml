@@ -6,6 +6,9 @@ services:
     build:
       context: ./services/backend/agents
       dockerfile: Dockerfile
+      # Dev uses the deps-only stage; source comes from the bind mount below.
+      # CI builds `--target prod` (source baked in) for Cloud Run.
+      target: base
     volumes:
       - ./services/backend/agents:/workspace
       - gcloud_config:/root/.config/gcloud:ro
@@ -32,12 +35,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      # Gateway owns the platform schema and runs `alembic upgrade head` in
-      # its entrypoint. Waiting on its healthcheck means migrations are done
-      # AND uvicorn is up before the agent starts reading/writing tables.
-      # ADK manages its own tables/migrations and is unaffected by this gate.
-      gateway:
-        condition: service_healthy
+      # The `migrate` service runs `alembic upgrade head`; waiting on it to
+      # complete means the platform schema is at head before the agent reads or
+      # writes tables. (ADK manages its own tables and is unaffected by this.)
+      # The agent no longer waits on the gateway — it sits *behind* the gateway.
+      migrate:
+        condition: service_completed_successfully
       mcp-toolbox:
         condition: service_started
     stdin_open: true
@@ -149,24 +152,44 @@ services:
     stdin_open: true
     tty: true
 
+  # ── Database migrations — one-shot, runs to completion before any API ──────
+  # Owns `alembic upgrade head` (the gateway package owns the schema, so we
+  # reuse its image). The gateway and the agent both wait on this with
+  # `service_completed_successfully`, so the schema is always at head before
+  # anything reads/writes it. This is the local mirror of the CI/CD pre-deploy
+  # step (`gcloud run jobs execute migrate`) that runs before new API revisions
+  # take traffic — keeping migrations OUT of app boot avoids cold-start races
+  # across multiple Cloud Run replicas.
+  migrate:
+    build:
+      context: ./services/backend/gateway
+      dockerfile: Dockerfile
+      target: base
+    volumes:
+      - ./services/backend/gateway:/workspace
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://user:password@postgres:5432/postgres}
+      - UV_LINK_MODE=copy
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    command: uv run alembic upgrade head
+
   # ── Gateway — the public entry point for the frontend ─────────────────────
-  # Owns auth, the platform's non-agent HTTP routes, AND the database
-  # schema. Boot order: `alembic upgrade head` → uvicorn → /healthz returns
-  # OK. The agent (and anything else that touches the platform tables)
-  # waits on this service's healthcheck so the schema is always at head.
-  # Everything the gateway doesn't handle directly is proxied to the
-  # private agent service; `/run_sse` streams through unchanged
-  # (see api/proxy.py).
-  #
-  # We keep migrations in the gateway boot (rather than a one-shot service)
-  # because Alembic is idempotent, we run one replica, and the operational
-  # cost of a separate service outweighs its benefit at this scale. If we
-  # ever scale to multi-replica gateway with cold-start migration races,
-  # swap this to a `gcloud run jobs execute` pre-deploy step.
+  # Owns auth, the platform's non-agent HTTP routes, and the public API. It is
+  # the ONLY service the frontend talks to; everything it doesn't handle
+  # directly is proxied to the private agent service (`/run_sse` streams through
+  # unchanged — see api/proxy.py). The schema is owned by the `migrate` service:
+  # the gateway waits on it (`service_completed_successfully`) so it never serves
+  # against an out-of-date schema.
   gateway:
     build:
       context: ./services/backend/gateway
       dockerfile: Dockerfile
+      # Dev uses the deps-only stage; source comes from the bind mount below.
+      # CI builds `--target prod` (source baked in) for Cloud Run.
+      target: base
     volumes:
       - ./services/backend/gateway:/workspace
     ports:
@@ -178,24 +201,45 @@ services:
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://user:password@postgres:5432/postgres}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost,http://localhost:3000,http://frontend:3000}
       - UV_LINK_MODE=copy
+      # No Firebase here: identity is verified at the BFF (frontend) and forwarded
+      # as X-User-* over the gateway's IAM-gated channel; the gateway trusts it.
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     stdin_open: true
     tty: true
-    # Run Alembic to head, THEN start uvicorn. Re-runs are idempotent.
-    command: >
-      sh -c "uv run alembic upgrade head &&
-             exec uv run uvicorn main:app --host 0.0.0.0 --port ${GATEWAY_PORT:-8080} --reload"
-    # Healthcheck flips green only once both migrations finished and uvicorn
-    # is serving /healthz. `start_period` gives the migration step room on a
-    # cold image build (~30s) before the failing probes start counting.
+    command: uv run uvicorn main:app --host 0.0.0.0 --port ${GATEWAY_PORT:-8080} --reload
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:${GATEWAY_PORT:-8080}/healthz || exit 1"]
       interval: 15s
       timeout: 3s
       retries: 5
-      start_period: 30s
+      start_period: 15s
+
+  # ── Firebase Auth emulator (dev only) ──────────────────────────────────────
+  # Local Firebase Auth so the whole stack runs real auth flows without touching
+  # a real Firebase project: the frontend's client SDK signs in against it and
+  # the frontend's Admin SDK (the BFF) verifies the resulting tokens / session
+  # cookies. Auth on 9099, emulator UI on 4000 (ports in ./firebase.json).
+  #
+  # Dev project id mirrors the tenant with a `-local` suffix. No real GCP creds
+  # are needed because every SDK is pointed at the emulator (the AUTH_EMULATOR
+  # _HOST vars). It MUST match the client/admin project id below or cookie
+  # verification fails.
+  firebase-emulator:
+    build:
+      context: ./tooling/firebase-emulator
+      dockerfile: Dockerfile
+    volumes:
+      - ./firebase.json:/firebase/firebase.json:ro
+    ports:
+      - "${FIREBASE_AUTH_EMULATOR_PORT:-9099}:9099"
+      - "${FIREBASE_EMULATOR_UI_PORT:-4000}:4000"
+    command: firebase emulators:start --only auth --project ${FIREBASE_PROJECT_ID:-nd-agentspace-local}
+    stdin_open: true
+    tty: true
 
   frontend:
     build:
@@ -210,12 +254,34 @@ services:
       - "${FRONTEND_PORT:-3000}:${FRONTEND_PORT:-3000}"
     environment:
       - NODE_ENV=${NODE_ENV:-development}
-      # The frontend talks to ONLY the gateway. Gateway proxies to the private
-      # agent service (ADK runtime), the MCP Toolbox (dashboards), and
-      # mcp-stats (Analyze page) — none of which the browser reaches directly.
-      - NEXT_PUBLIC_AGENTS_BASE_URL=${NEXT_PUBLIC_AGENTS_BASE_URL:-http://localhost:8080}
+      # The browser talks ONLY to the Next.js BFF proxy at /gw (same origin);
+      # the proxy forwards to the gateway server-side over the docker network.
+      # GATEWAY_URL is server-only — never shipped to the browser — so the
+      # gateway URL stays private and the gateway can be internal-ingress in
+      # prod. (Gateway proxies onward to the private agent / toolbox / stats.)
+      - GATEWAY_URL=${GATEWAY_URL:-http://gateway:8080}
+      # Firebase Auth (client SDK, runs in the browser). Dev values pair with the
+      # local emulator; the emulator host is the *browser-reachable* address
+      # (published port on localhost), not the docker-network name. Per-tenant
+      # real values are injected at deploy time (apphosting.yaml).
+      # Dev project id (mirrors the tenant, `-local` suffix); must match the
+      # emulator's --project. (Prod: real values from apphosting.yaml.)
+      - NEXT_PUBLIC_FIREBASE_PROJECT_ID=${NEXT_PUBLIC_FIREBASE_PROJECT_ID:-nd-agentspace-local}
+      - NEXT_PUBLIC_FIREBASE_API_KEY=${NEXT_PUBLIC_FIREBASE_API_KEY:-demo-api-key}
+      - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:-nd-agentspace-local.firebaseapp.com}
+      - NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST=${NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST:-http://localhost:9099}
+      # Server-side: the Admin SDK (BFF session verify) reaches the emulator over
+      # the docker network, not the browser's localhost. Unset in prod → the
+      # Admin SDK uses ADC (the App Hosting service account).
+      - FIREBASE_AUTH_EMULATOR_HOST=${FIREBASE_AUTH_EMULATOR_HOST:-firebase-emulator:9099}
+      # Access control: only these email domains may start a session (comma-
+      # separated). Empty = allow any (dev default). Set to your org domains in
+      # prod, e.g. "noisedigital.com,havas.com". Enforced in the session route.
+      - ALLOWED_EMAIL_DOMAINS=${ALLOWED_EMAIL_DOMAINS:-}
     depends_on:
       gateway:
+        condition: service_started
+      firebase-emulator:
         condition: service_started
     stdin_open: true
     tty: true
@@ -231,7 +297,7 @@ services:
       start_period: 30s
 
   postgres:
-    image: public.ecr.aws/docker/library/postgres:16
+    image: public.ecr.aws/docker/library/postgres:18
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-user}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
@@ -240,7 +306,9 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ./services/backend/database/init:/docker-entrypoint-initdb.d:ro
-      - postgres_data:/var/lib/postgresql/data
+      # Postgres 18+ stores data under /var/lib/postgresql/<major>/ and rejects a
+      # mount at /var/lib/postgresql/data — mount the parent. (docker-library/postgres#1259)
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-postgres}"]
       interval: 5s

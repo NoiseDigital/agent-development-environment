@@ -9,6 +9,7 @@ import { useSidebarCollapsed } from '../contexts/SidebarContext';
 import CollapsiblePanel from './ui/CollapsiblePanel';
 import Collapsible from './ui/Collapsible';
 import ThemeToggle from './ui/ThemeToggle';
+import UserMenu from './UserMenu';
 
 // ── Icons ────────────────────────────────────────────────────────────────────
 
@@ -255,7 +256,8 @@ export default function PlatformSidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="p-2 border-t border-line">
+      <div className="p-2 flex items-center gap-1">
+        <UserMenu />
         <ThemeToggle />
       </div>
     </CollapsiblePanel>

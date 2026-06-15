@@ -1,0 +1,62 @@
+# Firebase App Hosting runtime config for the Next.js frontend.
+# App Hosting builds this app from git (services/frontend = the backend's
+# rootDirectory) and manages the Cloud Run revision under the hood — we don't
+# build or deploy a frontend image ourselves.
+#
+# This app is also the BFF: its /gw route proxies to the gateway server-side.
+# Values below are for the sbx project. Non-secret NEXT_PUBLIC_* (Firebase web
+# config) come from `terraform output firebase_web_config`; the API key is in
+# Secret Manager. Per-stage overrides go in apphosting.<env>.yaml — only deltas.
+
+runConfig:
+  minInstances: 0
+  maxInstances: 2
+  cpu: 1
+  memoryMiB: 512
+  # VPC egress so the BFF can reach the INTERNAL-ingress gateway. Direct VPC
+  # egress (networkInterfaces, no Serverless connector) — the recommended path.
+  # ALL_TRAFFIC because the gateway's *.run.app is a public IP that must route
+  # through the VPC to count as internal. The VPC + subnet are created per-tenant
+  # by Terraform (module.tenant → <tenant>-<stage>-vpc / -subnet).
+  vpcAccess:
+    egress: ALL_TRAFFIC
+    networkInterfaces:
+      - network: vpc
+        subnetwork: subnet
+
+env:
+  # Server-only (RUNTIME, not BUILD): the gateway's INTERNAL Cloud Run URL. Used
+  # by the /gw proxy server-side; never shipped to the browser. = tf output gateway_url.
+  - variable: GATEWAY_URL
+    value: https://gateway-192748761045.us-central1.run.app
+    availability: [RUNTIME]
+  # Audience for the Cloud Run IAM ID token the proxy mints (same as GATEWAY_URL).
+  - variable: GATEWAY_AUDIENCE
+    value: https://gateway-192748761045.us-central1.run.app
+    availability: [RUNTIME]
+
+  # Access control: only these email domains may start a session (comma-
+  # separated). Enforced server-side in the BFF session route. Belt-and-suspenders
+  # with an Identity Platform blocking function (see infra/README.md follow-ups).
+  - variable: ALLOWED_EMAIL_DOMAINS
+    value: noisedigital.com
+    availability: [RUNTIME]
+
+  # Firebase web app config (client SDK, runs in the browser — legitimately
+  # public). From `terraform output firebase_web_config`.
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: nd-agentspace-sbx
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: nd-agentspace-sbx.firebaseapp.com
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:192748761045:web:a56c925c4f60cb28ddd75c"
+    availability: [BUILD, RUNTIME]
+
+  # Not a hard secret, but kept in Secret Manager so it isn't committed. Create:
+  #   gcloud secrets create firebase-web-api-key --data-file=- (paste the key)
+  # then grant the App Hosting service account secretAccessor.
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    secret: firebase-web-api-key
+    availability: [BUILD, RUNTIME]

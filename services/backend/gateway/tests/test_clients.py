@@ -1,4 +1,4 @@
-"""GET /api/clients — read-only platform client directory.
+"""GET /api/v1/clients — read-only platform client directory.
 
 The handler does a single SELECT against the `clients` table and shapes
 the rows into JSON. Tests pin the contract: the route exists, the
@@ -27,7 +27,7 @@ def test_list_clients_returns_rows_as_array(
             "logo_path": "/clients/noi.png",
         },
     ]
-    res = client.get("/api/clients")
+    res = client.get("/api/v1/clients")
     assert res.status_code == 200
     body = res.json()
     assert "clients" in body
@@ -45,7 +45,7 @@ def test_list_clients_empty_directory(
 ) -> None:
     # Zero-row case — the dashboards page should still render, so the route
     # must return `{ "clients": [] }`, never null / 204.
-    res = client.get("/api/clients")
+    res = client.get("/api/v1/clients")
     assert res.status_code == 200
     assert res.json() == {"clients": []}
 
@@ -55,7 +55,7 @@ def test_list_clients_query_is_deterministic(
     fake_pool: FakePool,
 ) -> None:
     # Pin the ORDER BY contract — sidebar listing relies on stable ordering.
-    client.get("/api/clients")
+    client.get("/api/v1/clients")
     assert len(fake_pool.fetch_calls) == 1
     query, _args = fake_pool.fetch_calls[0]
     assert "ORDER BY created_at ASC" in query

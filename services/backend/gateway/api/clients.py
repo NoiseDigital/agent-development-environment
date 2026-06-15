@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends
 from .auth import CurrentUser, current_user
 from .db import get_pool
 
-router = APIRouter(prefix="/api/clients", tags=["clients"])
+router = APIRouter(prefix="/clients", tags=["clients"])
 
 
 @router.get("")

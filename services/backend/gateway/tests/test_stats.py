@@ -61,23 +61,23 @@ def stats_client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
 class TestAllowlist:
     def test_forwards_correlate(self, stats_client: TestClient) -> None:
         FakeAsyncClient.next_response = (200, {"method": "pearson", "rows": []})
-        r = stats_client.post("/api/stats/correlate", json={"source": "upload:1"})
+        r = stats_client.post("/api/v1/stats/correlate", json={"source": "upload:1"})
         assert r.status_code == 200
         assert FakeAsyncClient.last_request is not None
         assert FakeAsyncClient.last_request["url"].endswith("/api/correlate")
 
     def test_forwards_qa(self, stats_client: TestClient) -> None:
-        stats_client.post("/api/stats/qa", json={"source": "upload:1"})
+        stats_client.post("/api/v1/stats/qa", json={"source": "upload:1"})
         assert FakeAsyncClient.last_request is not None
         assert FakeAsyncClient.last_request["url"].endswith("/api/qa")
 
     def test_forwards_describe(self, stats_client: TestClient) -> None:
-        stats_client.post("/api/stats/describe", json={"source": "upload:1"})
+        stats_client.post("/api/v1/stats/describe", json={"source": "upload:1"})
         assert FakeAsyncClient.last_request is not None
         assert FakeAsyncClient.last_request["url"].endswith("/api/describe")
 
     def test_rejects_endpoint_not_on_allowlist(self, stats_client: TestClient) -> None:
-        r = stats_client.post("/api/stats/exec_arbitrary_sql", json={})
+        r = stats_client.post("/api/v1/stats/exec_arbitrary_sql", json={})
         assert r.status_code == 404
         assert FakeAsyncClient.last_request is None  # never touched the upstream
 
@@ -85,7 +85,7 @@ class TestAllowlist:
 class TestRequestForwarding:
     def test_forwards_the_request_body_verbatim(self, stats_client: TestClient) -> None:
         body = {"source": "upload:1", "method": "spearman", "alpha": 0.01}
-        stats_client.post("/api/stats/correlate", json=body)
+        stats_client.post("/api/v1/stats/correlate", json=body)
         assert FakeAsyncClient.last_request is not None
         import json as _json
 
@@ -94,7 +94,7 @@ class TestRequestForwarding:
     def test_sets_content_type_on_upstream_request(
         self, stats_client: TestClient
     ) -> None:
-        stats_client.post("/api/stats/correlate", json={"source": "upload:1"})
+        stats_client.post("/api/v1/stats/correlate", json={"source": "upload:1"})
         assert FakeAsyncClient.last_request is not None
         assert (
             FakeAsyncClient.last_request["headers"]["content-type"]
@@ -107,7 +107,7 @@ class TestResponsePropagation:
         self, stats_client: TestClient
     ) -> None:
         FakeAsyncClient.next_response = (400, {"error": "bad source"})
-        r = stats_client.post("/api/stats/correlate", json={"source": "garbage"})
+        r = stats_client.post("/api/v1/stats/correlate", json={"source": "garbage"})
         assert r.status_code == 400
         assert r.json() == {"error": "bad source"}
 
@@ -115,13 +115,13 @@ class TestResponsePropagation:
         self, stats_client: TestClient
     ) -> None:
         FakeAsyncClient.next_response = (500, {"error": "stats crashed"})
-        r = stats_client.post("/api/stats/correlate", json={"source": "upload:1"})
+        r = stats_client.post("/api/v1/stats/correlate", json={"source": "upload:1"})
         assert r.status_code == 500
 
 
 class TestUpstreamFailure:
     def test_unreachable_upstream_becomes_502(self, stats_client: TestClient) -> None:
         FakeAsyncClient.raises = httpx.ConnectError("connection refused")
-        r = stats_client.post("/api/stats/correlate", json={"source": "upload:1"})
+        r = stats_client.post("/api/v1/stats/correlate", json={"source": "upload:1"})
         assert r.status_code == 502
         assert "stats upstream unreachable" in r.json()["detail"]

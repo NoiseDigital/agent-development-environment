@@ -1,4 +1,4 @@
-"""Stats proxy — forwards `/api/stats/<endpoint>` to the mcp-stats service.
+"""Stats proxy — forwards `/api/v1/stats/<endpoint>` to the mcp-stats service.
 
 The Analyze page calls statistics endpoints (correlate / qa / describe) that
 live on the mcp-stats container. The browser cannot reach mcp-stats directly
@@ -9,9 +9,9 @@ In local development this is a thin pass-through that lets us also stop
 exposing `NEXT_PUBLIC_STATS_BASE_URL` to the frontend. In production it's
 load-bearing: it's how the public ingress reaches the private stats service.
 
-Mounted under `/api/stats/...`; the upstream path is `/api/<endpoint>` so the
-mcp-stats Starlette routes (`/api/correlate`, `/api/qa`, `/api/describe`)
-match unchanged.
+Mounted under `/api/v1/stats/...` (the `/api/v1` parent lives in main.py); the
+upstream path is `/api/<endpoint>` so the mcp-stats Starlette routes
+(`/api/correlate`, `/api/qa`, `/api/describe`) match unchanged.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from .auth import CurrentUser, current_user
 
 STATS_URL = os.getenv("STATS_URL", "http://mcp-stats:8080")
 
-router = APIRouter(prefix="/api/stats", tags=["stats"])
+router = APIRouter(prefix="/stats", tags=["stats"])
 
 # Allowlisted upstream paths — the gateway never forwards an arbitrary path.
 # Mirrors the stats server's HTTP routes; if we add a new stats endpoint there

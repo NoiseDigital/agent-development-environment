@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars and fill in. Run once with an admin's credentials.
+project_id       = "nd-agentspace-sbx" # automation/seed project (can be the sbx project to start)
+region           = "us-central1"
+artifact_repo_id = "platform"
+
+github_owner = "your-org"       # GitHub org/user that owns the repo
+github_repo  = "agent-platform" # repo name (no owner)
+
+# State buckets are created as "<project>-tfstate" per entry below.
+
+# Tenant-stage projects the CI deployer may deploy into. Add stages as created.
+target_projects = ["nd-agentspace-sbx"]

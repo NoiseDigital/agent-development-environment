@@ -19,7 +19,9 @@ import pandas as pd
 from engine import clean_dataframe
 
 AGENT_URL = os.environ.get("AGENT_URL", "http://agent:8000")
+STORAGE_BACKEND = os.environ.get("STORAGE_BACKEND", "local").lower()
 STORAGE_PATH = os.environ.get("STORAGE_LOCAL_PATH", "/data/uploads")
+GCS_BUCKET = os.environ.get("GCS_BUCKET")
 BQ_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT")
 
 # BigQuery tables larger than this are randomly down-sampled — correlation and
@@ -50,7 +52,13 @@ def _read_upload(source_id: str, sheet: Optional[str]) -> pd.DataFrame:
     resp = httpx.get(f"{AGENT_URL}/api/sources/{source_id}", timeout=30.0)
     resp.raise_for_status()
     source = resp.json()
-    path = os.path.join(STORAGE_PATH, source["storage_key"])
+    key = source["storage_key"]
+    # Match the agent's storage backend: a gs:// URI in prod (pandas reads it via
+    # gcsfs + ADC), a shared-volume path in dev.
+    if STORAGE_BACKEND == "gcs":
+        path = f"gs://{GCS_BUCKET}/{key}"
+    else:
+        path = os.path.join(STORAGE_PATH, key)
     ext = (source.get("file_ext") or "").lower()
     if ext in (".csv", ".txt"):
         return pd.read_csv(path, low_memory=False)

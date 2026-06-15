@@ -170,18 +170,19 @@ docker volume create agent-platform_gcloud_config >/dev/null 2>&1 || true
 docker compose \
     --project-directory "$PROJECT_ROOT" \
     -f "$PROJECT_ROOT/docker-compose.yml" \
-    build gateway agent frontend mcp-stats
+    build gateway agent frontend mcp-stats migrate firebase-emulator
 
 # Up ordering:
-#   postgres (healthcheck) → gateway (runs `alembic upgrade head` then
-#   uvicorn; healthcheck flips green once /healthz responds) → agent
-#   (waits on gateway: service_healthy) → mcp-stats / frontend. `--wait`
-#   blocks until every named service is healthy.
+#   postgres (healthcheck) → migrate (one-shot `alembic upgrade head`, runs to
+#   completion) → gateway + agent (both wait on migrate via
+#   service_completed_successfully) → mcp-stats / frontend. firebase-emulator
+#   starts alongside for local Firebase Auth. `--wait` blocks until every
+#   long-running service is healthy (the one-shot migrate just needs exit 0).
 COMPOSE_IGNORE_ORPHANS=1 docker compose \
     --project-directory "$HOST_PROJECT_ROOT" \
     -f "$PROJECT_ROOT/docker-compose.yml" \
-    up -d --no-build --wait --wait-timeout 120 \
-    postgres mcp-toolbox gateway agent frontend mcp-stats
+    up -d --no-build --wait --wait-timeout 180 \
+    postgres mcp-toolbox migrate firebase-emulator gateway agent frontend mcp-stats
 
 echo ""
 echo "✔ All services running."

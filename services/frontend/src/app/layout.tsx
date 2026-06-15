@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import PlatformSidebar from "../components/PlatformSidebar";
-import FloatingAssistant from "../components/chat/FloatingAssistant";
-import NeuralBackground from "../components/NeuralBackground";
-import Toaster from "../components/ui/Toaster";
+import AppChrome from "../components/AppChrome";
 import { SidebarProvider } from "../contexts/SidebarContext";
 import { ThemeProvider } from "../contexts/ThemeContext";
+import { AuthProvider } from "../lib/firebase/auth-context";
 
 // Runs before first paint: resolves the saved preference (or the OS setting on
 // a fresh visit) and sets the `light`/`dark` class on <html> so there's never a
@@ -43,17 +41,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-canvas text-foreground`}
       >
         <ThemeProvider>
-          <SidebarProvider>
-            <NeuralBackground />
-            <div className="relative z-10 flex h-screen overflow-hidden">
-              <PlatformSidebar />
-              <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
-                {children}
-              </div>
-            </div>
-            <FloatingAssistant />
-            <Toaster />
-          </SidebarProvider>
+          <AuthProvider>
+            <SidebarProvider>
+              <AppChrome>{children}</AppChrome>
+            </SidebarProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

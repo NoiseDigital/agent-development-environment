@@ -1,4 +1,4 @@
-// BigQuery-backed dashboard data source. Hits the gateway's /api/dashboards/query
+// BigQuery-backed dashboard data source. Hits the gateway's /api/v1/dashboards/query
 // which runs the same toolbox tools the agent uses — one SQL surface.
 
 import { apiRequest } from '../api/http';
@@ -19,19 +19,20 @@ import type {
   CampaignWindow,
   CampaignWindowsFilter,
 } from './data-source';
+import { gatewayBase } from '@/lib/api/gateway';
 
-const BASE_URL = process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'http://localhost:8080';
+const BASE_URL = gatewayBase();
 
 interface ToolResponse<T> {
   rows: T[];
 }
 
-/** POST /api/dashboards/query. Promise-cached so tab-switches paint from
+/** POST /api/v1/dashboards/query. Promise-cached so tab-switches paint from
  *  cache; the Refresh button calls `invalidateAll()` (see cache.ts). */
 async function query<T>(tool: string, params: Record<string, unknown>): Promise<T[]> {
   return cached(tool, params, async () => {
     const data = await apiRequest<ToolResponse<T>>(
-      `${BASE_URL}/api/dashboards/query`,
+      `${BASE_URL}/api/v1/dashboards/query`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

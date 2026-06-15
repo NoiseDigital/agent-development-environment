@@ -19,7 +19,9 @@ __pycache__/
 *-credentials.json
 application_default_credentials.json
 
-# Terraform — ignore the entire .terraform working dir, not a versioned binary path
-terraform/.terraform/
-terraform/*.tfstate
-terraform/*.tfstate.backup
+# Terraform lives under infra/ (see infra/.gitignore for state/plan/tfvars
+# rules). Belt-and-suspenders globs in case anything runs outside infra/:
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan

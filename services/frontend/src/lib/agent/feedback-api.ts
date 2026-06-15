@@ -2,8 +2,9 @@
 // Ratings are keyed by the ADK event id of the message they apply to.
 
 import { apiRequest } from '../api/http';
+import { gatewayBase } from '@/lib/api/gateway';
 
-const BASE_URL = process.env.NEXT_PUBLIC_AGENTS_BASE_URL || 'http://localhost:8000';
+const BASE_URL = gatewayBase();
 
 export type Rating = 'up' | 'down';
 

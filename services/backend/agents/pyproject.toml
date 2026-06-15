@@ -29,6 +29,7 @@ dependencies = [
     "pandas>=2.3.3",
     "db-dtypes>=1.6.0",
     "tabulate>=0.10.0",
+    "google-cloud-storage>=3.10.1",
 ]
 
 [tool.setuptools]

@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "default": "nd-agentspace-sbx",
+    "sbx": "nd-agentspace-sbx"
+  }
+}

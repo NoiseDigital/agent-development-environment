@@ -174,23 +174,23 @@ jobs:
   terraform-check:
     name: Terraform — fmt + validate
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: terraform
-
     steps:
       - uses: actions/checkout@v4
 
       - uses: hashicorp/setup-terraform@v3
 
       - name: terraform fmt check
+        working-directory: infra
         run: terraform fmt -check -recursive
 
-      - name: terraform init (for validate)
-        run: terraform init -backend=false
-
+      # Validate the whole module tree through a concrete env (the sbx tenant
+      # calls module.tenant, so this validates the module too). -backend=false
+      # skips the GCS backend; validate needs no var values.
       - name: terraform validate
-        run: terraform validate
+        working-directory: infra/tenants/nd-agentspace/sbx
+        run: |
+          terraform init -backend=false
+          terraform validate
 
   # ── Docker Compose config validation ──────────────────────────────────────
   compose-check:
