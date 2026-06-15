@@ -39,16 +39,47 @@ terraform apply
 terraform output    # note: state_buckets, artifact_registry, ci_deployer_sa_email, workload_identity_provider
 ```
 
-Then set these **GitHub repo variables** (Settings → Secrets and variables →
-Actions → Variables):
+Then wire these into a **GitHub Environment** — see *CI deploy auth* below. This
+is a **manual step, once per tenant-stack** (the values come from this tenant's
+bootstrap output, so they can't be committed or auto-generated).
 
-| Variable | Value (from `terraform output`) |
-|----------|----------------------------------|
+### CI deploy auth — GitHub Environments (one per tenant-stack)
+
+Single-tenant model: each client gets its own GCP project, so the deploy target
+varies per tenant. We model each tenant-stack as a **GitHub Environment** named
+`<tenant>-<stage>` (e.g. `noise-sbx`). `deploy.yml` selects it
+(`environment:` — defaults to `noise-sbx` on push to `main`, or pick another via
+the `workflow_dispatch` input), which scopes `vars.*` to that environment. Adding
+a client later = run bootstrap in their project, create their environment, paste
+the 5 vars — **no workflow edit**.
+
+Set these as **environment variables** (repo → Settings → Environments →
+`<tenant>-<stage>` → Environment variables) — *not* repo-level, so each tenant's
+values stay isolated:
+
+| Variable | Value (from this tenant's `terraform output`) |
+| --- | --- |
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `workload_identity_provider` |
 | `GCP_CI_SERVICE_ACCOUNT` | `ci_deployer_sa_email` |
 | `GCP_REGION` | `us-central1` |
 | `DEPLOY_PROJECT` | `nd-agentspace-sbx` |
 | `ARTIFACT_REGISTRY` | `artifact_registry` |
+
+Via the CLI (run on your host, not the dev container — it has no `gh`):
+
+```bash
+REPO=NoiseDigital/agent-platform
+ENV=noise-sbx
+gh api -X PUT repos/$REPO/environments/$ENV          # create the environment
+gh variable set GCP_WORKLOAD_IDENTITY_PROVIDER --env $ENV -R $REPO -b "<workload_identity_provider>"
+gh variable set GCP_CI_SERVICE_ACCOUNT         --env $ENV -R $REPO -b "<ci_deployer_sa_email>"
+gh variable set ARTIFACT_REGISTRY              --env $ENV -R $REPO -b "<artifact_registry>"
+gh variable set GCP_REGION                     --env $ENV -R $REPO -b "us-central1"
+gh variable set DEPLOY_PROJECT                 --env $ENV -R $REPO -b "<project_id>"
+```
+
+These five are **identifiers, not secrets** (the keyless WIF trust is what gates
+deploys), so plain environment *variables* are correct — don't make them secrets.
 
 ## 2. Provision the tenant stack
 
@@ -83,11 +114,20 @@ on push to `main`).
 
 **b. Google Workspace SSO**
 Create an OAuth **Web** client (APIs & Services → Credentials). Set the consent
-screen to **Internal** (Workspace-only — your first hard access gate). Then:
+screen to **Internal** (Workspace-only — your first hard access gate). The
+client **secret must never go in the committed `terraform.tfvars`** — put it in
+a gitignored `secrets.auto.tfvars` (matched by `*.auto.tfvars` in
+`infra/.gitignore`) or pass it as an env var:
 
 ```hcl
+# infra/tenants/<tenant>/<stage>/secrets.auto.tfvars   (gitignored)
 google_oauth_client_id     = "....apps.googleusercontent.com"
 google_oauth_client_secret = "..."
+```
+
+```bash
+# …or, no file at all:
+export TF_VAR_google_oauth_client_secret='...'
 ```
 
 `terraform apply` → enables the Google IdP. Add the App Hosting domain to the
@@ -151,6 +191,11 @@ deploy — check them first:
 See [infra/README.md](infra/README.md) → "Add a new stage". A new stage =
 `tenants/nd-agentspace/<stage>/` (flip `stage` + backend prefix); a new tenant =
 `tenants/<tenant>/`. Add the project to bootstrap `target_projects` and re-apply.
+
+For either, also create the matching **GitHub Environment** `<tenant>-<stage>`
+with that stack's 5 deploy vars (§1, *CI deploy auth*) — that's the one manual,
+per-stack step the deploy needs. Then deploy it with the `workflow_dispatch`
+`environment` input (or wire its trigger branch).
 
 ## Hardening follow-ups (not blocking)
 

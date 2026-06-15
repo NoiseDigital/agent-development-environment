@@ -37,3 +37,26 @@ resource "google_secret_manager_secret_iam_member" "database_url_accessors" {
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${each.value}"
 }
+
+# ── Firebase web API key ─────────────────────────────────────────────────────
+# This is PUBLIC client config — it ships in the browser bundle; Firebase
+# security comes from Auth rules + authorized domains, not from hiding it. We
+# keep it in Secret Manager only so it isn't committed to the repo, and source
+# it from the web-app config data source so every tenant gets it automatically.
+# apphosting.yaml references it as `secret: firebase-web-api-key`; the App
+# Hosting SA's project-level secretAccessor (firebase.tf) covers read access.
+resource "google_secret_manager_secret" "firebase_web_api_key" {
+  project   = local.project_id
+  secret_id = "firebase-web-api-key"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.services]
+}
+
+resource "google_secret_manager_secret_version" "firebase_web_api_key" {
+  secret      = google_secret_manager_secret.firebase_web_api_key.id
+  secret_data = data.google_firebase_web_app_config.this.api_key
+}

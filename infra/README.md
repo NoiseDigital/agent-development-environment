@@ -56,10 +56,15 @@ Note the outputs (`state_buckets`, `artifact_registry`, `ci_deployer_sa_email`,
 `workload_identity_provider`) — they feed the env backends and the GitHub repo
 variables below.
 
-### GitHub repo variables (Settings → Secrets and variables → Actions → Variables)
+### GitHub Environment vars (Settings → Environments → `<tenant>-<stage>`)
+
+Per-tenant deploy targets, so the 5 deploy vars live in a **GitHub Environment**
+named `<tenant>-<stage>` (e.g. `noise-sbx`), not repo-wide — `deploy.yml` selects
+it so `vars.*` resolve per tenant. Manual, once per stack. Full rationale + `gh`
+commands: [DEPLOY.md](../DEPLOY.md) → "CI deploy auth".
 
 | Variable | Value |
-|----------|-------|
+| --- | --- |
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | bootstrap output `workload_identity_provider` |
 | `GCP_CI_SERVICE_ACCOUNT` | bootstrap output `ci_deployer_sa_email` |
 | `GCP_REGION` | `us-central1` |
