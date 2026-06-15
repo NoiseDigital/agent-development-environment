@@ -60,3 +60,16 @@ resource "google_secret_manager_secret_version" "firebase_web_api_key" {
   secret      = google_secret_manager_secret.firebase_web_api_key.id
   secret_data = data.google_firebase_web_app_config.this.api_key
 }
+
+# App Hosting's secret resolver validates a SECRET-LEVEL binding — a project-level
+# secretAccessor is NOT honored by it — so grant the App Hosting compute SA
+# accessor on this secret directly. This is what `firebase apphosting:secrets:
+# grantaccess` does; without it the frontend build fails with "Misconfigured
+# secret". (app_hosting_sa local + the App Hosting gate live in firebase.tf.)
+resource "google_secret_manager_secret_iam_member" "firebase_web_api_key_apphosting" {
+  count     = var.enable_app_hosting && var.developer_connect_repo != "" ? 1 : 0
+  project   = local.project_id
+  secret_id = google_secret_manager_secret.firebase_web_api_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${local.app_hosting_sa}"
+}
