@@ -229,6 +229,17 @@ resource "google_cloud_run_v2_service" "gateway" {
         name  = "STATS_URL"
         value = local.run_url["mcp-stats"]
       }
+      # Access control: enforce the invite-only allowlist + DB-resolved roles in
+      # prod (off in local dev, where every user is admin). Bootstrap admins
+      # auto-provision on first sign-in so there's an admin to invite the rest.
+      env {
+        name  = "REQUIRE_PROVISIONED_USERS"
+        value = "true"
+      }
+      env {
+        name  = "BOOTSTRAP_ADMIN_EMAILS"
+        value = join(",", var.admin_emails)
+      }
       # No Firebase here (the BFF verifies identity and forwards X-User-*), and
       # no ALLOWED_ORIGINS / CORS — the only caller is the same-origin BFF.
     }

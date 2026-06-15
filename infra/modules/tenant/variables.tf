@@ -60,6 +60,17 @@ variable "placeholder_image" {
   default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
 
+# ── Access control ──────────────────────────────────────────────────────────
+variable "admin_emails" {
+  type        = list(string)
+  description = <<-EOT
+    Emails that auto-provision as admin on first sign-in (bootstrap, so there's
+    an admin to invite everyone else). Must be within an allowed sign-in domain.
+    Everyone else is invite-only via the admin UI.
+  EOT
+  default     = []
+}
+
 # ── Vertex AI (the agent calls Gemini) ──────────────────────────────────────
 variable "vertex_location" {
   type        = string

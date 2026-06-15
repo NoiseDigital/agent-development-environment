@@ -23,11 +23,31 @@ class FakePool:
 
     def __init__(self, rows: list[dict[str, Any]] | None = None) -> None:
         self._rows = rows or []
+        # Explicit single-row result for `fetchrow`; falls back to _rows[0].
+        # Set to a sentinel-free None to force "no row" (e.g. un-provisioned).
+        self._row: dict[str, Any] | None = None
+        self._row_set = False
         self.fetch_calls: list[tuple[str, tuple[Any, ...]]] = []
+        self.execute_calls: list[tuple[str, tuple[Any, ...]]] = []
 
     async def fetch(self, query: str, *args: Any) -> list[dict[str, Any]]:
         self.fetch_calls.append((query, args))
         return self._rows
+
+    async def fetchrow(self, query: str, *args: Any) -> dict[str, Any] | None:
+        self.fetch_calls.append((query, args))
+        if self._row_set:
+            return self._row
+        return self._rows[0] if self._rows else None
+
+    async def execute(self, query: str, *args: Any) -> str:
+        self.execute_calls.append((query, args))
+        return "OK"
+
+    def set_row(self, row: dict[str, Any] | None) -> None:
+        """Pin the next `fetchrow` result (use None for 'no row')."""
+        self._row = row
+        self._row_set = True
 
 
 @pytest.fixture
@@ -52,11 +72,17 @@ def client(
     async def _get_pool() -> FakePool:
         return fake_pool
 
+    import api.auth
     import api.clients
     import api.db
+    import api.me
+    import api.users
 
     monkeypatch.setattr(api.db, "get_pool", _get_pool)
     monkeypatch.setattr(api.clients, "get_pool", _get_pool)
+    monkeypatch.setattr(api.me, "get_pool", _get_pool)
+    monkeypatch.setattr(api.users, "get_pool", _get_pool)
+    monkeypatch.setattr(api.auth, "get_pool", _get_pool)
 
     from main import app
 

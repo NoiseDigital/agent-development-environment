@@ -33,6 +33,7 @@ from api.health import router as health_router
 from api.me import router as me_router
 from api.proxy import router as proxy_router
 from api.stats import router as stats_router
+from api.users import router as users_router
 
 app = FastAPI(title="NoiseOS Gateway", version="0.1.0")
 
@@ -60,6 +61,7 @@ api_v1.include_router(dashboards_router)
 api_v1.include_router(stats_router)
 api_v1.include_router(clients_router)
 api_v1.include_router(me_router)
+api_v1.include_router(users_router)
 
 # Order matters — the proxy is a catch-all and must be the LAST router added,
 # so explicit gateway-owned routes match before falling through to the agent.
