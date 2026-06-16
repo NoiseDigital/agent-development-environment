@@ -32,6 +32,28 @@ interface AuthState {
   signOut: () => Promise<void>;
 }
 
+// GET /me needs the httpOnly session cookie. Right after sign-in that cookie is
+// minted by a separate async POST /api/auth/session that may not have landed
+// yet, and it can also expire while the Firebase session is still live. On a
+// 401 with a live Firebase user, (re)mint the cookie from a fresh ID token and
+// retry once — turning the sign-in race into a deterministic success and only
+// surfacing access-denied for a genuine allowlist denial.
+async function fetchMe(u: User | null): Promise<MeRecord> {
+  try {
+    return await meApi.get();
+  } catch (err) {
+    if (!u) throw err;
+    const idToken = await u.getIdToken();
+    const res = await fetch("/api/auth/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
+    });
+    if (!res.ok) throw err;
+    return await meApi.get();
+  }
+}
+
 const AuthContext = createContext<AuthState>({
   user: null,
   me: null,
@@ -59,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // user: local dev has no login but the gateway still returns the dev
       // admin; a logged-out prod request 403s and clears it.
       try {
-        const record = await meApi.get();
+        const record = await fetchMe(u);
         setMe(record);
         setCurrentUserRole(record.role as Role);
       } catch {
