@@ -14,13 +14,19 @@ be unwound for Firebase.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
-from fastapi import Header
+from fastapi import Header, HTTPException
 
 # The development identity used until Firebase is wired in. Kept as "user-1" so
 # existing ADK sessions and event metadata (all keyed by that id) still resolve.
+# LOCAL-ONLY: never used in a deployed env (see current_user) so the dev identity
+# can't leak into a production DB.
 DEV_UID = "user-1"
+
+# Cloud Run services set K_SERVICE; jobs set CLOUD_RUN_JOB. Either => deployed.
+_DEPLOYED = bool(os.getenv("K_SERVICE") or os.getenv("CLOUD_RUN_JOB"))
 
 
 @dataclass(frozen=True)
@@ -41,9 +47,20 @@ class CurrentUser:
 async def current_user(x_dev_user: str | None = Header(default=None)) -> CurrentUser:
     """Resolve the request's authenticated user.
 
-    DEV SEAM — returns a development identity (overridable via `X-Dev-User` for
-    multi-user testing). When auth lands, replace the body with Firebase token
-    verification (`firebase_admin.auth.verify_id_token`); the signature and
-    return type stay the same so no route has to change.
+    The gateway is the auth boundary: in every deployed env it forwards the
+    verified user as `X-Dev-User` (and only the gateway SA can reach this
+    internal service). So:
+
+      * `X-Dev-User` present -> use it (the verified identity).
+      * absent + deployed    -> reject (401). Never fall back to the shared dev
+        identity — that would seed "user-1" into a production DB.
+      * absent + local       -> the dev identity, so the stack runs without login.
+
+    When Firebase Auth is wired in, replace the body with token verification;
+    the signature and return type stay the same so no route has to change.
     """
-    return CurrentUser(uid=x_dev_user or DEV_UID)
+    if x_dev_user:
+        return CurrentUser(uid=x_dev_user)
+    if _DEPLOYED:
+        raise HTTPException(status_code=401, detail="identity required")
+    return CurrentUser(uid=DEV_UID)
