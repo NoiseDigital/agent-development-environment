@@ -1,8 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# tenant module — one tenant-stage's backend stack (Cloud SQL, Cloud Run,
-# GCS, Secret Manager, networking, IAM, Firebase). The frontend is NOT here:
-# it deploys via Firebase App Hosting's native git rollout (see firebase.tf +
-# services/frontend/apphosting.yaml).
+# tenant module — one tenant-stage's full stack (Cloud SQL, Cloud Run incl. the
+# public frontend, GCS, Secret Manager, networking, IAM, Firebase Auth). All
+# services build + deploy via CI (.github/workflows/deploy.yml).
 #
 # Single-tenant-per-project: project_id = "<tenant_id>-<stage>".
 #

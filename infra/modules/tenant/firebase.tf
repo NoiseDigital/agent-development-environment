@@ -25,8 +25,8 @@ resource "google_firebase_web_app" "this" {
 }
 
 # Web app config (apiKey, authDomain, appId, …) — surfaced as outputs so the
-# frontend's apphosting.yaml / NEXT_PUBLIC_* values come from Terraform, not
-# hand-copied console values.
+# frontend's NEXT_PUBLIC_* build args come from Terraform, not hand-copied
+# console values.
 data "google_firebase_web_app_config" "this" {
   provider   = google-beta
   project    = local.project_id

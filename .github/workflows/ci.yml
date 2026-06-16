@@ -1,10 +1,16 @@
 name: CI
 
 on:
+  # PRs cover feature branches; push only on main (post-merge) — so a branch with
+  # an open PR doesn't run CI twice.
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
-    branches: ["**"]
+
+# Cancel an in-progress run when a new commit supersedes it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # ── Python backend lint + type check ──────────────────────────────────────
