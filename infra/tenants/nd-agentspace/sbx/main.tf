@@ -27,10 +27,15 @@ provider "google-beta" {
 module "tenant" {
   source = "../../../modules/tenant"
 
-  tenant_id       = local.tenant_id
-  stage           = local.stage
-  region          = var.region
-  vertex_location = "northamerica-northeast1" # Vertex stays in Montreal
+  tenant_id = local.tenant_id
+  stage     = local.stage
+  region    = var.region
+  # Global endpoint: pools Gemini capacity across regions for the best
+  # availability (regional endpoints like northamerica-northeast1 have limited
+  # gemini-2.5 capacity and 429 under light load). NOTE: the global endpoint
+  # gives NO data-residency guarantee — revisit if a tenant requires in-region
+  # ML processing (then use a high-capacity region + Provisioned Throughput).
+  vertex_location = "global"
 
   google_oauth_client_id     = var.google_oauth_client_id
   google_oauth_client_secret = var.google_oauth_client_secret
