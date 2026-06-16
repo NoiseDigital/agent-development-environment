@@ -8,7 +8,7 @@ Step-by-step runbook for deploying a tenant-stage (starting with
 
 | Component | Target | How |
 |-----------|--------|-----|
-| Frontend (Next.js + BFF) | Firebase **App Hosting** | native git rollout on push |
+| Frontend (Next.js + BFF) | **Cloud Run** (public ingress) | GitHub Actions ([deploy.yml](.github/workflows/deploy.yml)) — standalone build |
 | Backend (gateway, agent, mcp-stats, mcp-toolbox) | **Cloud Run** (internal ingress) | GitHub Actions ([deploy.yml](.github/workflows/deploy.yml)) |
 | Migrations | Cloud Run **job** (`<stage>-migrate`) | run by CI before each deploy |
 | Database | **Cloud SQL** Postgres (private IP) | Terraform |
@@ -85,34 +85,22 @@ deploys), so plain environment *variables* are correct — don't make them secre
 
 ```bash
 cd infra/tenants/nd-agentspace/sbx
-# edit terraform.tfvars: set github_owner
+# edit terraform.tfvars: set admin_emails (bootstrap admin)
 terraform init     # uses the GCS backend from step 1
 terraform apply    # Cloud SQL + VPC take ~10–15 min
 ```
 
-Creates: VPC + private Cloud SQL, Cloud Run services (seeded with a placeholder
-image), the migrate job, GCS bucket, Secret Manager (DB URL), least-priv runtime
-SAs + IAM (gateway internal + BFF-only invoker; deep services internal), and
-Firebase (project, web app, email/password auth). App Hosting + Google SSO stay
-off until step 3.
+Creates: VPC + private Cloud SQL, Cloud Run services incl. the public **frontend**
+(seeded with a placeholder image), the migrate job, GCS bucket, Secret Manager,
+least-priv runtime SAs + IAM (gateway internal + frontend-only invoker; deep
+services internal), and Firebase (project, web app, email/password auth). Google
+SSO stays off until step 3.
 
 > If a first apply hits a transient "API not enabled", just re-run `apply`.
 
 ## 3. The interactive bits (can't be automated)
 
-**a. Firebase App Hosting — Developer Connect**
-Authorize the GitHub repo once (Firebase console → App Hosting → connect repo, or
-`gcloud developer-connect`). Then in the env tfvars:
-
-```hcl
-enable_app_hosting     = true
-developer_connect_repo = "projects/<p>/locations/<r>/connections/<c>/gitRepositoryLinks/<link>"
-```
-
-`terraform apply` → creates the App Hosting backend (builds `services/frontend`
-on push to `main`).
-
-**b. Google Workspace SSO**
+**a. Google Workspace SSO**
 Create an OAuth **Web** client (APIs & Services → Credentials). Set the consent
 screen to **Internal** (Workspace-only — your first hard access gate). The
 client **secret must never go in the committed `terraform.tfvars`** — put it in
@@ -130,26 +118,25 @@ google_oauth_client_secret = "..."
 export TF_VAR_google_oauth_client_secret='...'
 ```
 
-`terraform apply` → enables the Google IdP. Add the App Hosting domain to the
-Identity Platform authorized domains.
+`terraform apply` → enables the Google IdP. (The frontend's Cloud Run URL is
+added to the Identity Platform authorized domains automatically.)
 
-**c. Google Analytics (optional)**
+**b. Google Analytics (optional)**
 Link a GA4 property in the Firebase console; `measurementId` then flows through
 `terraform output firebase_web_config` automatically.
 
-## 4. Wire prod config
+**c. Frontend build var**
+Add `NEXT_PUBLIC_FIREBASE_APP_ID` (from `terraform output firebase_web_config`)
+to the tenant's **GitHub Environment**. CI bakes the public Firebase config into
+the client bundle at build; `project_id` + `auth_domain` derive from the project,
+and the API key comes from Secret Manager — none of it is committed.
 
-From `terraform output firebase_web_config` and `gateway_url`, fill the real
-values in [services/frontend/apphosting.yaml](services/frontend/apphosting.yaml):
-`NEXT_PUBLIC_FIREBASE_*`, `GATEWAY_URL` + `GATEWAY_AUDIENCE` (the gateway's
-internal URL), the VPC network/subnetwork, and `ALLOWED_EMAIL_DOMAINS`.
+## 4. The web API key secret
 
-Create the web API key secret:
-
-```bash
-echo -n "<web api key>" | gcloud secrets create firebase-web-api-key \
-  --data-file=- --project nd-agentspace-sbx
-```
+`terraform apply` creates the `firebase-web-api-key` secret from the Firebase
+web-app config (see [secrets.tf](infra/modules/tenant/secrets.tf)). CI reads it
+at frontend **build** time (the ci-deployer SA has project-level
+`secretAccessor`) and passes it as a build arg — it's never in the repo.
 
 ## 5. First deploy
 
@@ -157,16 +144,18 @@ echo -n "<web api key>" | gcloud secrets create firebase-web-api-key \
 git push origin main
 ```
 
-`deploy.yml`: WIF auth → build gateway/agent/mcp-stats/mcp-toolbox (`--target prod`
-where applicable) → push to Artifact Registry → **run the migrate job** → roll the
-Cloud Run services (replacing the placeholder images). The frontend builds and
-rolls out via App Hosting natively.
+`deploy.yml`: WIF auth → build **only the changed services** (gateway/agent/
+mcp-stats/mcp-toolbox + **frontend**, path-filtered) → push to Artifact Registry
+→ run the migrate job (when the gateway changed) → roll the Cloud Run services
+(replacing the placeholder images). The frontend is a standard Cloud Run service
+we own — same pipeline as the backend.
 
 ## 6. Verify
 
-- App Hosting URL loads → sign in (Google Workspace) → app works.
+- `terraform output frontend_url` loads → sign in (Google Workspace / a bootstrap
+  admin from `admin_emails`) → app works.
 - `curl https://<gateway-url>/healthz` from **outside** should fail (internal
-  ingress); the app works because the BFF reaches it over the VPC.
+  ingress); the app works because the frontend BFF reaches it over the VPC.
 - Dashboards load (agent → toolbox → BigQuery).
 
 ---

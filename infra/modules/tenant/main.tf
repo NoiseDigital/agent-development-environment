@@ -1,8 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# tenant module — one tenant-stage's backend stack (Cloud SQL, Cloud Run,
-# GCS, Secret Manager, networking, IAM, Firebase). The frontend is NOT here:
-# it deploys via Firebase App Hosting's native git rollout (see firebase.tf +
-# services/frontend/apphosting.yaml).
+# tenant module — one tenant-stage's full stack (Cloud SQL, Cloud Run incl. the
+# public frontend, GCS, Secret Manager, networking, IAM, Firebase Auth). All
+# services build + deploy via CI (.github/workflows/deploy.yml).
 #
 # Single-tenant-per-project: project_id = "<tenant_id>-<stage>".
 #
@@ -29,12 +28,8 @@ resource "google_project_service" "services" {
     "servicenetworking.googleapis.com",
     "aiplatform.googleapis.com",
     "bigquery.googleapis.com",
-    "firebase.googleapis.com",
-    "identitytoolkit.googleapis.com",
-    "firebasehosting.googleapis.com",
-    "firebaseapphosting.googleapis.com",
-    "developerconnect.googleapis.com", # App Hosting git connection (frontend deploy)
-    "cloudbuild.googleapis.com",       # App Hosting builds the frontend via Cloud Build
+    "firebase.googleapis.com",        # Firebase Auth (Identity Platform)
+    "identitytoolkit.googleapis.com", # session cookies / sign-in
     "iam.googleapis.com",
   ])
   project            = local.project_id

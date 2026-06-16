@@ -27,17 +27,10 @@ provider "google-beta" {
 module "tenant" {
   source = "../../../modules/tenant"
 
-  tenant_id          = local.tenant_id
-  stage              = local.stage
-  region             = var.region
-  vertex_location    = "northamerica-northeast1" # Vertex stays in Montreal
-  app_hosting_branch = "main"
-
-  github_owner = var.github_owner
-  github_repo  = var.github_repo
-
-  enable_app_hosting     = var.enable_app_hosting
-  developer_connect_repo = var.developer_connect_repo
+  tenant_id       = local.tenant_id
+  stage           = local.stage
+  region          = var.region
+  vertex_location = "northamerica-northeast1" # Vertex stays in Montreal
 
   google_oauth_client_id     = var.google_oauth_client_id
   google_oauth_client_secret = var.google_oauth_client_secret
