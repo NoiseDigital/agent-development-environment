@@ -17,6 +17,7 @@ import httpx
 import pandas as pd
 
 from engine import clean_dataframe
+from idtoken import id_token_for
 
 AGENT_URL = os.environ.get("AGENT_URL", "http://agent:8000")
 STORAGE_BACKEND = os.environ.get("STORAGE_BACKEND", "local").lower()
@@ -49,7 +50,13 @@ def load_source(source: str, sheet: Optional[str] = None) -> pd.DataFrame:
 
 
 def _read_upload(source_id: str, sheet: Optional[str]) -> pd.DataFrame:
-    resp = httpx.get(f"{AGENT_URL}/api/sources/{source_id}", timeout=30.0)
+    # The agent is internal-ingress behind Cloud Run IAM — authenticate with a
+    # Google-signed ID token (audience = the agent URL). None off-GCP (local).
+    token = id_token_for(AGENT_URL)
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    resp = httpx.get(
+        f"{AGENT_URL}/api/sources/{source_id}", headers=headers, timeout=30.0
+    )
     resp.raise_for_status()
     source = resp.json()
     key = source["storage_key"]

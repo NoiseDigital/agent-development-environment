@@ -25,7 +25,11 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
       - GOOGLE_GENAI_USE_VERTEXAI=${GOOGLE_GENAI_USE_VERTEXAI:-true}
       - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-nd-agentspace-sbx}
-      - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-northamerica-northeast1}
+      # Vertex global endpoint by default (matches prod): pools Gemini capacity
+      # across regions, avoiding the 429s a small region like
+      # northamerica-northeast1 hits under shared-quota saturation. Override with
+      # GOOGLE_CLOUD_LOCATION for a specific region (e.g. data-residency testing).
+      - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-global}
       - TOOLBOX_ENDPOINT=${TOOLBOX_ENDPOINT:-http://mcp-toolbox:5000}
       - MCP_STATS_URL=${MCP_STATS_URL:-http://mcp-stats:8080/sse}
       - UV_LINK_MODE=copy
