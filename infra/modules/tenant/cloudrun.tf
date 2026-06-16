@@ -249,6 +249,13 @@ resource "google_cloud_run_v2_service" "gateway" {
         name  = "STATS_URL"
         value = local.run_url["mcp-stats"]
       }
+      # The gateway is the dashboards BFF — it queries the Toolbox for tile data
+      # (api/toolbox.py). Without this it falls back to the local-compose
+      # hostname and can't resolve it on Cloud Run.
+      env {
+        name  = "TOOLBOX_ENDPOINT"
+        value = local.run_url["mcp-toolbox"]
+      }
       # Access control is enforced by default (the gateway only relaxes when
       # GATEWAY_DEV_AUTH is set, which Cloud Run never does). Bootstrap admins
       # auto-provision on first sign-in so there's an admin to invite the rest.

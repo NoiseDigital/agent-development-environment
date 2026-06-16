@@ -78,7 +78,10 @@ def _build_root_agent() -> LlmAgent:
 
     tools.append(
         McpToolset(
-            connection_params=SseConnectionParams(url=stats_url),
+            # 30s connect timeout (vs the 5s default): mcp-stats is internal and
+            # scales to zero, so the first request after idle must absorb a Cloud
+            # Run cold start instead of timing out and failing the whole run.
+            connection_params=SseConnectionParams(url=stats_url, timeout=30.0),
             header_provider=stats_auth_headers,
         )
     )
