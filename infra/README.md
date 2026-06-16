@@ -20,17 +20,18 @@ What deploys where:
 - **Backend** (gateway, agent, mcp-stats) → Cloud Run, via `.github/workflows/deploy.yml`.
 - **Database** → Cloud SQL Postgres (private IP only).
 - **Migrations** → a Cloud Run **job** (`<stage>-migrate`), run by CI *before* new API revisions take traffic.
-- **Frontend** → Firebase **App Hosting**, built & rolled out from git natively (not in the workflow).
+- **Frontend** → Cloud Run (public ingress, standalone Next.js build), via the same `.github/workflows/deploy.yml`.
 - **Uploads** → GCS (`STORAGE_BACKEND=gcs`).
 
 ## BFF boundary (no public backend)
 
-The browser reaches **only** the Next.js frontend (App Hosting). Its `/gw` proxy
-forwards to the gateway server-side. Nothing in the backend is public:
+The browser reaches **only** the public Next.js **frontend** Cloud Run service.
+Its `/gw` proxy forwards to the gateway server-side. Nothing in the backend is public:
 
 - **gateway** — `INGRESS_TRAFFIC_INTERNAL_ONLY`; `run.invoker` granted only to
-  the **App Hosting service account** (the BFF reaches it via Direct VPC egress,
-  authenticating with a Cloud Run IAM ID token).
+  the **frontend service account** (the BFF reaches it via Direct VPC egress,
+  authenticating with a Cloud Run IAM ID token whose audience is the gateway's
+  custom audience).
 - **agent / mcp-stats / mcp-toolbox** — `INGRESS_TRAFFIC_INTERNAL_ONLY`; invoker
   is `allUsers`, so the network is the boundary. This is a single-tenant project
   (only this tenant's own services are in the VPC), so internal ingress alone is
@@ -110,29 +111,17 @@ anything and has no place in CI. Provisioning is Terraform:
 
 - `google_firebase_project` — enables Firebase on the project.
 - `google_firebase_web_app` — the web app; its config (apiKey, authDomain, appId)
-  is a Terraform **output** (`firebase_web_config`) you drop into
-  `services/frontend/apphosting.yaml`.
+  is a Terraform **output** (`firebase_web_config`). CI bakes the public values
+  into the frontend bundle at build (the API key from Secret Manager).
 - `google_identity_platform_config` — Firebase Auth (email/password on; add OAuth
   IdPs via `google_identity_platform_default_supported_idp_config`).
-- `google_firebase_app_hosting_backend` — the git-connected frontend deploy.
 
-Committed config (not provisioning): `firebase.json` (emulator), `.firebaserc`
-(alias→project), `services/frontend/apphosting.yaml` (App Hosting runtime env).
+We use Firebase for **Auth only** — the frontend is a Cloud Run service we deploy
+ourselves (cloudrun.tf + deploy.yml), not Firebase App Hosting. No Developer
+Connect, no git-connected build.
 
-### The one interactive step: Developer Connect
-
-App Hosting builds from git, which needs a **Developer Connect** link to the
-GitHub repo — a one-time GitHub-App authorization that can't be done headless.
-Do it once (console: Firebase → App Hosting → Connect repo, or
-`gcloud developer-connect`), then set in the env tfvars:
-
-```hcl
-enable_app_hosting     = true
-developer_connect_repo = "projects/<p>/locations/<r>/connections/<c>/gitRepositoryLinks/<link>"
-```
-
-and `terraform apply`. Until then, `enable_app_hosting = false` — the Firebase
-project/web app/auth still apply, so the emulator and client-SDK wiring work.
+Committed config (not provisioning): `firebase.json` (Auth emulator) and
+`.firebaserc` (alias→project), both for local dev.
 
 ---
 

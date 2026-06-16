@@ -1,7 +1,7 @@
 name: Deploy (backend)
 
 # Backend deploy: build images, run DB migrations, roll Cloud Run. The frontend
-# is NOT here — Firebase App Hosting builds & rolls it out from git natively.
+# (frontend) is a standalone Cloud Run service built + rolled out here too.
 #
 # Auth is keyless via Workload Identity Federation (no JSON keys).
 #

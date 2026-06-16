@@ -29,12 +29,8 @@ resource "google_project_service" "services" {
     "servicenetworking.googleapis.com",
     "aiplatform.googleapis.com",
     "bigquery.googleapis.com",
-    "firebase.googleapis.com",
-    "identitytoolkit.googleapis.com",
-    "firebasehosting.googleapis.com",
-    "firebaseapphosting.googleapis.com",
-    "developerconnect.googleapis.com", # App Hosting git connection (frontend deploy)
-    "cloudbuild.googleapis.com",       # App Hosting builds the frontend via Cloud Build
+    "firebase.googleapis.com",        # Firebase Auth (Identity Platform)
+    "identitytoolkit.googleapis.com", # session cookies / sign-in
     "iam.googleapis.com",
   ])
   project            = local.project_id
