@@ -16,6 +16,7 @@ Security posture:
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import AsyncIterator
 
@@ -23,7 +24,10 @@ import httpx
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
+from ._idtoken import id_token_for
 from .auth import CurrentUser, current_user
+
+log = logging.getLogger(__name__)
 
 AGENT_URL = os.getenv("AGENT_URL", "http://agent:8000")
 
@@ -83,6 +87,12 @@ async def proxy_to_agent(
     """
     upstream_url = f"{AGENT_URL}/{path}"
     forward_headers = _filter_request_headers(dict(request.headers), user)
+    # Authenticate to the internal-ingress agent service with a Google-signed ID
+    # token (audience = the agent's URL). None off-GCP, where the agent is plain
+    # HTTP on the compose network.
+    token = id_token_for(AGENT_URL)
+    if token:
+        forward_headers["Authorization"] = f"Bearer {token}"
     body = await request.body()
 
     # Keep a long timeout for SSE — `/run_sse` holds the connection open while
@@ -101,6 +111,13 @@ async def proxy_to_agent(
     # — StreamingResponse consumes it after we return. We close the client
     # when the iterator is exhausted.
     response = await upstream.__aenter__()
+    if response.status_code in (401, 403):
+        log.error(
+            "agent upstream rejected %s /%s -> %s (service-to-service auth)",
+            request.method,
+            path,
+            response.status_code,
+        )
 
     async def body_iter() -> AsyncIterator[bytes]:
         try:
