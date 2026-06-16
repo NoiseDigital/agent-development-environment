@@ -39,9 +39,12 @@ def get_toolbox_client() -> ToolboxClient:
         endpoint = os.getenv("TOOLBOX_ENDPOINT", DEFAULT_TOOLBOX_ENDPOINT)
         # Authenticate to the internal-ingress Toolbox with a Google-signed ID
         # token (audience = its URL), refreshed per request via the callable.
-        # Only on GCP — locally the endpoint is plain HTTP on the compose net.
+        # Cloud Run's IAM token goes in X-Serverless-Authorization, NOT
+        # Authorization, so it never collides with Toolbox's own bearer-token
+        # auth (https://mcp-toolbox.dev/.../toolbox_mcp_auth). Only on GCP —
+        # locally the endpoint is plain HTTP on the compose net.
         client_headers = (
-            {"Authorization": lambda: f"Bearer {id_token_for(endpoint)}"}
+            {"X-Serverless-Authorization": lambda: f"Bearer {id_token_for(endpoint)}"}
             if endpoint.startswith("https://")
             else None
         )
