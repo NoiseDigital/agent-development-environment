@@ -23,6 +23,8 @@ browser reaches it directly. There is no cross-origin caller to allow.
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, FastAPI
 
 from api.access import router as access_router
@@ -33,6 +35,22 @@ from api.me import router as me_router
 from api.proxy import router as proxy_router
 from api.stats import router as stats_router
 from api.users import router as users_router
+
+
+class _MuteNoisyAccessLogs(logging.Filter):
+    """Drop access-log lines for the health probe and the high-frequency app-list
+    liveness poll — they fire every few seconds and carry no signal, drowning the
+    real request logs. Applied to uvicorn's access logger in dev and prod alike
+    (health checks shouldn't litter logs anywhere)."""
+
+    _MUTED = ("/healthz", "/health", "/list-apps")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        return not any(path in message for path in self._MUTED)
+
+
+logging.getLogger("uvicorn.access").addFilter(_MuteNoisyAccessLogs())
 
 app = FastAPI(title="NoiseOS Gateway", version="0.1.0")
 

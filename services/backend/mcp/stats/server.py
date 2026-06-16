@@ -6,6 +6,7 @@ returns a JSON-serializable result. Follows the SSE pattern of mcp/math.
 """
 
 import json
+import logging
 import os
 from typing import Optional
 
@@ -26,6 +27,16 @@ from google.adk.tools.mcp_tool.conversion_utils import adk_to_mcp_tool_type
 
 import engine
 from resolve import load_source
+
+
+class _MuteNoisyAccessLogs(logging.Filter):
+    """Drop the every-15s health-probe line from uvicorn's access log."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "/health" not in record.getMessage()
+
+
+logging.getLogger("uvicorn.access").addFilter(_MuteNoisyAccessLogs())
 
 
 # --- Tool implementations -----------------------------------------------------

@@ -1,5 +1,6 @@
 """Agent platform backend — the ADK FastAPI app plus the platform's own API."""
 
+import logging
 import os
 from pathlib import Path
 
@@ -16,6 +17,21 @@ from api.tools.routes import router as tools_router
 # `session_naming_agent` and `dashboard_insights_agent` apps under adk_agents/),
 # invoked by the frontend through the standard ADK /run endpoint. ONE auth
 # path — ADK + ADC — for every model interaction in the platform.
+
+
+class _MuteNoisyAccessLogs(logging.Filter):
+    """Drop access-log lines for the health probe and the high-frequency
+    app-list liveness poll — they fire every few seconds and carry no signal,
+    drowning the real request logs."""
+
+    _MUTED = ("/healthz", "/health", "/list-apps")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        return not any(path in message for path in self._MUTED)
+
+
+logging.getLogger("uvicorn.access").addFilter(_MuteNoisyAccessLogs())
 
 AGENTS_DIR = str(Path(__file__).resolve().parent / "adk_agents")
 

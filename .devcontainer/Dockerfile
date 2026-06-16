@@ -13,6 +13,12 @@ RUN apt-get update -y \
        jq \
        shellcheck \
        nodejs \
+       # System Python for repo tooling (pre-commit hooks, scripts). The
+       # google/cloud-sdk base bundles Python privately for gcloud only
+       # (CLOUDSDK_PYTHON) and puts no python3 on PATH, so install one
+       # explicitly. python-is-python3 also provides the `python` alias.
+       python3 \
+       python-is-python3 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

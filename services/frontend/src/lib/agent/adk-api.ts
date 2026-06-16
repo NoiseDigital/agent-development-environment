@@ -56,6 +56,15 @@ export interface Session {
 export class ADKApiClient {
   private endpoints: Record<string, AgentEndpoint>;
 
+  // list-apps is a near-static list, but it's requested by ~every useChat
+  // instance (FloatingAssistant, each page, the analyze panel) plus the
+  // sidebar's 15s liveness poll — and they re-fire on every navigation/remount.
+  // A short TTL cache + in-flight dedupe collapses that storm into one network
+  // request, instead of flooding /gw/list-apps many times per second.
+  private appsCache: { apps: string[]; at: number } | null = null;
+  private appsInflight: Promise<string[]> | null = null;
+  private static readonly APPS_TTL_MS = 5_000;
+
   constructor(customEndpoints?: Record<string, AgentEndpoint>) {
     // Use centralized agent configuration as the base
     const defaultEndpoints = getAgentEndpoints();
@@ -84,6 +93,25 @@ export class ADKApiClient {
   }
 
   async listApps(): Promise<string[]> {
+    const fresh =
+      this.appsCache &&
+      Date.now() - this.appsCache.at < ADKApiClient.APPS_TTL_MS;
+    if (fresh) return this.appsCache!.apps;
+    // Coalesce concurrent callers onto a single request.
+    if (this.appsInflight) return this.appsInflight;
+
+    this.appsInflight = this.fetchApps()
+      .then((apps) => {
+        this.appsCache = { apps, at: Date.now() };
+        return apps;
+      })
+      .finally(() => {
+        this.appsInflight = null;
+      });
+    return this.appsInflight;
+  }
+
+  private async fetchApps(): Promise<string[]> {
     // Query all configured endpoints to discover available apps
     const allApps = new Set<string>();
     const endpoints = Object.values(this.endpoints);
