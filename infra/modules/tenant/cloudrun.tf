@@ -2,19 +2,18 @@
 # Cloud Run services + the migrate job.
 #
 # Topology:
-#   App Hosting BFF ─▶ gateway (INTERNAL ingress, invoker = App Hosting SA)
-#                        ├─▶ agent      (INTERNAL ingress)
-#                        └─▶ mcp-stats  (INTERNAL ingress)
-#   agent ─▶ mcp-toolbox / mcp-stats (INTERNAL)
+#   frontend BFF ─▶ gateway (INTERNAL ingress, invoker = frontend SA)
+#                     ├─▶ agents     (INTERNAL ingress, invoker = gateway SA)
+#                     ├─▶ mcp-stats  (INTERNAL ingress, invoker = gateway SA)
+#                     └─▶ mcp-toolbox(INTERNAL ingress, invoker = gateway SA)
+#   agents ─▶ mcp-toolbox / mcp-stats (INTERNAL, invoker = agent SA)
 #
-# Nothing here is public — every service is internal-ingress (off the internet).
-# The gateway additionally requires IAM (only the BFF SA can invoke it; the BFF
-# mints the ID token). The deeper services (agent/stats/toolbox) rely on the
-# network boundary alone (allUsers invoker): this is a SINGLE-TENANT project, so
-# the only thing inside the VPC that can reach them is this tenant's own
-# services — internal ingress is a sound boundary here. (If a future shared
-# project ever co-located tenants, tighten to per-SA IAM with ID tokens minted in
-# the gateway/agent HTTP clients.)
+# Nothing here is public except the frontend — every backend is internal-ingress
+# (off the internet). Internal ingress is necessary but NOT sufficient: Cloud Run
+# rejects an unauthenticated VPC-routed call (403), so EVERY hop authenticates
+# with a Google-signed ID token (audience = the target's custom audience) and the
+# caller SA holds run.invoker on the target. See the internal_invokers grants and
+# the _idtoken helpers in each service. Network boundary is defence-in-depth.
 #
 # Images: seeded with a placeholder; CI rolls real revisions. `ignore_changes`
 # on the image keeps `terraform apply` from reverting CI deploys.
@@ -44,13 +43,18 @@ resource "google_cloud_run_v2_service" "agent" {
   ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"
   deletion_protection = local.is_protected
 
+  # Callers (the gateway) authenticate with an ID token whose audience is this
+  # service's deterministic URL — an alias, not the primary .uri, so it must be
+  # registered as a custom audience for Cloud Run to accept it.
+  custom_audiences = [local.run_url["agents"]]
+
   template {
     service_account = google_service_account.agent.email
     vpc_access {
       # Direct VPC egress (no Serverless connector) — the GCP-recommended default:
       # simpler, cheaper, faster. ALL_TRAFFIC so calls to a sibling's *.run.app
-      # route through the VPC and count as internal, and to reach the private
-      # Cloud SQL IP.
+      # reach its internal ingress (the caller still sends an ID token — see the
+      # internal_invokers grants), and to reach the private Cloud SQL IP.
       network_interfaces {
         network    = google_compute_network.vpc.name
         subnetwork = google_compute_subnetwork.subnet.name
@@ -116,13 +120,18 @@ resource "google_cloud_run_v2_service" "mcp_stats" {
   ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"
   deletion_protection = local.is_protected
 
+  # Callers (gateway, agent) authenticate with an ID token whose audience is this
+  # service's deterministic URL — an alias, not the primary .uri, so it must be
+  # registered as a custom audience for Cloud Run to accept it.
+  custom_audiences = [local.run_url["mcp-stats"]]
+
   template {
     service_account = google_service_account.mcp_stats.email
     vpc_access {
       # Direct VPC egress (no Serverless connector) — the GCP-recommended default:
       # simpler, cheaper, faster. ALL_TRAFFIC so calls to a sibling's *.run.app
-      # route through the VPC and count as internal, and to reach the private
-      # Cloud SQL IP.
+      # reach its internal ingress (the caller still sends an ID token — see the
+      # internal_invokers grants), and to reach the private Cloud SQL IP.
       network_interfaces {
         network    = google_compute_network.vpc.name
         subnetwork = google_compute_subnetwork.subnet.name
@@ -163,6 +172,11 @@ resource "google_cloud_run_v2_service" "mcp_toolbox" {
   location            = var.region
   ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"
   deletion_protection = local.is_protected
+
+  # Callers (gateway, agent) authenticate with an ID token whose audience is this
+  # service's deterministic URL — an alias, not the primary .uri, so it must be
+  # registered as a custom audience for Cloud Run to accept it.
+  custom_audiences = [local.run_url["mcp-toolbox"]]
 
   template {
     service_account = google_service_account.toolbox.email
@@ -206,8 +220,8 @@ resource "google_cloud_run_v2_service" "gateway" {
     vpc_access {
       # Direct VPC egress (no Serverless connector) — the GCP-recommended default:
       # simpler, cheaper, faster. ALL_TRAFFIC so calls to a sibling's *.run.app
-      # route through the VPC and count as internal, and to reach the private
-      # Cloud SQL IP.
+      # reach its internal ingress (the caller still sends an ID token — see the
+      # internal_invokers grants), and to reach the private Cloud SQL IP.
       network_interfaces {
         network    = google_compute_network.vpc.name
         subnetwork = google_compute_subnetwork.subnet.name
@@ -365,19 +379,25 @@ resource "google_cloud_run_v2_service_iam_member" "gateway_from_bff" {
   member   = "serviceAccount:${google_service_account.frontend.email}"
 }
 
-# Deep internal services (agent / mcp-stats / mcp-toolbox): reachable only from
-# within the VPC (internal ingress), so the network is the boundary and the
-# invoker is allUsers — no ID tokens needed on the existing service-to-service
-# HTTP calls. Tighten to per-SA IAM once those clients mint ID tokens.
+# Deep internal services (agents / mcp-stats / mcp-toolbox): internal ingress is
+# necessary but NOT sufficient — Cloud Run still rejects an unauthenticated
+# VPC-routed call (403). Each caller mints an ID token (audience = the target's
+# custom audience) AND must hold run.invoker on the target. One grant per
+# caller→target edge; the network boundary is defence-in-depth on top.
 resource "google_cloud_run_v2_service_iam_member" "internal_invokers" {
-  for_each = toset([
-    google_cloud_run_v2_service.agent.name,
-    google_cloud_run_v2_service.mcp_stats.name,
-    google_cloud_run_v2_service.mcp_toolbox.name,
-  ])
+  for_each = {
+    # the gateway proxies browser traffic to the agent + stats, and renders
+    # dashboard tiles via the toolbox.
+    agents_from_gateway  = { service = google_cloud_run_v2_service.agent.name, caller = google_service_account.gateway.email }
+    stats_from_gateway   = { service = google_cloud_run_v2_service.mcp_stats.name, caller = google_service_account.gateway.email }
+    toolbox_from_gateway = { service = google_cloud_run_v2_service.mcp_toolbox.name, caller = google_service_account.gateway.email }
+    # the agent loads Toolbox toolsets and (media agent) the stats MCP directly.
+    toolbox_from_agent = { service = google_cloud_run_v2_service.mcp_toolbox.name, caller = google_service_account.agent.email }
+    stats_from_agent   = { service = google_cloud_run_v2_service.mcp_stats.name, caller = google_service_account.agent.email }
+  }
   project  = local.project_id
   location = var.region
-  name     = each.value
+  name     = each.value.service
   role     = "roles/run.invoker"
-  member   = "allUsers"
+  member   = "serviceAccount:${each.value.caller}"
 }
