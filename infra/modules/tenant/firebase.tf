@@ -46,13 +46,15 @@ resource "google_identity_platform_config" "auth" {
     }
   }
 
-  # Default Firebase domains + the frontend Cloud Run URL, so login works on the
-  # deployed app with no manual "add authorized domain" step.
+  # Default Firebase domains + BOTH frontend Cloud Run URLs (the primary `.uri`
+  # hash form AND the deterministic `frontend-<projnum>.<region>.run.app` alias),
+  # so OAuth works whichever the user loads — no manual "add authorized domain".
   authorized_domains = [
     "localhost",
     "${local.project_id}.firebaseapp.com",
     "${local.project_id}.web.app",
     trimprefix(google_cloud_run_v2_service.frontend.uri, "https://"),
+    "frontend-${data.google_project.this.number}.${var.region}.run.app",
   ]
 
   depends_on = [google_firebase_project.this]
