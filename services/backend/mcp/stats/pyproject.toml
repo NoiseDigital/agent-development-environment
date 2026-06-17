@@ -14,7 +14,7 @@ dependencies = [
     # (resolve.py). Pulled in transitively by google-adk, but the auth hop
     # depends on it directly — pin it so a dep bump can't silently drop it.
     "google-auth>=2.0.0",
-    "pandas>=2.2.0",
+    "pandas>=3.0.3",
     "numpy>=1.26.0",
     "scipy>=1.13.0",
     "statsmodels>=0.14.0",
