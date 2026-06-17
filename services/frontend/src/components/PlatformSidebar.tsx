@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState, useMemo, type ReactNode } from 'react';
 import Image from 'next/image';
 import { agentConfigurations } from '../config/agent-config';
+import { track } from '../lib/analytics/track';
 import { useApps } from '../contexts/AppsContext';
 import { useSidebarCollapsed } from '../contexts/SidebarContext';
 import CollapsiblePanel from './ui/CollapsiblePanel';
@@ -214,7 +215,10 @@ export default function PlatformSidebar() {
                   <button
                     key={agent.name}
                     type="button"
-                    onClick={() => router.push(`/chat/${agent.name}`)}
+                    onClick={() => {
+                      track('agent_selected', { agent: agent.name });
+                      router.push(`/chat/${agent.name}`);
+                    }}
                     className={`flex items-center gap-2.5 w-full px-2.5 py-[7px] rounded-md text-[12.5px] cursor-pointer select-none transition-colors duration-150 ${
                       active
                         ? 'bg-surface-raised text-foreground font-medium'

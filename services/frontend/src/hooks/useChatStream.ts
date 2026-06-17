@@ -31,6 +31,7 @@ import {
   streamingDisplayText,
 } from '../lib/agent/response';
 import { setNeuralThinking } from '../lib/agent/neural-pulse';
+import { track } from '../lib/analytics/track';
 import type { UIBlock } from '../types/genui';
 
 const FALLBACK_REPLY =
@@ -157,6 +158,7 @@ export function useChatStream({
         newMessage: { parts: [{ text: agentText }], role: 'user' },
         streaming: true,
       };
+      track('message_sent', { agent: selectedApp });
 
       let accumulated = '';
       let agentAuthor = 'agent';
@@ -264,6 +266,7 @@ export function useChatStream({
           toolCalls: dedupedTools,
         },
       });
+      track('agent_run', { agent: selectedApp, status: 'success' });
 
       // Refetch the session — by now ADK has usually persisted the reply.
       let updatedSession: Session | null = null;
@@ -305,6 +308,7 @@ export function useChatStream({
       }
     } catch (err) {
       console.error('[useChatStream.sendMessage] stream failed for session', originSessionId, err);
+      track('agent_run', { agent: selectedApp, status: 'error' });
       const msg = err instanceof Error ? err.message : '';
       let fallback = FALLBACK_REPLY;
       if (/\b429\b|RESOURCE_EXHAUSTED|Too Many/i.test(msg)) {
