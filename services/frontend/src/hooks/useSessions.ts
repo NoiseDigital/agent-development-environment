@@ -14,6 +14,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { adkApi, type Session } from '../lib/agent/adk-api';
+import { track } from '../lib/analytics/track';
 import { feedbackApi } from '../lib/agent/feedback-api';
 import { sessionNamesApi } from '../lib/agent/session-names-api';
 import { newId } from '../lib/id';
@@ -168,6 +169,7 @@ export function useSessions({
         ...prev.filter((s) => !cleanedIds.includes(s.id)),
       ]);
       setCurrentSession(newSession);
+      track('new_conversation', { app });
       return newSession;
     } catch (err) {
       onError(`Failed to create session: ${err instanceof Error ? err.message : 'Unknown error'}`);

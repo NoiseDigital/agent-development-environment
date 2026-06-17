@@ -16,6 +16,7 @@ import { onAuthStateChanged, signOut as fbSignOut, type User } from "firebase/au
 import { auth } from "./client";
 import { setCurrentUserCache, setCurrentUserRole, type Role } from "@/lib/auth";
 import { meApi, type MeRecord } from "@/lib/api/me";
+import { track } from "@/lib/analytics/track";
 
 interface AuthState {
   user: User | null;
@@ -96,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSigningOut(true); // blank the shell immediately — no app flash before redirect
     await fbSignOut(auth);
     await fetch("/api/auth/session", { method: "DELETE" });
+    track("logout");
     window.location.href = "/login";
   }
 

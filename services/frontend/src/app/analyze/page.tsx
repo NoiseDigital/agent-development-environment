@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { sourcesApi } from '../../lib/api/sources';
 import { statsApi, type CorrelateResult, type QaResult, type ColumnProfile } from '../../lib/api/stats';
+import { track } from '../../lib/analytics/track';
 import type { Upload, SourceRef, BigQueryTableRef } from '../../types/source';
 import { sourceUri, sourceLabel } from '../../types/source';
 import { heatmapSpec } from '../../lib/charts/specs';
@@ -252,6 +253,8 @@ export default function AnalyzePage() {
       setSourceKind('upload');
       setSheet(created.metadata.sheet_names?.[0] ?? '');
       setUploadId(created.id);
+      // Extension only — never the filename (can carry client/PII).
+      track('source_uploaded', { file_type: file.name.split('.').pop()?.toLowerCase() ?? 'unknown' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
@@ -281,6 +284,7 @@ export default function AnalyzePage() {
           difference,
         }),
       );
+      track('analysis_run', { method, source_kind: sourceUri(source).split(':')[0] });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Analysis failed');
       setResult(null);
