@@ -13,6 +13,16 @@ RUN apt-get update -y \
        jq \
        shellcheck \
        nodejs \
+       # System Python for repo tooling (pre-commit hooks, scripts). The
+       # google/cloud-sdk base bundles Python privately for gcloud only
+       # (CLOUDSDK_PYTHON) and puts no python3 on PATH, so install one
+       # explicitly. Pinned to 3.13 to match the services
+       # (gateway/agents: requires-python = "==3.13.*"), so dev tooling parses
+       # the same syntax the services run. python-is-python3 adds the `python`
+       # alias. (Debian trixie's python3 IS 3.13; the explicit pin fails loud
+       # if a future base image moves off it.)
+       python3.13 \
+       python-is-python3 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

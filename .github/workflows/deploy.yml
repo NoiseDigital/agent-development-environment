@@ -126,3 +126,32 @@ jobs:
       - name: Deploy frontend
         if: ${{ steps.changed.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
         run: gcloud run deploy "frontend" --image "$AR/frontend:$SHA" --region "$REGION" --project "$PROJECT"
+
+      # ── Post-deploy smoke test ───────────────────────────────────────────────
+      # Validates the live deployment end-to-end against the public frontend:
+      # the app + production build, a static asset (build/middleware), and the
+      # deep service-mesh health (DB + gateway→agents/toolbox/stats IAM hops).
+      # These paths exist only when deployed, so this catches the prod-only
+      # failure modes (auth/audience/ingress/endpoint config) that local dev
+      # can't reproduce. Always runs — it verifies the live state even when a
+      # service was unchanged this push.
+      - name: Post-deploy smoke test
+        run: |
+          set -euo pipefail
+          FE="$(gcloud run services describe frontend --region "$REGION" --project "$PROJECT" --format='value(status.url)')"
+          echo "Frontend: $FE"
+
+          echo "→ app reachable (production build)"
+          curl -fsS -o /dev/null -w "  GET / -> %{http_code}\n" "$FE/"
+
+          echo "→ static asset served (build + middleware matcher)"
+          curl -fsS -o /dev/null -w "  GET /noise_white.svg -> %{http_code}\n" "$FE/noise_white.svg"
+
+          echo "→ deep service-mesh health (db + agents + toolbox + stats)"
+          # Don't use -f here: a red check returns 503 with a JSON body naming
+          # the failed dependency — capture it so the failure is diagnosable.
+          code="$(curl -sS -o /tmp/deep.json -w '%{http_code}' "$FE/gw/healthz/deep" || true)"
+          echo "  HTTP $code: $(cat /tmp/deep.json)"
+          python3 -c "import json,sys; sys.exit(0 if json.load(open('/tmp/deep.json')).get('ok') else 1)" \
+            || { echo "::error::deep health reported a red dependency (HTTP $code)"; exit 1; }
+          echo "✓ smoke test passed"

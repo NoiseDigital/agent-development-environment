@@ -104,7 +104,9 @@ export function useSessionNames({
 
   // Load saved metadata (names + hidden ids) whenever the app changes.
   useEffect(() => {
-    if (!selectedApp) {
+    // No identity-keyed calls until a real uid resolves (deployed ANON uid is
+    // empty until Firebase auth lands — see lib/auth). Re-runs when userId fills.
+    if (!selectedApp || !userId) {
       setSessionNames({});
       setHiddenSessions(new Set());
       return;

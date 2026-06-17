@@ -34,7 +34,7 @@ export function useChatFeedback({
 
   // Reload per-message ratings whenever the active session changes.
   useEffect(() => {
-    if (!selectedApp || !currentSession) {
+    if (!selectedApp || !currentSession || !userId) {
       setFeedback({});
       return;
     }

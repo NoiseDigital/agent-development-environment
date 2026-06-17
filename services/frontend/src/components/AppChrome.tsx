@@ -10,6 +10,7 @@ import FloatingAssistant from "./chat/FloatingAssistant";
 import NeuralBackground from "./NeuralBackground";
 import Toaster from "./ui/Toaster";
 import { useAuth } from "@/lib/firebase/auth-context";
+import { AppsProvider } from "@/contexts/AppsContext";
 
 export default function AppChrome({
   children,
@@ -55,8 +56,13 @@ export default function AppChrome({
     );
   }
 
+  // Authenticated shell. AppsProvider wraps everything here (sidebar,
+  // assistant, page children) so the available-apps list is fetched/polled once
+  // and shared, instead of each consumer fetching its own. It only mounts on
+  // the authenticated path (not /login or access-denied), so it never polls
+  // /list-apps before the user is in.
   return (
-    <>
+    <AppsProvider>
       <NeuralBackground />
       <div className="relative z-10 flex h-screen overflow-hidden">
         <PlatformSidebar />
@@ -66,6 +72,6 @@ export default function AppChrome({
       </div>
       <FloatingAssistant />
       <Toaster />
-    </>
+    </AppsProvider>
   );
 }

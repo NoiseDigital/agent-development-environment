@@ -401,6 +401,9 @@ resource "google_cloud_run_v2_service_iam_member" "internal_invokers" {
     # the agent loads Toolbox toolsets and (media agent) the stats MCP directly.
     toolbox_from_agent = { service = google_cloud_run_v2_service.mcp_toolbox.name, caller = google_service_account.agent.email }
     stats_from_agent   = { service = google_cloud_run_v2_service.mcp_stats.name, caller = google_service_account.agent.email }
+    # mcp-stats calls back to the agent to resolve an upload's storage key
+    # (services/backend/mcp/stats/resolve.py).
+    agents_from_stats = { service = google_cloud_run_v2_service.agent.name, caller = google_service_account.mcp_stats.email }
   }
   project  = local.project_id
   location = var.region
