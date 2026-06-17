@@ -2,7 +2,7 @@
 name = "mcp-stats"
 version = "0.3.1"
 description = "Statistics & correlation analysis MCP server"
-requires-python = ">=3.11"
+requires-python = "==3.13.*"
 dependencies = [
     "mcp==1.27.0",
     "google-adk==1.32.0",
