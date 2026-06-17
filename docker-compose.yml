@@ -155,6 +155,30 @@ services:
     stdin_open: true
     tty: true
 
+  # ── Server-side Google Tag Manager (sGTM) ─────────────────────────────────
+  # Google's official server container image. The browser's gtag.js posts
+  # measurement data here (server_container_url) instead of straight to Google;
+  # the tags/triggers authored in the GTM UI shape + route it onward to GA4.
+  #
+  # Built from services/backend/tagging/sgtm (Google's gtm-cloud-image, pinned),
+  # the same way the other image-based services are. Profile-gated: needs
+  # CONTAINER_CONFIG from a GTM *Server* container (created at
+  # tagmanager.google.com), so it stays OFF until you set SGTM_CONTAINER_CONFIG
+  # and run `docker compose --profile tagging up`. Point the frontend at it with
+  # NEXT_PUBLIC_GA_SERVER_CONTAINER_URL=http://localhost:${SGTM_PORT:-8090}.
+  sgtm:
+    build:
+      context: ./services/backend/tagging/sgtm
+    ports:
+      - "${SGTM_PORT:-8090}:8080"
+    environment:
+      - PORT=8080
+      - CONTAINER_CONFIG=${SGTM_CONTAINER_CONFIG:-}
+    profiles:
+      - tagging
+    stdin_open: true
+    tty: true
+
   # ── Database migrations — one-shot, runs to completion before any API ──────
   # Owns `alembic upgrade head` (the gateway package owns the schema, so we
   # reuse its image). The gateway and the agent both wait on this with
@@ -282,6 +306,11 @@ services:
       - FIREBASE_AUTH_EMULATOR_HOST=${FIREBASE_AUTH_EMULATOR_HOST:-firebase-emulator:9099}
       # Access control lives in the gateway's access_rules allowlist (DB/UI);
       # local dev is permissive (GATEWAY_DEV_AUTH on the gateway → admin).
+      # Google Analytics (gtag.js). Empty = analytics no-ops. Set the measurement
+      # id to test tagging locally; point the server URL at the `sgtm` service
+      # (run `docker compose --profile tagging up` to route through it).
+      - NEXT_PUBLIC_GA_MEASUREMENT_ID=${NEXT_PUBLIC_GA_MEASUREMENT_ID:-}
+      - NEXT_PUBLIC_GA_SERVER_CONTAINER_URL=${NEXT_PUBLIC_GA_SERVER_CONTAINER_URL:-}
     depends_on:
       gateway:
         condition: service_started
