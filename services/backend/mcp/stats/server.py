@@ -29,14 +29,15 @@ import engine
 from resolve import load_source
 
 
-class _MuteNoisyAccessLogs(logging.Filter):
-    """Drop the every-15s health-probe line from uvicorn's access log."""
+class _MuteLivenessAccessLog(logging.Filter):
+    """Drop ONLY the exact liveness-probe access line (`GET /health`). Precise on
+    purpose — every other route and any non-2xx stays visible."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        return "/health" not in record.getMessage()
+        return '"GET /health HTTP' not in record.getMessage()
 
 
-logging.getLogger("uvicorn.access").addFilter(_MuteNoisyAccessLogs())
+logging.getLogger("uvicorn.access").addFilter(_MuteLivenessAccessLog())
 
 
 # --- Tool implementations -----------------------------------------------------

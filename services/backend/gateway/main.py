@@ -37,20 +37,18 @@ from api.stats import router as stats_router
 from api.users import router as users_router
 
 
-class _MuteNoisyAccessLogs(logging.Filter):
-    """Drop access-log lines for the health probe and the high-frequency app-list
-    liveness poll — they fire every few seconds and carry no signal, drowning the
-    real request logs. Applied to uvicorn's access logger in dev and prod alike
-    (health checks shouldn't litter logs anywhere)."""
-
-    _MUTED = ("/healthz", "/health", "/list-apps")
+class _MuteLivenessAccessLog(logging.Filter):
+    """Drop ONLY the exact liveness-probe access line (`GET /healthz`), which the
+    orchestrator hits every few seconds with zero signal. Deliberately precise:
+    `/healthz/deep` (the smoke check), `/list-apps`, every real route, and ANY
+    non-2xx on these paths all stay visible — a health check failing surfaces via
+    the orchestrator marking the container unhealthy, not via this access line."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        message = record.getMessage()
-        return not any(path in message for path in self._MUTED)
+        return '"GET /healthz HTTP' not in record.getMessage()
 
 
-logging.getLogger("uvicorn.access").addFilter(_MuteNoisyAccessLogs())
+logging.getLogger("uvicorn.access").addFilter(_MuteLivenessAccessLog())
 
 app = FastAPI(title="NoiseOS Gateway", version="0.1.0")
 

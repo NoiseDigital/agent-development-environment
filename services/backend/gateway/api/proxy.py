@@ -8,7 +8,7 @@ useless without per-line flushing.
 
 Security posture:
 - The upstream sees ONLY headers the gateway forwards. We drop hop-by-hop
-  headers and drop the inbound `X-Dev-User` so a browser can't impersonate a
+  headers and drop the inbound `X-User-*` so a browser can't impersonate a
   user; we then forward the user resolved by `current_user` instead.
 - Cookies and the inbound `Authorization` header are NOT forwarded — the
   gateway is the auth boundary and the agent runs on the private network.
@@ -44,15 +44,17 @@ HOP_BY_HOP = {
     "upgrade",
 }
 
-# Headers that name the gateway as the auth boundary — the client can't set
-# them and have them reach the upstream.
+# Headers the gateway owns as the auth boundary — a client can't set them and
+# have them reach the upstream. The identity headers (`x-user-id`/`x-user-email`)
+# are stripped from the inbound request and RE-asserted below from the
+# gateway-resolved user, so a browser can never spoof an identity through.
 #
 # `host` is critical: Cloud Run's front end routes by the Host header, and the
 # inbound one is the GATEWAY's host. Forwarding it would route this hop to the
 # gateway itself (so the agent's token audience never matches → 401, and the
 # agent is never reached). Dropping it lets httpx regenerate Host from the
 # target URL so the request actually lands on the agent service.
-STRIPPED_FROM_CLIENT = {"x-dev-user", "authorization", "cookie", "host"}
+STRIPPED_FROM_CLIENT = {"x-user-id", "x-user-email", "authorization", "cookie", "host"}
 
 router = APIRouter()
 
@@ -65,9 +67,10 @@ def _filter_request_headers(
         for k, v in headers.items()
         if k.lower() not in HOP_BY_HOP and k.lower() not in STRIPPED_FROM_CLIENT
     }
-    # The agent reads identity from this header today; once both services
-    # share a Firebase verifier, this becomes a signed JWT instead.
-    out["X-Dev-User"] = user.uid
+    # The agent reads identity from this header (the real Firebase uid in any
+    # deployed env). The next hardening step is a forwarded ID token the agent
+    # verifies itself, rather than trusting this header over the IAM boundary.
+    out["X-User-Id"] = user.uid
     return out
 
 

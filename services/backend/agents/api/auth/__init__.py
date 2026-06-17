@@ -1,10 +1,12 @@
 """Authentication seam.
 
 The whole platform reads request identity through one dependency, `current_user`.
-Today it resolves a development identity from an optional `X-Dev-User` header.
-When Firebase Auth is wired in, ONLY this module changes — `current_user` will
-verify the `Authorization: Bearer <id_token>` instead. Routes depend on
-`current_user` and never see the provider, so the switch is local to this file.
+The gateway (the auth boundary) verifies the Firebase session and forwards the
+user as `X-User-Id`; this service trusts it because, in every deployed env, only
+the gateway SA can reach this internal-ingress service (IAM). The next hardening
+step is for this module to verify a forwarded Firebase ID token directly, rather
+than trust the header — routes depend on `current_user` and never see the
+provider, so that switch stays local to this file.
 
 No database tables are introduced here on purpose: identity is owned by the auth
 provider (the Firebase UID). Organization / membership / role tables arrive with
@@ -19,10 +21,10 @@ from dataclasses import dataclass
 
 from fastapi import Header, HTTPException
 
-# The development identity used until Firebase is wired in. Kept as "user-1" so
-# existing ADK sessions and event metadata (all keyed by that id) still resolve.
-# LOCAL-ONLY: never used in a deployed env (see current_user) so the dev identity
-# can't leak into a production DB.
+# LOCAL-ONLY development identity, used when there's no login (compose). Kept as
+# "user-1" so existing local ADK sessions/event metadata still resolve. It is
+# NEVER used in a deployed env (see current_user + the _DEPLOYED guard), so the
+# dev identity can't reach a production DB.
 DEV_UID = "user-1"
 
 # Cloud Run services set K_SERVICE; jobs set CLOUD_RUN_JOB. Either => deployed.
@@ -44,23 +46,17 @@ class CurrentUser:
     org_id: str | None = None
 
 
-async def current_user(x_dev_user: str | None = Header(default=None)) -> CurrentUser:
-    """Resolve the request's authenticated user.
+async def current_user(x_user_id: str | None = Header(default=None)) -> CurrentUser:
+    """Resolve the request's authenticated user from the gateway-forwarded
+    `X-User-Id` (the real Firebase uid in every deployed env).
 
-    The gateway is the auth boundary: in every deployed env it forwards the
-    verified user as `X-Dev-User` (and only the gateway SA can reach this
-    internal service). So:
-
-      * `X-Dev-User` present -> use it (the verified identity).
-      * absent + deployed    -> reject (401). Never fall back to the shared dev
-        identity — that would seed "user-1" into a production DB.
-      * absent + local       -> the dev identity, so the stack runs without login.
-
-    When Firebase Auth is wired in, replace the body with token verification;
-    the signature and return type stay the same so no route has to change.
+      * `X-User-Id` present -> use it (the verified identity).
+      * absent + deployed   -> reject (401). There is NO dev identity in the
+        cloud — the gateway always forwards a real user.
+      * absent + local      -> the dev identity, so the stack runs without login.
     """
-    if x_dev_user:
-        return CurrentUser(uid=x_dev_user)
+    if x_user_id:
+        return CurrentUser(uid=x_user_id)
     if _DEPLOYED:
         raise HTTPException(status_code=401, detail="identity required")
     return CurrentUser(uid=DEV_UID)

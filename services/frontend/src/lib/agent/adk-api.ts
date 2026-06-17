@@ -52,18 +52,19 @@ export interface Session {
   lastUpdateTime: number;
 }
 
+// list-apps is a near-static list. The cache + in-flight dedupe live at MODULE
+// scope (not on the instance) so they're shared no matter how many ADKApiClient
+// instances the bundler/HMR creates — a static list should never hit the
+// network more than once per TTL. `_appsNetCount` lets us see real network hits
+// in the console vs. the request log.
+let _appsCache: { apps: string[]; at: number } | null = null;
+let _appsInflight: Promise<string[]> | null = null;
+let _appsNetCount = 0;
+const APPS_TTL_MS = 10_000;
+
 // API functions
 export class ADKApiClient {
   private endpoints: Record<string, AgentEndpoint>;
-
-  // list-apps is a near-static list, but it's requested by ~every useChat
-  // instance (FloatingAssistant, each page, the analyze panel) plus the
-  // sidebar's 15s liveness poll — and they re-fire on every navigation/remount.
-  // A short TTL cache + in-flight dedupe collapses that storm into one network
-  // request, instead of flooding /gw/list-apps many times per second.
-  private appsCache: { apps: string[]; at: number } | null = null;
-  private appsInflight: Promise<string[]> | null = null;
-  private static readonly APPS_TTL_MS = 5_000;
 
   constructor(customEndpoints?: Record<string, AgentEndpoint>) {
     // Use centralized agent configuration as the base
@@ -93,25 +94,26 @@ export class ADKApiClient {
   }
 
   async listApps(): Promise<string[]> {
-    const fresh =
-      this.appsCache &&
-      Date.now() - this.appsCache.at < ADKApiClient.APPS_TTL_MS;
-    if (fresh) return this.appsCache!.apps;
+    if (_appsCache && Date.now() - _appsCache.at < APPS_TTL_MS) {
+      return _appsCache.apps;
+    }
     // Coalesce concurrent callers onto a single request.
-    if (this.appsInflight) return this.appsInflight;
+    if (_appsInflight) return _appsInflight;
 
-    this.appsInflight = this.fetchApps()
+    _appsInflight = this.fetchApps()
       .then((apps) => {
-        this.appsCache = { apps, at: Date.now() };
+        _appsCache = { apps, at: Date.now() };
         return apps;
       })
       .finally(() => {
-        this.appsInflight = null;
+        _appsInflight = null;
       });
-    return this.appsInflight;
+    return _appsInflight;
   }
 
   private async fetchApps(): Promise<string[]> {
+    _appsNetCount += 1;
+    console.debug(`[adkApi] list-apps NETWORK hit #${_appsNetCount}`);
     // Query all configured endpoints to discover available apps
     const allApps = new Set<string>();
     const endpoints = Object.values(this.endpoints);

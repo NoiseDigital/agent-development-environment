@@ -19,19 +19,16 @@ from api.tools.routes import router as tools_router
 # path — ADK + ADC — for every model interaction in the platform.
 
 
-class _MuteNoisyAccessLogs(logging.Filter):
-    """Drop access-log lines for the health probe and the high-frequency
-    app-list liveness poll — they fire every few seconds and carry no signal,
-    drowning the real request logs."""
-
-    _MUTED = ("/healthz", "/health", "/list-apps")
+class _MuteLivenessAccessLog(logging.Filter):
+    """Drop ONLY the exact liveness-probe access line (`GET /healthz`), which the
+    orchestrator hits every few seconds with zero signal. Precise on purpose:
+    `/list-apps`, every real route, and any non-2xx on `/healthz` stay visible."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        message = record.getMessage()
-        return not any(path in message for path in self._MUTED)
+        return '"GET /healthz HTTP' not in record.getMessage()
 
 
-logging.getLogger("uvicorn.access").addFilter(_MuteNoisyAccessLogs())
+logging.getLogger("uvicorn.access").addFilter(_MuteLivenessAccessLog())
 
 AGENTS_DIR = str(Path(__file__).resolve().parent / "adk_agents")
 
