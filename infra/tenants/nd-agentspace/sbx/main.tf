@@ -42,6 +42,10 @@ module "tenant" {
 
   admin_emails = var.admin_emails
 
+  # Server-side tagging. Empty until a GTM Server container exists; supply via
+  # TF_VAR_sgtm_container_config to light up the sgtm service (stored as a secret).
+  sgtm_container_config = var.sgtm_container_config
+
   # sbx is a sandbox — keep it cheap.
   db_tier = "db-f1-micro"
 }
@@ -57,4 +61,10 @@ output "migrate_job" {
 output "firebase_web_config" {
   value     = module.tenant.firebase_web_config
   sensitive = true
+}
+
+# Empty until sGTM is configured; once set, this is the gtag.js
+# server_container_url (wire it into vars.NEXT_PUBLIC_GA_SERVER_CONTAINER_URL).
+output "sgtm_url" {
+  value = module.tenant.sgtm_url
 }

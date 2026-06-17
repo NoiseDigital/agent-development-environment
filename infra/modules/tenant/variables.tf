@@ -61,6 +61,19 @@ variable "vertex_location" {
   default     = "us-central1"
 }
 
+# ── Server-side tagging (sGTM) ──────────────────────────────────────────────
+variable "sgtm_container_config" {
+  type        = string
+  description = <<-EOT
+    CONTAINER_CONFIG from a GTM *Server* container (tagmanager.google.com →
+    Admin → Create Container → Server). Empty (default) disables sGTM entirely —
+    no service, secret, or SA is created. When set, it's stored in Secret Manager
+    and the sgtm Cloud Run service is deployed.
+  EOT
+  default     = ""
+  sensitive   = true
+}
+
 # ── Google sign-in (Workspace SSO) ──────────────────────────────────────────
 variable "google_oauth_client_id" {
   type        = string
