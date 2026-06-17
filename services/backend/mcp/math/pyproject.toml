@@ -1,6 +1,6 @@
 [project]
 name = "mcp-math"
-version = "0.3.1"
+version = "0.3.2"
 description = "Example of deploying a MCP server on Cloud Run"
 requires-python = "==3.13.*"
 dependencies = [

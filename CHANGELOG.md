@@ -1,5 +1,91 @@
 # Changelog
 
+## [0.3.2](https://github.com/NoiseDigital/agent-platform/compare/v0.3.1...v0.3.2) (2026-06-17)
+
+
+### Features
+
+* **analytics:** instrument key product events via gtag (login/logout, message_sent, agent_run, agent_selected, new_conversation, feedback, source_uploaded, analysis_run, dashboard_created, chart_pinned) with a typed track() helper ([93c41bc](https://github.com/NoiseDigital/agent-platform/commit/93c41bc1fdd52c7b2d87ec39e67dc3363f438dc7))
+* **auth:** Firebase Auth via BFF session cookies + gateway identity ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **backend:** authenticate internal Cloud Run hops with OIDC ID tokens ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **backend:** authenticate internal Cloud Run hops with OIDC ID tokens ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **db:** Postgres 18 — local containers + Cloud SQL platform-db ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **db:** Postgres 18 — local containers + Cloud SQL platform-db ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* deployment scaffolding ([#27](https://github.com/NoiseDigital/agent-platform/issues/27)) ([bf07235](https://github.com/NoiseDigital/agent-platform/commit/bf07235358e6096158b7ae11c68bb09c4535dd77))
+* **dev:** one-shot migrate service + Firebase Auth emulator ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **frontend:** access admin UI (rules + users), access-denied guard, email_verified + emulator login ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **frontend:** add GA gtag.js analytics routed through server-side tagging ([93c41bc](https://github.com/NoiseDigital/agent-platform/commit/93c41bc1fdd52c7b2d87ec39e67dc3363f438dc7))
+* **frontend:** add GA gtag.js analytics routed through server-side tagging ([#64](https://github.com/NoiseDigital/agent-platform/issues/64)) ([3fe8082](https://github.com/NoiseDigital/agent-platform/commit/3fe8082b46a2e2b96ec1611f37ef729b9b1ca61d))
+* **frontend:** admin user management UI + live role from /me ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **frontend:** route backend calls through a same-origin BFF proxy (/gw) ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **gateway:** add /healthz/deep service-mesh check + post-deploy CI smoke test ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **gateway:** add /healthz/deep service-mesh check + post-deploy CI smoke test ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **gateway:** configurable access_rules allowlist (emails + domains) + JIT provisioning, secure-by-default RBAC ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **gateway:** invite-only access + RBAC — users allowlist, admin API, bootstrap admins ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **gateway:** version the platform API under /api/v1 + add /me ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **infra:** App Hosting frontend via TF — auto-rollout branch + authorized domain + DevConnect/CloudBuild APIs ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **infra:** App Hosting native compute SA + gateway access enforcement (admin_emails bootstrap) ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **infra:** deploy-as-code foundation for GCP ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **infra:** Direct VPC egress, per-project state, no-suffix naming + apply fixes ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **infra:** Direct VPC egress, per-project state, no-suffix naming + apply fixes ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **infra:** give the gateway TOOLBOX_ENDPOINT so dashboards reach the toolbox ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **infra:** manage firebase-web-api-key in TF + harden secret/state hygiene ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **infra:** require ID-token auth on internal services (custom audiences + per-SA invoker) ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **infra:** require ID-token auth on internal services (custom audiences + per-SA invoker) ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **infra:** require ID-token auth on internal services (custom audiences + per-SA invoker) ([af42fc6](https://github.com/NoiseDigital/agent-platform/commit/af42fc6371b4a0b9c92430b2f29e46f882bc8e7e))
+* **storage:** GCS uploads backend (agent GcsStorage + mcp-stats gs:// reads) ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **tagging:** add server-side GTM (sGTM) service — compose + config-gated Cloud Run ([93c41bc](https://github.com/NoiseDigital/agent-platform/commit/93c41bc1fdd52c7b2d87ec39e67dc3363f438dc7))
+* **tagging:** add server-side GTM (sGTM) service — compose + config-gated Cloud Run ([3fe8082](https://github.com/NoiseDigital/agent-platform/commit/3fe8082b46a2e2b96ec1611f37ef729b9b1ca61d))
+
+
+### Bug Fixes
+
+* **agents:** raise stats MCP connect timeout to absorb mcp-stats cold starts ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **agents:** raise stats MCP connect timeout to absorb mcp-stats cold starts ([3da63c4](https://github.com/NoiseDigital/agent-platform/commit/3da63c4f7c4c786b5a4cf4530e1ae94e7ca566aa))
+* app hosting errors ([#54](https://github.com/NoiseDigital/agent-platform/issues/54)) ([8d5e868](https://github.com/NoiseDigital/agent-platform/commit/8d5e8685652c14ac8f5af13b2cfb64f252c64c5a))
+* **auth:** keep the dev user strictly local — never seed or accept it in deployed envs ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **auth:** keep the dev user strictly local — never seed or accept it in deployed envs ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **ci:** move CI checks to PRs and main push ([8d5e868](https://github.com/NoiseDigital/agent-platform/commit/8d5e8685652c14ac8f5af13b2cfb64f252c64c5a))
+* **deploy:** start from baked venv (uv run --no-sync) + Private Google Access for locked-down VPC egress ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **dev-env:** pin python version in root containerfile ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **dev:** default local Vertex to the global endpoint to avoid regional 429s ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **frontend:** bff admin bootstrap ([#56](https://github.com/NoiseDigital/agent-platform/issues/56)) ([38dcd18](https://github.com/NoiseDigital/agent-platform/commit/38dcd185f605a87130deb99c93bb673605c7890e))
+* **frontend:** bff admin bootstrap ([#57](https://github.com/NoiseDigital/agent-platform/issues/57)) ([af42fc6](https://github.com/NoiseDigital/agent-platform/commit/af42fc6371b4a0b9c92430b2f29e46f882bc8e7e))
+* **frontend:** bff admin bootstrap ([#59](https://github.com/NoiseDigital/agent-platform/issues/59)) ([2823f5e](https://github.com/NoiseDigital/agent-platform/commit/2823f5e9c335c66d69f55fa7db9f1dc9ee0fddf4))
+* **frontend:** bff admin bootstrap ([#60](https://github.com/NoiseDigital/agent-platform/issues/60)) ([3da63c4](https://github.com/NoiseDigital/agent-platform/commit/3da63c4f7c4c786b5a4cf4530e1ae94e7ca566aa))
+* **frontend:** bff admin bootstrap ([#62](https://github.com/NoiseDigital/agent-platform/issues/62)) ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **frontend:** env-gate the anon identity so the dev uid never reaches a deployed DB ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **frontend:** re-mint session cookie and retry /me on 401 to fix sign-in race ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **frontend:** stop bouncing uppercase/extra image assets to /login ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **frontend:** stop bouncing uppercase/extra image assets to /login ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **frontend:** stop bouncing uppercase/extra image assets to /login ([af42fc6](https://github.com/NoiseDigital/agent-platform/commit/af42fc6371b4a0b9c92430b2f29e46f882bc8e7e))
+* **frontend:** swap metadata fetch for google auth library ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **gateway:** drop inbound Host header when proxying to the agent service ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **gateway:** remove duplicate routers left from merge ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **gateway:** remove duplicate routers left from merge ([#29](https://github.com/NoiseDigital/agent-platform/issues/29)) ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* **infra:** add not encoded cloud run url to authorized domains ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **infra:** add unencoded cloud run url to authorized domains ([#55](https://github.com/NoiseDigital/agent-platform/issues/55)) ([cec0962](https://github.com/NoiseDigital/agent-platform/commit/cec0962cd96868e97625322619223fac228a9315))
+* **infra:** provision App Hosting secret grants in TF (mirror grantac… ([#31](https://github.com/NoiseDigital/agent-platform/issues/31)) ([d7cee61](https://github.com/NoiseDigital/agent-platform/commit/d7cee612008998e93cf985750fec99ac6d4ae435))
+* **infra:** provision App Hosting secret grants in TF (mirror grantaccess) — keep web API key in Secret Manager ([d7cee61](https://github.com/NoiseDigital/agent-platform/commit/d7cee612008998e93cf985750fec99ac6d4ae435))
+* **infra:** use the Vertex AI global endpoint for Gemini capacity (avoids regional 429s) ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **infra:** use the Vertex AI global endpoint for Gemini capacity (avoids regional 429s) ([#61](https://github.com/NoiseDigital/agent-platform/issues/61)) ([728b8e4](https://github.com/NoiseDigital/agent-platform/commit/728b8e4b9eca02ff9a4f006264a8d887271bef03))
+* **stats:** authenticate the mcp-stats→agent hop with an ID token + invoker grant ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+
+
+### Documentation
+
+* document analytics + sGTM setup and env vars ([93c41bc](https://github.com/NoiseDigital/agent-platform/commit/93c41bc1fdd52c7b2d87ec39e67dc3363f438dc7))
+* document analytics + sGTM setup and env vars ([3fe8082](https://github.com/NoiseDigital/agent-platform/commit/3fe8082b46a2e2b96ec1611f37ef729b9b1ca61d))
+* refresh infra README + DEPLOY runbook ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+* refresh infra README + DEPLOY runbook for the above ([0333eea](https://github.com/NoiseDigital/agent-platform/commit/0333eea481b6bd4018ee0e9a7023b963c55352c7))
+
+
+### Code Refactoring
+
+* **auth:** forward verified identity as X-User-Id, dropping the dev-header seam in cloud ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **frontend:** collapse /list-apps into a single shared AppsProvider with module-level dedup ([ab2cb14](https://github.com/NoiseDigital/agent-platform/commit/ab2cb143359d267f16d3214897a84019a9dc7b08))
+* **smoke:** drop public deep-health endpoint; smoke the real BFF→gateway path (/me→401) instead ([6ec83e1](https://github.com/NoiseDigital/agent-platform/commit/6ec83e15dd2c07d130e3b42e04e05f5d386a0889))
+
 ## [0.3.1](https://github.com/NoiseDigital/agent-platform/compare/v0.3.0...v0.3.1) (2026-06-11)
 
 
