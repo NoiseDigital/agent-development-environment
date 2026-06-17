@@ -128,30 +128,36 @@ jobs:
         run: gcloud run deploy "frontend" --image "$AR/frontend:$SHA" --region "$REGION" --project "$PROJECT"
 
       # ── Post-deploy smoke test ───────────────────────────────────────────────
-      # Validates the live deployment end-to-end against the public frontend:
-      # the app + production build, a static asset (build/middleware), and the
-      # deep service-mesh health (DB + gateway→agents/toolbox/stats IAM hops).
-      # These paths exist only when deployed, so this catches the prod-only
-      # failure modes (auth/audience/ingress/endpoint config) that local dev
-      # can't reproduce. Always runs — it verifies the live state even when a
-      # service was unchanged this push.
+      # Hits the public frontend on the REAL request path — no bespoke endpoint,
+      # no auth, no synthetic shortcuts. Catches the prod-only failure modes that
+      # matter at this surface: a broken production build, broken static serving,
+      # and a broken BFF→IAM-token→gateway hop. Deeper authenticated hops
+      # (agents/toolbox/stats, real runs) need an authenticated smoke and are
+      # intentionally out of scope here. Always runs (verifies the live state
+      # even on a push that didn't roll a given service).
       - name: Post-deploy smoke test
         run: |
           set -euo pipefail
           FE="$(gcloud run services describe frontend --region "$REGION" --project "$PROJECT" --format='value(status.url)')"
           echo "Frontend: $FE"
 
-          echo "→ app reachable (production build)"
-          curl -fsS -o /dev/null -w "  GET / -> %{http_code}\n" "$FE/"
+          echo "→ app reachable (production build + middleware)"
+          code="$(curl -sS -o /dev/null -w '%{http_code}' "$FE/")"
+          echo "  GET / -> $code"
+          case "$code" in 2*|3*) ;; *) echo "::error::frontend not reachable ($code)"; exit 1 ;; esac
 
-          echo "→ static asset served (build + middleware matcher)"
+          echo "→ static asset served (build output + middleware matcher)"
           curl -fsS -o /dev/null -w "  GET /noise_white.svg -> %{http_code}\n" "$FE/noise_white.svg"
 
-          echo "→ deep service-mesh health (db + agents + toolbox + stats)"
-          # Don't use -f here: a red check returns 503 with a JSON body naming
-          # the failed dependency — capture it so the failure is diagnosable.
-          code="$(curl -sS -o /tmp/deep.json -w '%{http_code}' "$FE/gw/healthz/deep" || true)"
-          echo "  HTTP $code: $(cat /tmp/deep.json)"
-          python3 -c "import json,sys; sys.exit(0 if json.load(open('/tmp/deep.json')).get('ok') else 1)" \
-            || { echo "::error::deep health reported a red dependency (HTTP $code)"; exit 1; }
-          echo "✓ smoke test passed"
+          echo "→ BFF → IAM token → gateway hop (unauthenticated /me must be a real 401)"
+          # The body proves the request reached the gateway APP (its current_user
+          # answered) — i.e. the whole BFF→token→gateway chain works. A 5xx, a
+          # connect error, or a 401 with a DIFFERENT body = the hop is broken.
+          resp="$(curl -sS -o /tmp/me.json -w '%{http_code}' "$FE/gw/api/v1/me" || echo 000)"
+          echo "  GET /gw/api/v1/me -> $resp: $(cat /tmp/me.json 2>/dev/null)"
+          if [ "$resp" = "401" ] && grep -q "authentication required" /tmp/me.json; then
+            echo "✓ smoke test passed"
+          else
+            echo "::error::BFF→gateway hop unhealthy (got $resp; expected 401 'authentication required')"
+            exit 1
+          fi

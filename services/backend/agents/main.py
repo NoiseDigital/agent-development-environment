@@ -20,9 +20,10 @@ from api.tools.routes import router as tools_router
 
 
 class _MuteLivenessAccessLog(logging.Filter):
-    """Drop ONLY the exact liveness-probe access line (`GET /healthz`), which the
-    orchestrator hits every few seconds with zero signal. Precise on purpose:
-    `/list-apps`, every real route, and any non-2xx on `/healthz` stay visible."""
+    """Drop the exact liveness-probe access line (`GET /healthz`, any status) —
+    zero-signal orchestrator noise; a real liveness failure shows via the
+    unhealthy container + app error log. Narrow on purpose: `/list-apps`, every
+    other route, and their failures stay visible."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         return '"GET /healthz HTTP' not in record.getMessage()

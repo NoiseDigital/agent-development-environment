@@ -38,11 +38,11 @@ from api.users import router as users_router
 
 
 class _MuteLivenessAccessLog(logging.Filter):
-    """Drop ONLY the exact liveness-probe access line (`GET /healthz`), which the
-    orchestrator hits every few seconds with zero signal. Deliberately precise:
-    `/healthz/deep` (the smoke check), `/list-apps`, every real route, and ANY
-    non-2xx on these paths all stay visible — a health check failing surfaces via
-    the orchestrator marking the container unhealthy, not via this access line."""
+    """Drop the exact liveness-probe access line (`GET /healthz`, any status),
+    which the orchestrator hits every few seconds with zero signal — a liveness
+    failure surfaces via the orchestrator marking the container unhealthy + the
+    app-level error log, not this access line. Deliberately narrow: `/list-apps`,
+    every other route, and their failures all stay visible."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         return '"GET /healthz HTTP' not in record.getMessage()
