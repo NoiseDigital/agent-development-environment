@@ -1,6 +1,6 @@
 [project]
 name = "mcp-stats"
-version = "0.3.1"
+version = "0.3.2"
 description = "Statistics & correlation analysis MCP server"
 requires-python = "==3.13.*"
 dependencies = [
