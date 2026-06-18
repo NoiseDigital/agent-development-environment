@@ -1,4 +1,4 @@
-name: Deploy (backend)
+name: Migrate DB & Deploy Services
 
 # Backend deploy: build images, run DB migrations, roll Cloud Run. The frontend
 # (frontend) is a standalone Cloud Run service built + rolled out here too.
