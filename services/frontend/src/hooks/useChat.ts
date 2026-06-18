@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from 'react';
 import { type Session } from '../lib/agent/adk-api';
 import { getAgentConfiguration } from '../config/agent-config';
 import { getCurrentUser } from '../lib/auth';
+import { useAuth } from '../lib/firebase/auth-context';
 import {
   type ChatMessage,
   type ToolCall,
@@ -25,9 +26,17 @@ import { useSessions } from './useSessions';
 
 export type { ChatMessage, ToolCall };
 
-// Identity comes from the auth seam (lib/auth) — a fixed dev user today, the
-// Firebase user once auth is live. Callers may still override `userId` for tests.
-export function useChat(initialApp?: string, userId: string = getCurrentUser().uid) {
+// Identity must be REACTIVE. On a deployed reload getCurrentUser() is "" until
+// Firebase auth resolves — and ChatProvider does NOT re-render on that resolution
+// (its children come from a server layout with a stable reference, so the
+// AuthProvider re-render bails out on them). Reading the auth context here makes
+// useChat re-render when the user lands, so the URL-driven session load re-fires
+// with the real uid instead of 404ing on an empty one. Falls back to the auth
+// seam (lib/auth) so the local "user-1" dev identity — and tests — keep working.
+// Callers may still override `userId` for tests.
+export function useChat(initialApp?: string, userIdOverride?: string) {
+  const { user } = useAuth();
+  const userId = userIdOverride ?? user?.uid ?? getCurrentUser().uid;
   // Available apps come from the app-wide AppsProvider (one fetch/poll, shared),
   // not a per-instance fetch. See contexts/AppsContext.
   const { apps: availableApps, isLoading: isLoadingApps, refresh: refreshApps } = useApps();

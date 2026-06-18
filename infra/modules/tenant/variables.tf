@@ -1,7 +1,7 @@
 # ── Identity ────────────────────────────────────────────────────────────────
 variable "tenant_id" {
   type        = string
-  description = "Tenant root id, e.g. \"nd-agentspace\"."
+  description = "Tenant root id (label / folder name), e.g. \"noise\"."
 }
 
 variable "stage" {
@@ -11,6 +11,16 @@ variable "stage" {
     condition     = contains(["sbx", "dev", "uat", "prod"], var.stage)
     error_message = "stage must be one of: sbx, dev, uat, prod."
   }
+}
+
+variable "project_id" {
+  type        = string
+  description = <<-EOT
+    GCP project id. Defaults to "<tenant_id>-<stage>"; set it explicitly when the
+    tenant name and the project id differ (project ids are immutable, tenant_id is
+    just a label/folder name).
+  EOT
+  default     = ""
 }
 
 variable "region" {
@@ -62,16 +72,16 @@ variable "vertex_location" {
 }
 
 # ── Server-side tagging (sGTM) ──────────────────────────────────────────────
-variable "sgtm_container_config" {
-  type        = string
+variable "enable_sgtm" {
+  type        = bool
   description = <<-EOT
-    CONTAINER_CONFIG from a GTM *Server* container (tagmanager.google.com →
-    Admin → Create Container → Server). Empty (default) disables sGTM entirely —
-    no service, secret, or SA is created. When set, it's stored in Secret Manager
-    and the sgtm Cloud Run service is deployed.
+    Provision the server-side GTM service + its Secret Manager secret + SA.
+    Committed per-tenant (terraform.tfvars), so routine applies never tear it
+    down. The CONTAINER_CONFIG value is NOT a Terraform input — it's added
+    out-of-band to the `sgtm-container-config` secret and never touches tfvars or
+    state. See services/backend/tagging/sgtm/README.md.
   EOT
-  default     = ""
-  sensitive   = true
+  default     = false
 }
 
 # ── Datastream CDC (Postgres → BigQuery) ────────────────────────────────────

@@ -7,9 +7,11 @@ crash.log
 crash.*.log
 .terraform.tfstate.lock.info
 
-# Commit lock files (.terraform.lock.hcl) and the per-env terraform.tfvars
-# (non-secret config: github owner/repo, flags). Real SECRETS (e.g.
-# google_oauth_client_secret) must NOT be committed — put them in a
-# *.auto.tfvars override (ignored below) or pass TF_VAR_* in the environment.
+# Commit lock files (.terraform.lock.hcl) and the per-stage env/<stage>.tfvars
+# (non-secret config: stage, flags, admin emails). Real SECRETS (e.g.
+# google_oauth_client_secret) must NOT be committed — put them in a per-stage
+# env/<stage>.secret.tfvars (the Makefile includes it when present) or a
+# *.auto.tfvars override, or pass TF_VAR_* in the environment.
 bootstrap/terraform.tfvars
 *.auto.tfvars
+tenants/*/env/*.secret.tfvars

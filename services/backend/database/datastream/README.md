@@ -17,43 +17,21 @@ Datastream ─(private connection)─▶ datastream-proxy VM ─▶ Cloud SQL (p
      └──────────────────── stream ─────────────────────▶ BigQuery  (dataset: platform_cdc)
 ```
 
-## Rollout (3 steps — all automated, no manual SQL)
+## Setup
 
-Terraform can't create the publication/slot against a private DB, so the SQL
-prereqs live in an **Alembic migration**
+Three phases — provision → migrate → start the stream — all automated. The
+ordered commands are **[DEPLOY.md §7](../../../../DEPLOY.md)**.
+
+The one subtlety that belongs here: Terraform can't create the publication/slot
+against a private DB, so those SQL prereqs live in an **Alembic migration**
 ([20260819_0000_datastream_cdc_setup](../../gateway/alembic/versions/20260819_0000_datastream_cdc_setup.py))
-that the **migrate Cloud Run job** runs from inside the VPC as the `app` user (a
-`cloudsqlsuperuser`). It's guarded on the `datastream` role existing, so it
-no-ops everywhere CDC isn't enabled.
-
-> **Order matters.** Terraform must create the `datastream` role (step 1) BEFORE
-> the migration runs (step 2 / the merge). If the migration runs first it no-ops
-> and is marked applied, and the slot never gets made.
-
-**1. Provision the infra** — run from `infra/tenants/nd-agentspace/sbx/`:
-```bash
-cd infra/tenants/nd-agentspace/sbx
-terraform apply        # enable_datastream = true (already in terraform.tfvars)
-```
-Creates the proxy VM, private connection, connection profiles, the `platform_cdc`
-BigQuery dataset, and the **`datastream` DB user** — and restarts the instance
-once to enable `cloudsql.logical_decoding`.
-
-**2. Merge to main → the migrate job runs the prereqs.** CI builds the gateway
-(with the new migration) and runs `migrate`, which — now that the `datastream`
-role exists — creates the publication, replication slot, and grants. No `psql`.
-
-**3. Start the stream** — set `datastream_create_stream = true` in
-`terraform.tfvars` (commit it so it persists), then from the same dir:
-```bash
-cd infra/tenants/nd-agentspace/sbx
-terraform apply
-```
-Creates the stream (`RUNNING`), backfills all tables, then tails into `platform_cdc`.
-
-> Manual fallback: if you ran the migrate job out of order (before step 1), the
-> migration already no-op'd. Re-run the SQL by hand with [setup.sql](./setup.sql)
-> (as the `app` user, through the proxy VM / Cloud SQL Studio), then do step 3.
+that the **migrate job** runs from inside the VPC as the `app` user (a
+`cloudsqlsuperuser`), creating the publication + slot in an
+`autocommit_block` (a logical slot can't be made in a write transaction). It's
+guarded on the `datastream` role existing, so it no-ops where CDC is off — which
+is why the provision phase (which creates that role) must run *before* the
+migrate job. [setup.sql](./setup.sql) is the manual fallback if the migration ever
+no-ops out of order.
 
 ## Verify
 

@@ -133,8 +133,7 @@ jobs:
       - name: Deploy mcp-stats
         if: ${{ steps.changed.outputs.mcp_stats == 'true' || github.event_name == 'workflow_dispatch' }}
         run: gcloud run deploy "mcp-stats" --image "$AR/mcp-stats:$SHA" --region "$REGION" --project "$PROJECT"
-      # sgtm is config-gated in Terraform (no service until sgtm_container_config
-      # is set)
+      # sgtm is toggle-gated in Terraform (no service unless enable_sgtm = true)
       - name: Deploy sgtm
         if: ${{ steps.changed.outputs.sgtm == 'true' || github.event_name == 'workflow_dispatch' }}
         run: |

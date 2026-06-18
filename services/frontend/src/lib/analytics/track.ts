@@ -25,7 +25,7 @@ export type AnalyticsEvent =
   | 'dashboard_created'
   | 'chart_pinned';
 
-/** Fire a GA4 event. Safe to call anywhere — server or client, GA on or off. */
+/** Fire a GA4 event */
 export function track(event: AnalyticsEvent, params?: Record<string, unknown>): void {
   if (typeof window === 'undefined') return;
   // Dev aid: log every event so you can verify firing locally without digging

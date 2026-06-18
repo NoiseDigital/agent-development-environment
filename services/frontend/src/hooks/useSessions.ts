@@ -77,7 +77,10 @@ export function useSessions({
   // (stale "New chat" placeholders left behind by previous tabs); a session
   // that has any message at all is never touched.
   useEffect(() => {
-    if (!selectedApp) return;
+    // Wait for a resolved identity — listing/getting sessions under an empty uid
+    // 404s on a deployed reload. `userId` is in the deps, so this re-runs the
+    // moment auth resolves and supplies the real uid.
+    if (!selectedApp || !userId) return;
     let cancelled = false;
     const loadSessionsForApp = async () => {
       setIsLoadingSessions(true);
@@ -89,7 +92,16 @@ export function useSessions({
         // cap the getSession fan-out to a reasonable number and only act on
         // sessions where the FULL event list comes back empty.
         const PRUNE_CAP = 40;
-        const candidates = sessionList.slice(0, PRUNE_CAP);
+        // Never sweep an empty session created in the last few minutes — the user
+        // may be sitting on a fresh "New chat" they haven't messaged yet. The
+        // in-memory localFreshSessions set covers this within a tab but is lost on
+        // refresh; the server-side lastUpdateTime (epoch seconds) survives a reload,
+        // so it's the durable guard against deleting the chat the user is on.
+        const FRESH_GRACE_SEC = 5 * 60;
+        const nowSec = Date.now() / 1000;
+        const candidates = sessionList
+          .slice(0, PRUNE_CAP)
+          .filter((s) => nowSec - s.lastUpdateTime > FRESH_GRACE_SEC);
         const prunedIds: string[] = [];
         await Promise.all(
           candidates.map(async (s) => {
