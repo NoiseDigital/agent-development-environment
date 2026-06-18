@@ -42,7 +42,7 @@ jobs:
       # Only build/deploy services whose source changed since the previous commit
       # (a manual workflow_dispatch forces a full deploy — see the `force` exprs).
       # The migrate job runs when the gateway changed (Alembic migrations live there).
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: changed
         with:
           filters: |
