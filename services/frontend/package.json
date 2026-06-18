@@ -3,12 +3,12 @@
   "version": "0.3.2",
   "private": true,
   "scripts": {
-    "dev": "WATCHPACK_POLLING=true next dev -H 0.0.0.0 -p 3000",
-    "build": "next build",
+    "dev": "WATCHPACK_POLLING=true next dev -H 0.0.0.0 -p 3000 --webpack",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
-    "analyze": "ANALYZE=true next build"
+    "analyze": "ANALYZE=true next build --webpack"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.20",
