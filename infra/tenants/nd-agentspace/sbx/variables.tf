@@ -26,3 +26,15 @@ variable "sgtm_container_config" {
   default   = ""
   sensitive = true
 }
+
+# Datastream CDC (Postgres → BigQuery). Two-phase: apply with enable_datastream,
+# run setup.sql, then set datastream_create_stream to start the stream.
+variable "enable_datastream" {
+  type    = bool
+  default = false
+}
+
+variable "datastream_create_stream" {
+  type    = bool
+  default = false
+}

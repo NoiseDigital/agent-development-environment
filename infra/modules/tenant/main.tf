@@ -28,6 +28,7 @@ resource "google_project_service" "services" {
     "servicenetworking.googleapis.com",
     "aiplatform.googleapis.com",
     "bigquery.googleapis.com",
+    "datastream.googleapis.com",      # CDC: Postgres → BigQuery (datastream.tf)
     "firebase.googleapis.com",        # Firebase Auth (Identity Platform)
     "identitytoolkit.googleapis.com", # session cookies / sign-in
     "iam.googleapis.com",
