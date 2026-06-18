@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { feedbackApi, type Rating } from '../lib/agent/feedback-api';
+import { track } from '../lib/analytics/track';
 import type { Session } from '../lib/agent/adk-api';
 
 export type { Rating };
@@ -34,7 +35,7 @@ export function useChatFeedback({
 
   // Reload per-message ratings whenever the active session changes.
   useEffect(() => {
-    if (!selectedApp || !currentSession) {
+    if (!selectedApp || !currentSession || !userId) {
       setFeedback({});
       return;
     }
@@ -63,6 +64,8 @@ export function useChatFeedback({
     });
     try {
       await feedbackApi.setRating(selectedApp, currentSession.id, eventId, rating, userId);
+      // Only the act of giving a thumb is signal; clearing a rating (null) isn't.
+      if (rating) track('feedback_submitted', { rating, agent: selectedApp });
     } catch (err) {
       // Log loudly so a feedback-endpoint regression isn't silent — and
       // revert the optimistic write so the UI reflects server truth.

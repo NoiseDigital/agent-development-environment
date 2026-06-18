@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { saveUserDashboard } from '../../lib/dashboards/user-dashboards';
+import { track } from '../../lib/analytics/track';
 import { newId } from '../../lib/id';
 import { listClients, clientBySlug, type Client } from '../../data/clients';
 import { dashboardData, type NamedValue } from '../../lib/dashboards';
@@ -62,6 +63,7 @@ export default function NewDashboardModal({ onClose }: { onClose: () => void }) 
       campaignId: campaign || 'all',
       createdAt: new Date().toISOString(),
     });
+    track('dashboard_created', { scope: campaign ? 'campaign' : 'all' });
     router.push(`/dashboards/${id}`);
   };
 

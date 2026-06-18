@@ -22,6 +22,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from ._idtoken import id_token_for
 from .auth import CurrentUser, current_user
 
 STATS_URL = os.getenv("STATS_URL", "http://mcp-stats:8080")
@@ -47,12 +48,19 @@ async def stats_proxy(
     body = await request.body()
     upstream = f"{STATS_URL}/api/{endpoint}"
 
+    # Authenticate to the internal-ingress mcp-stats service with a Google-signed
+    # ID token (audience = its URL). None off-GCP (local plain HTTP).
+    headers = {"content-type": "application/json"}
+    token = id_token_for(STATS_URL)
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
     async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
         try:
             resp = await client.post(
                 upstream,
                 content=body,
-                headers={"content-type": "application/json"},
+                headers=headers,
             )
         except httpx.HTTPError as exc:
             raise HTTPException(502, f"stats upstream unreachable: {exc}") from exc

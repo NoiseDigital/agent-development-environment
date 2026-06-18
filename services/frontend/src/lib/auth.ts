@@ -19,10 +19,19 @@ export interface CurrentUser {
   role: Role;
 }
 
-// Fallback before auth resolves / during SSR. uid 'user-1' keeps existing
-// locally-keyed dev data resolving until it's migrated to real Firebase uids.
-// Admin so the local stack (no login) stays fully usable.
-const ANON: CurrentUser = { uid: "user-1", email: null, role: "admin" };
+// Fallback before auth resolves / during SSR.
+//
+// LOCAL ONLY (Firebase emulator, no login): the stable dev uid keeps locally
+// keyed ADK sessions/data resolving, and admin so the no-login stack is usable.
+//
+// DEPLOYED: never use the dev identity — a real Firebase uid always resolves
+// first, and the dev uid must not reach a production DB (incl. ADK session
+// tables). Empty uid + least-privilege; callers must skip identity-keyed calls
+// until a real uid resolves (the ADK hooks guard on it).
+const IS_LOCAL = !!process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST;
+const ANON: CurrentUser = IS_LOCAL
+  ? { uid: "user-1", email: null, role: "admin" }
+  : { uid: "", email: null, role: "member" };
 
 let _current: CurrentUser = ANON;
 

@@ -21,6 +21,7 @@ export default function ChatSessionPage() {
   const thinking = useNeuralThinking();
 
   const {
+    userId,
     availableApps,
     selectedApp,
     sessions,
@@ -52,11 +53,16 @@ export default function ChatSessionPage() {
   // The URL is the single source of truth for which session is open: load
   // whatever session the route names. Selecting a conversation or creating one
   // just navigates — this effect does the loading, so there is one load path.
+  //
+  // Gate on `userId`: on a deployed reload the authenticated uid is "" until
+  // Firebase auth resolves, and selecting a session under an empty user 404s
+  // ("Failed to select session: Not Found"). `userId` is in the deps so the load
+  // re-fires once auth resolves and the real uid lands — fixing the reload race.
   useEffect(() => {
-    if (selectedApp && sessionId && currentSession?.id !== sessionId) {
+    if (selectedApp && userId && sessionId && currentSession?.id !== sessionId) {
       selectSession(sessionId);
     }
-  }, [selectedApp, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedApp, userId, sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleNewSession = async () => {
     const s = await createNewSession();

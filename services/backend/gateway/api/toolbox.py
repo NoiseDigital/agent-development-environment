@@ -21,6 +21,8 @@ from typing import Any
 from toolbox_core import ToolboxClient
 from toolbox_core.protocol import Protocol
 
+from ._idtoken import id_token_for
+
 DEFAULT_TOOLBOX_ENDPOINT = "http://mcp-toolbox:5000"
 
 # Lazy singleton — built on first use, shared by every request. Cheap to
@@ -35,7 +37,22 @@ def get_toolbox_client() -> ToolboxClient:
     global _client
     if _client is None:
         endpoint = os.getenv("TOOLBOX_ENDPOINT", DEFAULT_TOOLBOX_ENDPOINT)
-        _client = ToolboxClient(endpoint, protocol=Protocol.MCP_v20250326)
+        # Authenticate to the internal-ingress Toolbox with a Google-signed ID
+        # token (audience = its URL), refreshed per request via the callable.
+        # Cloud Run's IAM token goes in X-Serverless-Authorization, NOT
+        # Authorization, so it never collides with Toolbox's own bearer-token
+        # auth (https://mcp-toolbox.dev/.../toolbox_mcp_auth). Only on GCP —
+        # locally the endpoint is plain HTTP on the compose net.
+        client_headers = (
+            {"X-Serverless-Authorization": lambda: f"Bearer {id_token_for(endpoint)}"}
+            if endpoint.startswith("https://")
+            else None
+        )
+        _client = ToolboxClient(
+            endpoint,
+            protocol=Protocol.MCP_v20250326,
+            client_headers=client_headers,
+        )
     return _client
 
 

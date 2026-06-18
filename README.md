@@ -78,6 +78,8 @@ services/
 │   │   ├── images/                 #   image-based MCP configs (toolbox tools.yaml lives here)
 │   │   ├── math/                   #   code-based MCP server
 │   │   └── stats/                  #   code-based MCP server (correlate / regress / QA)
+│   ├── tagging/
+│   │   └── sgtm/                   # server-side Google Tag Manager (gtag → sGTM → GA4)
 │   └── database/                   # Postgres init scripts
 terraform/                          # GCP infrastructure
 ```
@@ -147,6 +149,26 @@ Notes:
   - `GOOGLE_ADS_MCP_ENV_SECRET_VERSION` (optional; defaults to `latest`)
   - `GOOGLE_IMPERSONATE_SERVICE_ACCOUNT` (optional; uses IAM impersonation, no local key file)
 - If the current user cannot access the configured secret, the generated `.env` is removed and `mcp-google-ads` cannot be started.
+
+## Analytics / server-side tagging
+
+Frontend GA (`gtag.js`) routes measurement data through a server-side Google
+Tag Manager container instead of straight to Google. The browser posts to the
+`sgtm` service (`server_container_url`), which forwards to GA4 per the tags you
+publish in the GTM UI.
+
+- **Code owns:** the `sgtm` *service* (`services/backend/tagging/sgtm`, an
+  image-based service like the toolbox), the frontend `gtag` wiring, and the
+  env/secrets. **GTM owns** the tag/trigger/variable logic — authored in the
+  GTM UI and published; the container fetches its published config at runtime.
+- **Profile-gated** (`tagging`): needs `SGTM_CONTAINER_CONFIG` from a GTM Server
+  container, so it stays off until configured — `docker compose --profile tagging up`.
+- **Prod:** gated on a committed `enable_sgtm` toggle; the CONTAINER_CONFIG value
+  lives only in Secret Manager (added out-of-band — never in tfvars or state).
+
+Setup (local + the full prod runbook) is in [DEPLOY.md §6](DEPLOY.md); how the
+service works internally is in
+[services/backend/tagging/sgtm/README.md](services/backend/tagging/sgtm/README.md).
 
 ## Schema Migrations
 

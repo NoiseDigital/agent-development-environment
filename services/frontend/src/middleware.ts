@@ -26,6 +26,11 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Run on everything except static assets.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|svg|ico)$).*)"],
+  // Run on everything except static assets. The extension match is
+  // case-insensitive (letter classes, since JS regex has no inline `i` flag) so
+  // brand marks like `/noise_N.PNG` aren't mistaken for routes and bounced to
+  // /login — and covers the common image types, not just png/svg/ico.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:[pP][nN][gG]|[jJ][pP][eE]?[gG]|[gG][iI][fF]|[sS][vV][gG]|[iI][cC][oO]|[wW][eE][bB][pP])$).*)",
+  ],
 };

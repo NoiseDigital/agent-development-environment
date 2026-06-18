@@ -1,6 +1,6 @@
 {
   "name": "noise-agent-platform",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "scripts": {
     "dev": "WATCHPACK_POLLING=true next dev -H 0.0.0.0 -p 3000",
@@ -11,13 +11,14 @@
     "analyze": "ANALYZE=true next build"
   },
   "dependencies": {
-    "@tailwindcss/typography": "^0.5.19",
+    "@tailwindcss/typography": "^0.5.20",
     "firebase": "^12.14.0",
     "firebase-admin": "^14.0.0",
+    "google-auth-library": "^10.7.0",
     "html-to-image": "^1.11.13",
     "next": "^15.5.19",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "react-grid-layout": "^2.2.3",
     "react-markdown": "^10.1.0",
     "react-vega": "^8.0.0",
@@ -26,7 +27,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@next/bundle-analyzer": "^16.2.7",
+    "@next/bundle-analyzer": "^16.2.9",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -39,6 +40,6 @@
     "happy-dom": "^20.10.4",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.9"
   }
 }

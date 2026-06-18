@@ -11,6 +11,7 @@
 // forward straight to the docker-network gateway.
 
 import { type NextRequest } from "next/server";
+import { GoogleAuth } from "google-auth-library";
 
 import { adminAuth, SESSION_COOKIE_NAME } from "@/lib/firebase/admin";
 
@@ -19,6 +20,12 @@ export const runtime = "nodejs"; // needs streaming fetch + the metadata server
 
 const GATEWAY_URL = process.env.GATEWAY_URL ?? "http://localhost:8080";
 const GATEWAY_AUDIENCE = process.env.GATEWAY_AUDIENCE ?? ""; // prod: = gateway URL
+
+// Mints (and caches/refreshes) an OIDC ID token for the gateway, signed by the
+// frontend Cloud Run SA, used as the Cloud Run IAM invoker credential. Using
+// google-auth-library instead of a hand-rolled metadata fetch handles token
+// caching + refresh + audience correctly.
+const googleAuth = new GoogleAuth();
 
 // Identity headers the proxy injects from the verified session. ALWAYS stripped
 // from the inbound request first so a client can never spoof them.
@@ -39,16 +46,14 @@ const STRIP = new Set([
   "accept-encoding",
 ]);
 
-// Cloud Run / GCE metadata server: an OIDC ID token for `audience` (the
-// gateway), used as the Cloud Run IAM invoker credential. null off-GCP (dev).
-async function googleIdToken(audience: string): Promise<string | null> {
+// `Authorization: Bearer <id token>` for the gateway, or null off-GCP (dev).
+async function gatewayAuthHeader(audience: string): Promise<string | null> {
   try {
-    const res = await fetch(
-      `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(audience)}`,
-      { headers: { "Metadata-Flavor": "Google" } },
-    );
-    return res.ok ? await res.text() : null;
-  } catch {
+    const client = await googleAuth.getIdTokenClient(audience);
+    const headers = await client.getRequestHeaders();
+    return headers.get("authorization") ?? null;
+  } catch (e) {
+    console.error("[gw] failed to mint gateway ID token:", e);
     return null;
   }
 }
@@ -84,17 +89,19 @@ async function handle(
     }
   }
 
-  // Prod only: authenticate to the internal gateway as the App Hosting SA. The
+  // Prod only: authenticate to the internal gateway as the frontend SA. The
   // user's Firebase Bearer (once auth is live) moves to a custom header so the
   // IAM token can own Authorization.
   if (GATEWAY_AUDIENCE) {
-    const idToken = await googleIdToken(GATEWAY_AUDIENCE);
-    if (idToken) {
+    const authz = await gatewayAuthHeader(GATEWAY_AUDIENCE);
+    if (authz) {
       const userAuth = headers.get("authorization");
       if (userAuth) {
         headers.set("x-firebase-id-token", userAuth.replace(/^Bearer\s+/i, ""));
       }
-      headers.set("authorization", `Bearer ${idToken}`);
+      headers.set("authorization", authz);
+    } else {
+      console.error("[gw] no gateway auth header minted — call will 401");
     }
   }
 
@@ -108,6 +115,9 @@ async function handle(
     duplex: "half",
     redirect: "manual",
   });
+  if (upstream.status === 401 || upstream.status === 403) {
+    console.error(`[gw] ${req.method} ${path.join("/")} -> ${upstream.status} (gateway auth)`);
+  }
 
   // Stream the upstream body straight back. Drop encoding/length so the runtime
   // re-derives them for the (already-decoded) stream.

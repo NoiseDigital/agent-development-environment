@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { toPng } from 'html-to-image';
 import { clientDashboards, dashboardFromSpec, type Dashboard } from '../data/dashboards';
 import { loadUserDashboards, saveUserDashboard } from '../lib/dashboards/user-dashboards';
+import { track } from '../lib/analytics/track';
 import { pinsApi } from '../lib/dashboards/pins-api';
 import { dashboardTitle as dashTitle, isPinnable } from '../lib/dashboards/access';
 import { saveIssueReport } from '../lib/api/issue-reports';
@@ -156,6 +157,7 @@ export default function ChartActions({ chart, fallbackTitle, captureRef, exports
     });
     close();
     setSavedTo(target);
+    track('chart_pinned', { new_dashboard: false });
     window.setTimeout(() => setSavedTo(null), 6000);
   };
 
@@ -186,6 +188,7 @@ export default function ChartActions({ chart, fallbackTitle, captureRef, exports
     ]);
     close();
     setSavedTo(target);
+    track('chart_pinned', { new_dashboard: true });
     window.setTimeout(() => setSavedTo(null), 6000);
   };
 

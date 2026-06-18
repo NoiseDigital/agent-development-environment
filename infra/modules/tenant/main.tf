@@ -1,8 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# tenant module — one tenant-stage's backend stack (Cloud SQL, Cloud Run,
-# GCS, Secret Manager, networking, IAM, Firebase). The frontend is NOT here:
-# it deploys via Firebase App Hosting's native git rollout (see firebase.tf +
-# services/frontend/apphosting.yaml).
+# tenant module — one tenant-stage's full stack (Cloud SQL, Cloud Run incl. the
+# public frontend, GCS, Secret Manager, networking, IAM, Firebase Auth). All
+# services build + deploy via CI (.github/workflows/deploy.yml).
 #
 # Single-tenant-per-project: project_id = "<tenant_id>-<stage>".
 #
@@ -12,7 +11,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 locals {
-  project_id   = "${var.tenant_id}-${var.stage}"
+  # project_id is the real (immutable) GCP project. It defaults to the tenant/stage
+  # convention but can be set explicitly when the tenant *name* differs from the
+  # project id (e.g. tenant_id = "noise", project = "nd-agentspace-sbx").
+  project_id   = var.project_id != "" ? var.project_id : "${var.tenant_id}-${var.stage}"
   name_prefix  = "${var.tenant_id}-${var.stage}"
   gcs_bucket   = "${local.project_id}-uploads"
   is_protected = var.stage == "prod" || var.stage == "uat"
@@ -29,12 +31,9 @@ resource "google_project_service" "services" {
     "servicenetworking.googleapis.com",
     "aiplatform.googleapis.com",
     "bigquery.googleapis.com",
-    "firebase.googleapis.com",
-    "identitytoolkit.googleapis.com",
-    "firebasehosting.googleapis.com",
-    "firebaseapphosting.googleapis.com",
-    "developerconnect.googleapis.com", # App Hosting git connection (frontend deploy)
-    "cloudbuild.googleapis.com",       # App Hosting builds the frontend via Cloud Build
+    "datastream.googleapis.com",      # CDC: Postgres → BigQuery (datastream.tf)
+    "firebase.googleapis.com",        # Firebase Auth (Identity Platform)
+    "identitytoolkit.googleapis.com", # session cookies / sign-in
     "iam.googleapis.com",
   ])
   project            = local.project_id
