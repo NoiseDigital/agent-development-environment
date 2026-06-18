@@ -13,15 +13,13 @@ RUN apt-get update -y \
        jq \
        make \
        shellcheck \
-       nodejs \
-       # System Python for repo tooling (pre-commit hooks, scripts). The
+       # System Python for repo TOOLING (pre-commit, AST checks, scripts). The
        # google/cloud-sdk base bundles Python privately for gcloud only
-       # (CLOUDSDK_PYTHON) and puts no python3 on PATH, so install one
-       # explicitly. Pinned to 3.13 to match the services
-       # (gateway/agents: requires-python = "==3.13.*"), so dev tooling parses
-       # the same syntax the services run. python-is-python3 adds the `python`
-       # alias. (Debian trixie's python3 IS 3.13; the explicit pin fails loud
-       # if a future base image moves off it.)
+       # (CLOUDSDK_PYTHON) and puts no python3 on PATH, so install one explicitly.
+       # This is 3.13 (Debian trixie's default) — fine for tooling. The SERVICES
+       # run on 3.14 (requires-python = "==3.14.*"); uv provides that interpreter
+       # for `uv sync`/`uv run` (see `uv python install 3.14` below), independent
+       # of this system Python. python-is-python3 adds the `python` alias.
        python3.13 \
        python-is-python3 \
     && apt-get clean \
@@ -55,7 +53,19 @@ RUN curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/sh
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Node.js 24 (NodeSource) — match the frontend prod image (node:24-slim)
+# and Next 16's Node >= 20.9 requirement. Debian's apt `nodejs` is older and
+# splits out `npm`; NodeSource ships a current node + npm together.
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install uv for Python environment management and pre-commit for repo hooks
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
 RUN uv tool install pre-commit
+
+# Pre-fetch the services' Python (requires-python = "==3.14.*") so backend
+# `uv sync`/`uv run` in the devcontainer match the service images + locks.
+RUN uv python install 3.14

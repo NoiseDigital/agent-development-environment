@@ -6,7 +6,7 @@
   <img src="https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white" alt="Next.js 15" />
   <img src="https://img.shields.io/badge/Google_ADK-1.32.0-4285F4?logo=google&logoColor=white" alt="Google ADK 1.32.0" />
   <img src="https://img.shields.io/badge/MCP_Toolbox-1.1.0-00897B" alt="MCP Toolbox 1.1.0" />
-  <img src="https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white" alt="Python 3.13" />
+  <img src="https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white" alt="Python 3.14" />
   <img src="https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white" alt="PostgreSQL 16" />
   <img src="https://github.com/noisedigital/agent-development-environment/actions/workflows/ci.yml/badge.svg" alt="CI" />
 </p>
