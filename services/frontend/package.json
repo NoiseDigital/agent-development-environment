@@ -16,7 +16,7 @@
     "firebase-admin": "^14.0.0",
     "google-auth-library": "^10.7.0",
     "html-to-image": "^1.11.13",
-    "next": "^15.5.19",
+    "next": "^16.2.9",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-grid-layout": "^2.2.3",
@@ -34,12 +34,12 @@
     "@types/node": "^25",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^5.2.0",
-    "eslint": "^9",
-    "eslint-config-next": "^15.5.19",
+    "@vitejs/plugin-react": "^6.0.2",
+    "eslint": "^10",
+    "eslint-config-next": "^16.2.9",
     "happy-dom": "^20.10.4",
     "tailwindcss": "^4",
-    "typescript": "^5",
+    "typescript": "^6",
     "vitest": "^4.1.9"
   }
 }

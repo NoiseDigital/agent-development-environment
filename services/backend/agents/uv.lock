@@ -61,7 +61,7 @@ requires-dist = [
     { name = "a2a-sdk", specifier = ">=1.1.0" },
     { name = "altair", specifier = ">=6.2.1" },
     { name = "asyncpg", specifier = ">=0.30.0" },
-    { name = "db-dtypes", specifier = ">=1.6.0" },
+    { name = "db-dtypes", specifier = ">=1.7.0" },
     { name = "fastapi", specifier = ">=0.137.2" },
     { name = "google-adk", specifier = "==1.32.0" },
     { name = "google-auth", specifier = ">=2.55.0" },
