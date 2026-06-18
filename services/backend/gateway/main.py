@@ -23,6 +23,8 @@ browser reaches it directly. There is no cross-origin caller to allow.
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, FastAPI
 
 from api.access import router as access_router
@@ -33,6 +35,20 @@ from api.me import router as me_router
 from api.proxy import router as proxy_router
 from api.stats import router as stats_router
 from api.users import router as users_router
+
+
+class _MuteLivenessAccessLog(logging.Filter):
+    """Drop the exact liveness-probe access line (`GET /healthz`, any status),
+    which the orchestrator hits every few seconds with zero signal — a liveness
+    failure surfaces via the orchestrator marking the container unhealthy + the
+    app-level error log, not this access line. Deliberately narrow: `/list-apps`,
+    every other route, and their failures all stay visible."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return '"GET /healthz HTTP' not in record.getMessage()
+
+
+logging.getLogger("uvicorn.access").addFilter(_MuteLivenessAccessLog())
 
 app = FastAPI(title="NoiseOS Gateway", version="0.1.0")
 

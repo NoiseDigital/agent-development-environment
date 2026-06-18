@@ -8,7 +8,7 @@ useless without per-line flushing.
 
 Security posture:
 - The upstream sees ONLY headers the gateway forwards. We drop hop-by-hop
-  headers and drop the inbound `X-Dev-User` so a browser can't impersonate a
+  headers and drop the inbound `X-User-*` so a browser can't impersonate a
   user; we then forward the user resolved by `current_user` instead.
 - Cookies and the inbound `Authorization` header are NOT forwarded — the
   gateway is the auth boundary and the agent runs on the private network.
@@ -16,14 +16,18 @@ Security posture:
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import AsyncIterator
 
 import httpx
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import StreamingResponse
 
+from ._idtoken import id_token_for
 from .auth import CurrentUser, current_user
+
+log = logging.getLogger(__name__)
 
 AGENT_URL = os.getenv("AGENT_URL", "http://agent:8000")
 
@@ -40,9 +44,17 @@ HOP_BY_HOP = {
     "upgrade",
 }
 
-# Headers that name the gateway as the auth boundary — the client can't set
-# them and have them reach the upstream.
-STRIPPED_FROM_CLIENT = {"x-dev-user", "authorization", "cookie"}
+# Headers the gateway owns as the auth boundary — a client can't set them and
+# have them reach the upstream. The identity headers (`x-user-id`/`x-user-email`)
+# are stripped from the inbound request and RE-asserted below from the
+# gateway-resolved user, so a browser can never spoof an identity through.
+#
+# `host` is critical: Cloud Run's front end routes by the Host header, and the
+# inbound one is the GATEWAY's host. Forwarding it would route this hop to the
+# gateway itself (so the agent's token audience never matches → 401, and the
+# agent is never reached). Dropping it lets httpx regenerate Host from the
+# target URL so the request actually lands on the agent service.
+STRIPPED_FROM_CLIENT = {"x-user-id", "x-user-email", "authorization", "cookie", "host"}
 
 router = APIRouter()
 
@@ -55,9 +67,10 @@ def _filter_request_headers(
         for k, v in headers.items()
         if k.lower() not in HOP_BY_HOP and k.lower() not in STRIPPED_FROM_CLIENT
     }
-    # The agent reads identity from this header today; once both services
-    # share a Firebase verifier, this becomes a signed JWT instead.
-    out["X-Dev-User"] = user.uid
+    # The agent reads identity from this header (the real Firebase uid in any
+    # deployed env). The next hardening step is a forwarded ID token the agent
+    # verifies itself, rather than trusting this header over the IAM boundary.
+    out["X-User-Id"] = user.uid
     return out
 
 
@@ -74,7 +87,7 @@ async def proxy_to_agent(
     path: str,
     request: Request,
     user: CurrentUser = Depends(current_user),
-) -> StreamingResponse:
+) -> Response:
     """Forward the request to the agent and stream the response back.
 
     `path` is captured from the URL after the gateway's prefix is stripped
@@ -83,6 +96,12 @@ async def proxy_to_agent(
     """
     upstream_url = f"{AGENT_URL}/{path}"
     forward_headers = _filter_request_headers(dict(request.headers), user)
+    # Authenticate to the internal-ingress agent service with a Google-signed ID
+    # token (audience = the agent's URL). None off-GCP, where the agent is plain
+    # HTTP on the compose network.
+    token = id_token_for(AGENT_URL)
+    if token:
+        forward_headers["Authorization"] = f"Bearer {token}"
     body = await request.body()
 
     # Keep a long timeout for SSE — `/run_sse` holds the connection open while
@@ -101,6 +120,26 @@ async def proxy_to_agent(
     # — StreamingResponse consumes it after we return. We close the client
     # when the iterator is exhausted.
     response = await upstream.__aenter__()
+    if response.status_code in (401, 403):
+        # Cloud Run puts the IAM rejection reason in WWW-Authenticate + body.
+        # Read it (error bodies are tiny) so the cause is unambiguous, then
+        # return it instead of streaming.
+        body = await response.aread()
+        log.error(
+            "agent upstream rejected %s /%s -> %s; www-authenticate=%r body=%r",
+            request.method,
+            path,
+            response.status_code,
+            response.headers.get("www-authenticate"),
+            body[:400],
+        )
+        await upstream.__aexit__(None, None, None)
+        await client.aclose()
+        return Response(
+            content=body,
+            status_code=response.status_code,
+            headers=_filter_response_headers(response.headers),
+        )
 
     async def body_iter() -> AsyncIterator[bytes]:
         try:

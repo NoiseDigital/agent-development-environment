@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { clientDashboards, dashboardFromSpec, type Dashboard } from '../../../data/dashboards';
 import { loadUserDashboards } from '../../../lib/dashboards/user-dashboards';
 import DashboardDetail from '../../../components/dashboards/DashboardDetail';
+import { track } from '../../../lib/analytics/track';
 
 // Per-dashboard route — every dashboard has its own URL (/dashboards/<id>).
 // A code-defined dashboard resolves synchronously; a user-created one is loaded
@@ -22,6 +23,15 @@ export default function DashboardPage() {
     const spec = loadUserDashboards().find((s) => s.id === params.dashboardId);
     setDashboard(spec ? dashboardFromSpec(spec) : null);
   }, [params.dashboardId, dashboard]);
+
+  // Fire once per dashboard actually rendered (code-defined or user-created),
+  // keyed on id so navigating between dashboards re-counts. Not-found (null)
+  // and the loading state (undefined) don't count as views.
+  useEffect(() => {
+    if (!dashboard) return;
+    const source = clientDashboards.some((d) => d.id === dashboard.id) ? 'code' : 'user';
+    track('dashboard_viewed', { dashboard_id: dashboard.id, source });
+  }, [dashboard]);
 
   if (dashboard === undefined) {
     return <div className="h-full bg-canvas" />;

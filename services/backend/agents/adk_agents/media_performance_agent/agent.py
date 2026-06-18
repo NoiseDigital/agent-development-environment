@@ -27,6 +27,7 @@ dashboard_editor_agent which AgentTool-wraps this agent.
 import logging
 import os
 from datetime import date
+from urllib.parse import urlparse
 
 from google.adk.agents import LlmAgent
 from google.adk.agents.context_cache_config import ContextCacheConfig
@@ -34,6 +35,7 @@ from google.adk.apps.app import App
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.mcp_tool import McpToolset, SseConnectionParams
 
+from shared.idtoken import id_token_for
 from shared.toolbox import get_toolbox_client
 
 from .prompts.root_agent import get_root_agent_prompt
@@ -61,8 +63,28 @@ def _build_root_agent() -> LlmAgent:
     tools.append(AgentTool(vega_charts_root_agent))
 
     # Stats MCP server — correlation, regression, QA on user-uploaded sources.
+    # It's internal-ingress behind Cloud Run IAM, so each SSE connection must
+    # carry a Google-signed ID token whose audience is the service origin (no
+    # /sse path). `header_provider` is called per connection, so the cached
+    # token refreshes before it expires — a static `headers=` would go stale on
+    # this module-singleton agent. None off-GCP (plain HTTP), where we send no
+    # header. mcp-stats has no bearer auth of its own, so Authorization is fine.
     stats_url = os.getenv("MCP_STATS_URL", "http://mcp-stats:8080/sse")
-    tools.append(McpToolset(connection_params=SseConnectionParams(url=stats_url)))
+    stats_origin = "{0.scheme}://{0.netloc}".format(urlparse(stats_url))
+
+    def stats_auth_headers(_ctx) -> dict[str, str]:
+        token = id_token_for(stats_origin)
+        return {"Authorization": f"Bearer {token}"} if token else {}
+
+    tools.append(
+        McpToolset(
+            # 30s connect timeout (vs the 5s default): mcp-stats is internal and
+            # scales to zero, so the first request after idle must absorb a Cloud
+            # Run cold start instead of timing out and failing the whole run.
+            connection_params=SseConnectionParams(url=stats_url, timeout=30.0),
+            header_provider=stats_auth_headers,
+        )
+    )
 
     return LlmAgent(
         model=MODEL_NAME,

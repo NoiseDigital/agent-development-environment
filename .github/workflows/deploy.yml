@@ -1,7 +1,7 @@
-name: Deploy (backend)
+name: Migrate DB & Deploy Services
 
 # Backend deploy: build images, run DB migrations, roll Cloud Run. The frontend
-# is NOT here — Firebase App Hosting builds & rolls it out from git natively.
+# (frontend) is a standalone Cloud Run service built + rolled out here too.
 #
 # Auth is keyless via Workload Identity Federation (no JSON keys).
 #
@@ -37,7 +37,7 @@ jobs:
     # Scopes vars.* to this tenant-stack's environment (push → noise-sbx).
     environment: ${{ github.event.inputs.environment || 'noise-sbx' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # Only build/deploy services whose source changed since the previous commit
       # (a manual workflow_dispatch forces a full deploy — see the `force` exprs).
@@ -50,14 +50,16 @@ jobs:
             agents: ['services/backend/agents/**']
             mcp_stats: ['services/backend/mcp/stats/**']
             mcp_toolbox: ['services/backend/mcp/images/toolbox/**']
+            sgtm: ['services/backend/tagging/sgtm/**']
+            frontend: ['services/frontend/**']
 
       - id: auth
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_CI_SERVICE_ACCOUNT }}
 
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@v3
 
       - name: Configure Docker for Artifact Registry
         run: |
@@ -85,9 +87,34 @@ jobs:
         run: |
           docker build -t "$AR/mcp-toolbox:$SHA" services/backend/mcp/images/toolbox
           docker push "$AR/mcp-toolbox:$SHA"
+      - name: Build & push sgtm
+        if: ${{ steps.changed.outputs.sgtm == 'true' || github.event_name == 'workflow_dispatch' }}
+        run: |
+          # Google's gtm-cloud-image, snapshotted into our AR. Pushed regardless;
+          # the deploy step below only rolls it if the service is provisioned.
+          docker build -t "$AR/sgtm:$SHA" services/backend/tagging/sgtm
+          docker push "$AR/sgtm:$SHA"
+      - name: Build & push frontend
+        if: ${{ steps.changed.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
+        run: |
+          # NEXT_PUBLIC_* are inlined at build time. Public config from vars; the
+          # API key from Secret Manager (ci-deployer has project secretAccessor).
+          API_KEY="$(gcloud secrets versions access latest --secret=firebase-web-api-key --project="$PROJECT")"
+          # Analytics is optional: both default empty (vars unset → gtag no-ops).
+          # Set vars.NEXT_PUBLIC_GA_MEASUREMENT_ID + vars.NEXT_PUBLIC_GA_SERVER_CONTAINER_URL
+          # (the sgtm_url TF output) to light it up.
+          docker build --target runner \
+            --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID="$PROJECT" \
+            --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="$PROJECT.firebaseapp.com" \
+            --build-arg NEXT_PUBLIC_FIREBASE_APP_ID="${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}" \
+            --build-arg NEXT_PUBLIC_FIREBASE_API_KEY="$API_KEY" \
+            --build-arg NEXT_PUBLIC_GA_MEASUREMENT_ID="${{ vars.NEXT_PUBLIC_GA_MEASUREMENT_ID }}" \
+            --build-arg NEXT_PUBLIC_GA_SERVER_CONTAINER_URL="${{ vars.NEXT_PUBLIC_GA_SERVER_CONTAINER_URL }}" \
+            -t "$AR/frontend:$SHA" services/frontend
+          docker push "$AR/frontend:$SHA"
 
       # ── Migrate FIRST (only when the gateway/migrations changed) ─────────────
-      - name: Run DB migrations (one-shot job)
+      - name: Run DB migrations
         if: ${{ steps.changed.outputs.gateway == 'true' || github.event_name == 'workflow_dispatch' }}
         run: |
           set -euo pipefail
@@ -106,6 +133,49 @@ jobs:
       - name: Deploy mcp-stats
         if: ${{ steps.changed.outputs.mcp_stats == 'true' || github.event_name == 'workflow_dispatch' }}
         run: gcloud run deploy "mcp-stats" --image "$AR/mcp-stats:$SHA" --region "$REGION" --project "$PROJECT"
+      # sgtm is toggle-gated in Terraform (no service unless enable_sgtm = true)
+      - name: Deploy sgtm
+        if: ${{ steps.changed.outputs.sgtm == 'true' || github.event_name == 'workflow_dispatch' }}
+        run: |
+          set -euo pipefail
+          if gcloud run services describe "sgtm" --region "$REGION" --project "$PROJECT" >/dev/null 2>&1; then
+            gcloud run deploy "sgtm" --image "$AR/sgtm:$SHA" --region "$REGION" --project "$PROJECT"
+          else
+            echo "sgtm not provisioned (no CONTAINER_CONFIG / terraform apply) — skipping deploy"
+          fi
       - name: Deploy gateway
         if: ${{ steps.changed.outputs.gateway == 'true' || github.event_name == 'workflow_dispatch' }}
         run: gcloud run deploy "gateway" --image "$AR/gateway:$SHA" --region "$REGION" --project "$PROJECT"
+      - name: Deploy frontend
+        if: ${{ steps.changed.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
+        run: gcloud run deploy "frontend" --image "$AR/frontend:$SHA" --region "$REGION" --project "$PROJECT"
+
+      # ── Post-deploy smoke test ───────────────────────────────────────────────
+      # Hits the public frontend on the request path — verifies the live state
+      # even on a push that didn't roll a given service).
+      - name: Post-deploy smoke test
+        run: |
+          set -euo pipefail
+          FE="$(gcloud run services describe frontend --region "$REGION" --project "$PROJECT" --format='value(status.url)')"
+          echo "Frontend: $FE"
+
+          echo "→ app reachable (production build + middleware)"
+          code="$(curl -sS -o /dev/null -w '%{http_code}' "$FE/")"
+          echo "  GET / -> $code"
+          case "$code" in 2*|3*) ;; *) echo "::error::frontend not reachable ($code)"; exit 1 ;; esac
+
+          echo "→ static asset served (build output + middleware matcher)"
+          curl -fsS -o /dev/null -w "  GET /noise_white.svg -> %{http_code}\n" "$FE/noise_white.svg"
+
+          echo "→ BFF → IAM token → gateway hop (unauthenticated /me must be a real 401)"
+          # The body proves the request reached the gateway APP (its current_user
+          # answered) — i.e. the whole BFF→token→gateway chain works. A 5xx, a
+          # connect error, or a 401 with a DIFFERENT body = the hop is broken.
+          resp="$(curl -sS -o /tmp/me.json -w '%{http_code}' "$FE/gw/api/v1/me" || echo 000)"
+          echo "  GET /gw/api/v1/me -> $resp: $(cat /tmp/me.json 2>/dev/null)"
+          if [ "$resp" = "401" ] && grep -q "authentication required" /tmp/me.json; then
+            echo "✓ smoke test passed"
+          else
+            echo "::error::BFF→gateway hop unhealthy (got $resp; expected 401 'authentication required')"
+            exit 1
+          fi

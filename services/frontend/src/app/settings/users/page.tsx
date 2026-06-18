@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { accessApi, type AccessRule, type Role } from "@/lib/api/access";
 import { usersApi, type UserRecord } from "@/lib/api/users";
 import { useAuth } from "@/lib/firebase/auth-context";
+import { track } from "@/lib/analytics/track";
 
 const ROLES: Role[] = ["admin", "member", "viewer"];
 
@@ -99,7 +100,10 @@ export default function AccessPage() {
   async function addRule(e: React.FormEvent) {
     e.preventDefault();
     if (!pattern.trim()) return;
-    await run(() => accessApi.add(pattern.trim(), role));
+    await run(async () => {
+      await accessApi.add(pattern.trim(), role);
+      track("user_invited", { role });
+    });
     setPattern("");
     setRole("member");
   }
@@ -176,7 +180,12 @@ export default function AccessPage() {
               <RoleSelect
                 value={r.role}
                 disabled={busy}
-                onChange={(role) => run(() => accessApi.update(r.id, { role }))}
+                onChange={(role) =>
+                  run(async () => {
+                    await accessApi.update(r.id, { role });
+                    track("role_changed", { target: "rule", role });
+                  })
+                }
               />
               <StatusPill active={r.is_active} />
               <div className="flex items-center justify-end gap-2">
@@ -229,7 +238,12 @@ export default function AccessPage() {
                 <RoleSelect
                   value={u.role}
                   disabled={busy || self}
-                  onChange={(role) => run(() => usersApi.update(u.id, { role }))}
+                  onChange={(role) =>
+                    run(async () => {
+                      await usersApi.update(u.id, { role });
+                      track("role_changed", { target: "user", role });
+                    })
+                  }
                 />
                 <StatusPill active={u.is_active} />
                 <div className="flex items-center justify-end gap-2">

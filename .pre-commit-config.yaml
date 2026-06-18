@@ -1,5 +1,11 @@
 exclude: ^services/backend/agents/adk_agents\.egg-info/
 
+# Install BOTH the pre-commit and commit-msg git hooks from a plain
+# `pre-commit install` (the devcontainer postCreateCommand). Without this only
+# the pre-commit stage is wired, so the commitizen commit-msg hook below would
+# silently never run.
+default_install_hook_types: [pre-commit, commit-msg]
+
 repos:
 
   # Ruff — Python linter + formatter (replaces flake8/black/isort)

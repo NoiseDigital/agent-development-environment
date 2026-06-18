@@ -125,36 +125,35 @@ class TestProxyForwarding:
         )
         assert last_request()["content"] == b'{"k":1}'
 
-    def test_forwards_default_uid_when_no_dev_user_header(
+    def test_forwards_default_uid_when_no_identity_header(
         self, proxy_client: TestClient
     ) -> None:
         """No inbound auth context — gateway resolves to DEV_UID and
-        forwards that as X-Dev-User."""
+        forwards that as X-User-Id."""
         from api.auth import DEV_UID
 
         proxy_client.get("/apps")
-        assert last_request()["headers"]["X-Dev-User"] == DEV_UID
+        assert last_request()["headers"]["X-User-Id"] == DEV_UID
 
-    def test_strips_then_resets_x_dev_user_from_resolved_identity(
+    def test_strips_then_resets_identity_from_resolved_user(
         self, proxy_client: TestClient
     ) -> None:
-        """Dev seam: X-Dev-User IS the identity input. The proxy strips the
-        inbound copy and re-emits the value current_user resolved to. When
-        Firebase Auth lands, current_user will ignore the header and this
-        test will assert the verified uid wins (and break the dev override
-        — which is the whole point)."""
-        proxy_client.get("/apps", headers={"X-Dev-User": "alice"})
-        assert last_request()["headers"]["X-Dev-User"] == "alice"
+        """Identity is the gateway-resolved user, re-asserted as X-User-Id. The
+        proxy strips any inbound copy a client set and re-emits the value
+        current_user resolved to — so a browser can't spoof an identity
+        through."""
+        proxy_client.get("/apps", headers={"X-User-Id": "alice"})
+        assert last_request()["headers"]["X-User-Id"] == "alice"
 
-    def test_inbound_x_dev_user_does_not_appear_twice(
+    def test_inbound_identity_header_does_not_appear_twice(
         self, proxy_client: TestClient
     ) -> None:
         """The inbound header MUST be stripped before the resolved value is
-        re-added — otherwise we'd forward `X-Dev-User` twice and the agent
+        re-added — otherwise we'd forward `X-User-Id` twice and the agent
         would see whichever one wins the http normalisation lottery."""
-        proxy_client.get("/apps", headers={"X-Dev-User": "alice"})
+        proxy_client.get("/apps", headers={"X-User-Id": "alice"})
         keys = [k.lower() for k in last_request()["headers"].keys()]
-        assert keys.count("x-dev-user") == 1
+        assert keys.count("x-user-id") == 1
 
     def test_strips_authorization_and_cookie_from_forwarded_headers(
         self, proxy_client: TestClient

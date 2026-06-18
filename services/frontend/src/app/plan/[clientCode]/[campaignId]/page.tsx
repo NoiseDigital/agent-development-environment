@@ -5,10 +5,11 @@
 // localStorage via the spreadsheet, then bump our local `tick` so the
 // plan re-reads from storage and every cell reflects the saved value.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { loadPlanByClient } from '../../../../lib/dashboards/user-plans';
 import { usdCompact } from '../../../../lib/format/format';
+import { track } from '../../../../lib/analytics/track';
 import PlanSpreadsheet from '../../../../components/plan/PlanSpreadsheet';
 
 export default function CampaignPlanPage() {
@@ -24,6 +25,15 @@ export default function CampaignPlanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [clientCode, tick],
   );
+
+  // Plan-surface usage signal. Fired here (before the early returns, to respect
+  // the rules of hooks) once the campaign resolves. No client_code/name — those
+  // are client identifiers we keep out of analytics.
+  useEffect(() => {
+    if (plan?.campaigns.some((c) => c.id === campaignId)) {
+      track('plan_viewed', { level: 'campaign' });
+    }
+  }, [plan, campaignId]);
 
   if (!plan) {
     return (

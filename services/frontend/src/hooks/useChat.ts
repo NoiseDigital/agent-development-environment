@@ -10,13 +10,15 @@
 //     the surface stays a one-import dependency.
 
 import { useEffect, useRef, useState } from 'react';
-import { adkApi, type Session } from '../lib/agent/adk-api';
+import { type Session } from '../lib/agent/adk-api';
 import { getAgentConfiguration } from '../config/agent-config';
 import { getCurrentUser } from '../lib/auth';
+import { useAuth } from '../lib/firebase/auth-context';
 import {
   type ChatMessage,
   type ToolCall,
 } from '../lib/agent/events';
+import { useApps } from '../contexts/AppsContext';
 import { useChatFeedback } from './useChatFeedback';
 import { useChatStream } from './useChatStream';
 import { useSessionNames } from './useSessionNames';
@@ -24,12 +26,21 @@ import { useSessions } from './useSessions';
 
 export type { ChatMessage, ToolCall };
 
-// Identity comes from the auth seam (lib/auth) — a fixed dev user today, the
-// Firebase user once auth is live. Callers may still override `userId` for tests.
-export function useChat(initialApp?: string, userId: string = getCurrentUser().uid) {
-  const [availableApps, setAvailableApps] = useState<string[]>([]);
+// Identity must be REACTIVE. On a deployed reload getCurrentUser() is "" until
+// Firebase auth resolves — and ChatProvider does NOT re-render on that resolution
+// (its children come from a server layout with a stable reference, so the
+// AuthProvider re-render bails out on them). Reading the auth context here makes
+// useChat re-render when the user lands, so the URL-driven session load re-fires
+// with the real uid instead of 404ing on an empty one. Falls back to the auth
+// seam (lib/auth) so the local "user-1" dev identity — and tests — keep working.
+// Callers may still override `userId` for tests.
+export function useChat(initialApp?: string, userIdOverride?: string) {
+  const { user } = useAuth();
+  const userId = userIdOverride ?? user?.uid ?? getCurrentUser().uid;
+  // Available apps come from the app-wide AppsProvider (one fetch/poll, shared),
+  // not a per-instance fetch. See contexts/AppsContext.
+  const { apps: availableApps, isLoading: isLoadingApps, refresh: refreshApps } = useApps();
   const [selectedApp, setSelectedApp] = useState<string | null>(initialApp ?? null);
-  const [isLoadingApps, setIsLoadingApps] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const supportsVisualization = selectedApp
@@ -93,26 +104,6 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
     userId,
   });
 
-  // Load available apps on mount.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setIsLoadingApps(true);
-        const apps = await adkApi.listApps();
-        if (!cancelled) setAvailableApps(apps);
-      } catch (err) {
-        if (!cancelled) {
-          console.error('Failed to load apps:', err);
-          setError(`Failed to load available apps: ${err instanceof Error ? err.message : 'Unknown error'}`);
-        }
-      } finally {
-        if (!cancelled) setIsLoadingApps(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
   // React to `initialApp` changes (FloatingAssistant swaps agents on edit-
   // mode toggle). Drop everything tied to the previous app — the new one
   // spawns its own session via the consumer's mount effect.
@@ -123,23 +114,11 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
     setError(null);
   }, [initialApp, selectedApp]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadAvailableApps = async () => {
-    try {
-      setIsLoadingApps(true);
-      const apps = await adkApi.listApps();
-      setAvailableApps(apps);
-      if (apps.length > 0 && !selectedApp) {
-        setSelectedApp(apps[0]);
-      }
-    } catch (err) {
-      console.error('Failed to load apps:', err);
-      setError(`Failed to load available apps: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setIsLoadingApps(false);
-    }
-  };
-
   return {
+    // Exposed so URL-driven loads can gate on a RESOLVED identity. On a deployed
+    // reload this is "" until Firebase auth resolves; selecting a session with an
+    // empty uid 404s, so consumers wait for it + re-run when it populates.
+    userId,
     availableApps,
     selectedApp,
     setSelectedApp,
@@ -165,6 +144,6 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
     renameSession: naming.renameSession,
     saveSessionName: naming.saveSessionName,
     refreshSessions: sessionsHook.refreshSessions,
-    refreshApps: loadAvailableApps,
+    refreshApps,
   };
 }

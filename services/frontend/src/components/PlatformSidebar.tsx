@@ -1,10 +1,11 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import Image from 'next/image';
 import { agentConfigurations } from '../config/agent-config';
-import { adkApi } from '../lib/agent/adk-api';
+import { track } from '../lib/analytics/track';
+import { useApps } from '../contexts/AppsContext';
 import { useSidebarCollapsed } from '../contexts/SidebarContext';
 import CollapsiblePanel from './ui/CollapsiblePanel';
 import Collapsible from './ui/Collapsible';
@@ -66,26 +67,12 @@ export default function PlatformSidebar() {
   const inAgentsSection = pathname.startsWith('/agents') || pathname.startsWith('/chat');
   const [agentsExpanded, setAgentsExpanded] = useState(inAgentsSection);
   const [collapsed, setCollapsed] = useSidebarCollapsed('platform');
-  const [onlineAgents, setOnlineAgents] = useState<Set<string>>(new Set());
 
-  // Which agents are live — poll every 15s so the green dot reflects reality
-  // without a page refresh. A single GET /list-apps is cheap (it's a static
-  // list on the ADK side), and 15s is short enough that flipping an agent on
-  // or off feels live without flooding logs.
-  useEffect(() => {
-    let cancelled = false;
-    const tick = () =>
-      adkApi
-        .listApps()
-        .then((apps) => { if (!cancelled) setOnlineAgents(new Set(apps)); })
-        .catch(() => {});
-    tick();
-    const id = window.setInterval(tick, 15_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, []);
+  // Which agents are live — from the shared AppsProvider (one poll app-wide),
+  // so the green dot reflects reality without every consumer fetching its own
+  // /list-apps. See contexts/AppsContext.
+  const { apps: liveApps } = useApps();
+  const onlineAgents = useMemo(() => new Set(liveApps), [liveApps]);
 
   const visibleAgents = Object.values(agentConfigurations).filter(
     (a) => !a.hidden && !a.comingSoon,
@@ -228,7 +215,10 @@ export default function PlatformSidebar() {
                   <button
                     key={agent.name}
                     type="button"
-                    onClick={() => router.push(`/chat/${agent.name}`)}
+                    onClick={() => {
+                      track('agent_selected', { agent: agent.name });
+                      router.push(`/chat/${agent.name}`);
+                    }}
                     className={`flex items-center gap-2.5 w-full px-2.5 py-[7px] rounded-md text-[12.5px] cursor-pointer select-none transition-colors duration-150 ${
                       active
                         ? 'bg-surface-raised text-foreground font-medium'

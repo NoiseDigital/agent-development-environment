@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AppChrome from "../components/AppChrome";
+import Analytics from "../components/Analytics";
 import { SidebarProvider } from "../contexts/SidebarContext";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import { AuthProvider } from "../lib/firebase/auth-context";
@@ -40,6 +41,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-canvas text-foreground`}
       >
+        <Analytics />
         <ThemeProvider>
           <AuthProvider>
             <SidebarProvider>

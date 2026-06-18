@@ -2,7 +2,7 @@
 # Dev builds THIS stage (docker-compose pins `target: base`) and bind-mounts the
 # source over /workspace, so deps are baked but code is live-reloaded. The venv
 # lives at /opt/venv — outside /workspace — so the bind mount doesn't shadow it.
-FROM python:3.13-bookworm AS base
+FROM python:3.14-bookworm AS base
 
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 ENV PORT=8000

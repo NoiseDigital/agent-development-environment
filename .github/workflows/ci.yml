@@ -1,10 +1,16 @@
 name: CI
 
 on:
+  # PRs cover feature branches; push only on main (post-merge) — so a branch with
+  # an open PR doesn't run CI twice.
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
-    branches: ["**"]
+
+# Cancel an in-progress run when a new commit supersedes it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # ── Python backend lint + type check ──────────────────────────────────────
@@ -16,7 +22,7 @@ jobs:
         working-directory: services/backend/agents
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-python@v5
         with:
@@ -48,9 +54,9 @@ jobs:
         working-directory: services/frontend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
@@ -77,7 +83,7 @@ jobs:
         working-directory: services/backend/agents
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-python@v5
         with:
@@ -112,7 +118,7 @@ jobs:
     name: Schema — DDL discipline + migration parity
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0  # need the merge-base for the parity check below
 
@@ -175,7 +181,7 @@ jobs:
     name: Terraform — fmt + validate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: hashicorp/setup-terraform@v3
 
@@ -183,11 +189,11 @@ jobs:
         working-directory: infra
         run: terraform fmt -check -recursive
 
-      # Validate the whole module tree through a concrete env (the sbx tenant
+      # Validate the whole module tree through a concrete env (the noise tenant
       # calls module.tenant, so this validates the module too). -backend=false
       # skips the GCS backend; validate needs no var values.
       - name: terraform validate
-        working-directory: infra/tenants/nd-agentspace/sbx
+        working-directory: infra/tenants/noise
         run: |
           terraform init -backend=false
           terraform validate
@@ -198,7 +204,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Validate docker-compose.yml
         run: docker compose config --quiet

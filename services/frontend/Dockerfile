@@ -17,16 +17,38 @@ RUN npm ci --prefer-offline
 EXPOSE 3000
 CMD ["sh", "-c", "npm install --no-audit --no-fund && npm run dev"]
 
-# ── Production build ──────────────────────────────────────────────────────────
+# ── Production build (Cloud Run) ──────────────────────────────────────────────
 FROM deps AS builder
+# Explicit prod NODE_ENV: Next 15 mis-prerenders the error pages under a
+# non-standard NODE_ENV (the deps stage leaves it unset for `next dev`).
+ENV NODE_ENV=production
+# NEXT_PUBLIC_* are inlined into the client bundle at build time, so they're
+# build args. CI passes the public Firebase config (project/authDomain/appId)
+# and reads the API key from Secret Manager — nothing committed to the repo.
+ARG NEXT_PUBLIC_FIREBASE_PROJECT_ID
+ARG NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+ARG NEXT_PUBLIC_FIREBASE_APP_ID
+ARG NEXT_PUBLIC_FIREBASE_API_KEY
+# Google Analytics (gtag.js). Both optional — empty = analytics no-ops. The
+# measurement id is public config; the server-container URL points gtag at our
+# sGTM endpoint for first-party measurement.
+ARG NEXT_PUBLIC_GA_MEASUREMENT_ID
+ARG NEXT_PUBLIC_GA_SERVER_CONTAINER_URL
+ENV NEXT_PUBLIC_FIREBASE_PROJECT_ID=$NEXT_PUBLIC_FIREBASE_PROJECT_ID \
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=$NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN \
+    NEXT_PUBLIC_FIREBASE_APP_ID=$NEXT_PUBLIC_FIREBASE_APP_ID \
+    NEXT_PUBLIC_FIREBASE_API_KEY=$NEXT_PUBLIC_FIREBASE_API_KEY \
+    NEXT_PUBLIC_GA_MEASUREMENT_ID=$NEXT_PUBLIC_GA_MEASUREMENT_ID \
+    NEXT_PUBLIC_GA_SERVER_CONTAINER_URL=$NEXT_PUBLIC_GA_SERVER_CONTAINER_URL
 COPY . .
 RUN npm run build
 
 FROM node:24-slim AS runner
 ENV NODE_ENV=production
+ENV PORT=8080
 WORKDIR /app
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-EXPOSE 3000
+EXPOSE 8080
 CMD ["node", "server.js"]

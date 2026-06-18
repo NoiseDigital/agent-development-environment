@@ -1,7 +1,7 @@
 # ── Identity ────────────────────────────────────────────────────────────────
 variable "tenant_id" {
   type        = string
-  description = "Tenant root id, e.g. \"nd-agentspace\"."
+  description = "Tenant root id (label / folder name), e.g. \"noise\"."
 }
 
 variable "stage" {
@@ -13,27 +13,20 @@ variable "stage" {
   }
 }
 
+variable "project_id" {
+  type        = string
+  description = <<-EOT
+    GCP project id. Defaults to "<tenant_id>-<stage>"; set it explicitly when the
+    tenant name and the project id differ (project ids are immutable, tenant_id is
+    just a label/folder name).
+  EOT
+  default     = ""
+}
+
 variable "region" {
   type        = string
   description = "Region for Cloud Run, Cloud SQL, GCS, and App Hosting."
   default     = "us-central1"
-}
-
-# ── Source repo (for Firebase App Hosting git rollout) ──────────────────────
-variable "github_owner" {
-  type        = string
-  description = "GitHub org/user owning the app repo."
-}
-
-variable "github_repo" {
-  type        = string
-  description = "Repository name (no owner)."
-}
-
-variable "app_hosting_branch" {
-  type        = string
-  description = "Branch App Hosting builds & rolls out for this stage (e.g. main for sbx, prod for prod)."
-  default     = "main"
 }
 
 # ── Database ────────────────────────────────────────────────────────────────
@@ -78,23 +71,40 @@ variable "vertex_location" {
   default     = "us-central1"
 }
 
-# ── Firebase App Hosting ────────────────────────────────────────────────────
-variable "enable_app_hosting" {
-  type        = string
+# ── Server-side tagging (sGTM) ──────────────────────────────────────────────
+variable "enable_sgtm" {
+  type        = bool
   description = <<-EOT
-    Create the Firebase App Hosting backend (git-connected frontend). Requires a
-    one-time Developer Connect link to the GitHub repo (interactive GitHub App
-    authorization — see infra/README.md), passed via developer_connect_repo.
-    Leave false until that link exists; the Firebase project/web app/auth below
-    still apply, so the emulator + client SDK wiring works first.
+    Provision the server-side GTM service + its Secret Manager secret + SA.
+    Committed per-tenant (terraform.tfvars), so routine applies never tear it
+    down. The CONTAINER_CONFIG value is NOT a Terraform input — it's added
+    out-of-band to the `sgtm-container-config` secret and never touches tfvars or
+    state. See services/backend/tagging/sgtm/README.md.
   EOT
   default     = false
 }
 
-variable "developer_connect_repo" {
-  type        = string
-  description = "Developer Connect git_repository_link resource name (set once the GitHub link exists)."
-  default     = ""
+# ── Datastream CDC (Postgres → BigQuery) ────────────────────────────────────
+variable "enable_datastream" {
+  type        = bool
+  description = <<-EOT
+    Provision the Datastream CDC infra (proxy VM, private connection, connection
+    profiles, BigQuery dataset, datastream DB user). Default off — only tenants
+    that want a live BigQuery mirror pay for the proxy VM. After enabling + apply,
+    run services/backend/database/datastream/setup.sql, then set
+    datastream_create_stream to start the stream.
+  EOT
+  default     = false
+}
+
+variable "datastream_create_stream" {
+  type        = bool
+  description = <<-EOT
+    Create the Datastream stream itself. Requires enable_datastream AND the SQL
+    prerequisites (publication + replication slot) to already exist, or stream
+    creation fails. Two-phase on purpose: apply infra → run setup.sql → flip this.
+  EOT
+  default     = false
 }
 
 # ── Google sign-in (Workspace SSO) ──────────────────────────────────────────

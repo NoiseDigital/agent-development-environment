@@ -1,5 +1,6 @@
 """Agent platform backend — the ADK FastAPI app plus the platform's own API."""
 
+import logging
 import os
 from pathlib import Path
 
@@ -16,6 +17,19 @@ from api.tools.routes import router as tools_router
 # `session_naming_agent` and `dashboard_insights_agent` apps under adk_agents/),
 # invoked by the frontend through the standard ADK /run endpoint. ONE auth
 # path — ADK + ADC — for every model interaction in the platform.
+
+
+class _MuteLivenessAccessLog(logging.Filter):
+    """Drop the exact liveness-probe access line (`GET /healthz`, any status) —
+    zero-signal orchestrator noise; a real liveness failure shows via the
+    unhealthy container + app error log. Narrow on purpose: `/list-apps`, every
+    other route, and their failures stay visible."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return '"GET /healthz HTTP' not in record.getMessage()
+
+
+logging.getLogger("uvicorn.access").addFilter(_MuteLivenessAccessLog())
 
 AGENTS_DIR = str(Path(__file__).resolve().parent / "adk_agents")
 

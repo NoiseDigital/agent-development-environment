@@ -6,6 +6,7 @@ returns a JSON-serializable result. Follows the SSE pattern of mcp/math.
 """
 
 import json
+import logging
 import os
 from typing import Optional
 
@@ -26,6 +27,18 @@ from google.adk.tools.mcp_tool.conversion_utils import adk_to_mcp_tool_type
 
 import engine
 from resolve import load_source
+
+
+class _MuteLivenessAccessLog(logging.Filter):
+    """Drop the exact liveness-probe access line (`GET /health`, any status) —
+    zero-signal noise. Narrow on purpose: every other route and their failures
+    stay visible."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return '"GET /health HTTP' not in record.getMessage()
+
+
+logging.getLogger("uvicorn.access").addFilter(_MuteLivenessAccessLog())
 
 
 # --- Tool implementations -----------------------------------------------------

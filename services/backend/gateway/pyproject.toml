@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "noise-gateway"
-version = "0.3.1"
+version = "0.3.2"
 description = "API gateway for the NoiseOS frontend — owns auth, proxies agent traffic, hosts platform-owned routes, and manages the platform's Postgres schema via Alembic."
 readme = "README.md"
 requires-python = "==3.13.*"
@@ -24,6 +24,11 @@ dependencies = [
     # agent service uses (sync flavour), so the SQL surface in tools.yaml
     # is shared. See services/backend/gateway/api/toolbox.py.
     "toolbox-core>=0.5.4",
+    # Mints OIDC ID tokens to authenticate to internal Cloud Run siblings
+    # (agents, mcp-stats, mcp-toolbox). Pulled in transitively today, but the
+    # service-to-service auth hop depends on it directly — pin it so a dep bump
+    # can't silently drop it. See services/backend/gateway/api/_idtoken.py.
+    "google-auth>=2.0.0",
 ]
 
 [tool.setuptools]

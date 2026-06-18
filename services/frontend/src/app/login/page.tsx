@@ -9,6 +9,7 @@ import {
 } from "firebase/auth";
 
 import { auth, googleProvider } from "@/lib/firebase/client";
+import { track } from "@/lib/analytics/track";
 
 // Exchange a freshly-signed-in user for an httpOnly session cookie, then go to
 // the originally-requested page. Surfaces the server's reason (e.g. a domain
@@ -35,8 +36,9 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function complete(idToken: string) {
+  async function complete(idToken: string, method: "google" | "email") {
     await startSession(idToken);
+    track("login", { method });
     router.replace(next);
   }
 
@@ -46,7 +48,7 @@ function LoginForm() {
     setError(null);
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
-      await complete(await cred.user.getIdToken());
+      await complete(await cred.user.getIdToken(), "email");
     } catch (e) {
       // A denied session leaves the client signed-in; sign back out so a retry
       // is clean and no half-authenticated state lingers.
@@ -65,7 +67,7 @@ function LoginForm() {
     setError(null);
     try {
       const cred = await signInWithPopup(auth, googleProvider);
-      await complete(await cred.user.getIdToken());
+      await complete(await cred.user.getIdToken(), "google");
     } catch (e) {
       await signOut(auth).catch(() => {});
       setError(

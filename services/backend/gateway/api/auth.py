@@ -11,11 +11,11 @@ Access + role are resolved HERE from the `users` table (the DB is authoritative
 — we don't trust a forwarded role header), so admins control who gets in and
 with what role:
 
-  * REQUIRE_PROVISIONED_USERS unset (local dev + tests): no gating, and the
-    user is always `admin`, so the stack runs without a login.
-  * REQUIRE_PROVISIONED_USERS set (production, via cloudrun.tf): only an active
-    row in `users` may proceed; an un-provisioned user gets 403. First sign-in
-    binds the Firebase uid to the matching invite (row created by email).
+  * DEV_AUTH on (local dev + tests only): no gating, and the user is always
+    `admin`, so the stack runs without a login.
+  * DEV_AUTH off (every deployed environment): only an active row in `users`
+    may proceed; an un-provisioned user gets 403. First sign-in binds the
+    Firebase uid to the matching access rule (row created by email).
 
 `require_role` is the per-route RBAC gate (e.g. the admin user-management API).
 """
@@ -29,16 +29,28 @@ from fastapi import Depends, Header, HTTPException
 
 from .db import get_pool
 
+# Cloud Run services set K_SERVICE; Cloud Run jobs set CLOUD_RUN_JOB. Either
+# means we're deployed — the single signal used to keep dev-only behaviour
+# (the dev identity below, the local seed) physically out of every deployment.
+_DEPLOYED = bool(os.getenv("K_SERVICE") or os.getenv("CLOUD_RUN_JOB"))
+
 # Kept in sync with services/backend/agents/api/auth/__init__.py so the dev
 # identity is identical across services and ADK sessions resolve consistently.
+# LOCAL-ONLY: it must never be persisted in a deployed DB (see the
+# drop_dev_user_seed migration + the agent's current_user guard).
 DEV_UID = "user-1"
 
 # Secure-by-default: access is ENFORCED (invite-only allowlist + DB-resolved
 # roles) UNLESS GATEWAY_DEV_AUTH is explicitly set. Local dev / tests set it to
-# get the permissive "everyone is admin" mode; it must NEVER be set in a deployed
-# environment, so a forgotten/new service can't ship wide open (the old opt-in
-# default did exactly that). docker-compose sets it for local; Cloud Run does not.
-DEV_AUTH = os.getenv("GATEWAY_DEV_AUTH", "").lower() in ("1", "true", "yes")
+# get the permissive "everyone is admin" mode. Gated on `not _DEPLOYED` as
+# defence-in-depth: even if GATEWAY_DEV_AUTH leaked into a Cloud Run env by
+# mistake, dev-auth (and the dev admin identity) can never activate in a
+# deployment. docker-compose sets the var for local; Cloud Run does not.
+DEV_AUTH = (not _DEPLOYED) and os.getenv("GATEWAY_DEV_AUTH", "").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 # Bootstrap admins: emails that auto-provision as admin on first sign-in. Solves
 # the chicken-and-egg (someone must be admin to invite the first users). Set per

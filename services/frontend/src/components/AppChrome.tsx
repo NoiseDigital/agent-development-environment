@@ -10,6 +10,7 @@ import FloatingAssistant from "./chat/FloatingAssistant";
 import NeuralBackground from "./NeuralBackground";
 import Toaster from "./ui/Toaster";
 import { useAuth } from "@/lib/firebase/auth-context";
+import { AppsProvider } from "@/contexts/AppsContext";
 
 export default function AppChrome({
   children,
@@ -17,7 +18,7 @@ export default function AppChrome({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const { accessDenied, user, signOut } = useAuth();
+  const { accessDenied, signingOut, user, signOut } = useAuth();
 
   if (pathname === "/login") {
     return (
@@ -27,6 +28,10 @@ export default function AppChrome({
       </>
     );
   }
+
+  // Sign-out in flight — render nothing so the app never flashes between
+  // clearing the session and the redirect to /login.
+  if (signingOut) return null;
 
   // Authenticated to Firebase but not in the gateway's allowlist.
   if (accessDenied) {
@@ -51,8 +56,13 @@ export default function AppChrome({
     );
   }
 
+  // Authenticated shell. AppsProvider wraps everything here (sidebar,
+  // assistant, page children) so the available-apps list is fetched/polled once
+  // and shared, instead of each consumer fetching its own. It only mounts on
+  // the authenticated path (not /login or access-denied), so it never polls
+  // /list-apps before the user is in.
   return (
-    <>
+    <AppsProvider>
       <NeuralBackground />
       <div className="relative z-10 flex h-screen overflow-hidden">
         <PlatformSidebar />
@@ -62,6 +72,6 @@ export default function AppChrome({
       </div>
       <FloatingAssistant />
       <Toaster />
-    </>
+    </AppsProvider>
   );
 }

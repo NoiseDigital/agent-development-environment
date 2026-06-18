@@ -101,6 +101,16 @@ if [ -n "${GOOGLE_IMPERSONATE_SERVICE_ACCOUNT:-}" ]; then
     GCLOUD_IMPERSONATION_ARGS=(--impersonate-service-account "$GOOGLE_IMPERSONATE_SERVICE_ACCOUNT")
 fi
 
+# Server-side GTM (sGTM) is profile-gated (`tagging`) — bring it up only when a
+# container config is present, otherwise the gtm-cloud-image crash-loops on an
+# empty CONTAINER_CONFIG. Naming the service explicitly on build/up starts it
+# without needing --profile.
+TAGGING_SERVICES=()
+if [ -n "${SGTM_CONTAINER_CONFIG:-}" ]; then
+    TAGGING_SERVICES=(sgtm)
+    echo "  sGTM config detected — starting the tagging server (sgtm)."
+fi
+
 # ── 2. GCP Authentication ─────────────────────────────────────────────────────
 if [ -f "$CREDS_FILE" ]; then
     AUTHED_ACCOUNT="$(python3 -c "import json; d=json.load(open('$CREDS_FILE')); print(d.get('client_id','') or d.get('service_account_email','unknown'))" 2>/dev/null || echo "unknown")"
@@ -170,7 +180,7 @@ docker volume create agent-platform_gcloud_config >/dev/null 2>&1 || true
 docker compose \
     --project-directory "$PROJECT_ROOT" \
     -f "$PROJECT_ROOT/docker-compose.yml" \
-    build gateway agent frontend mcp-stats migrate firebase-emulator
+    build gateway agent frontend mcp-stats migrate firebase-emulator "${TAGGING_SERVICES[@]}"
 
 # Up ordering:
 #   postgres (healthcheck) → migrate (one-shot `alembic upgrade head`, runs to
@@ -182,7 +192,7 @@ COMPOSE_IGNORE_ORPHANS=1 docker compose \
     --project-directory "$HOST_PROJECT_ROOT" \
     -f "$PROJECT_ROOT/docker-compose.yml" \
     up -d --no-build --wait --wait-timeout 180 \
-    postgres mcp-toolbox migrate firebase-emulator gateway agent frontend mcp-stats
+    postgres mcp-toolbox migrate firebase-emulator gateway agent frontend mcp-stats "${TAGGING_SERVICES[@]}"
 
 echo ""
 echo "✔ All services running."
