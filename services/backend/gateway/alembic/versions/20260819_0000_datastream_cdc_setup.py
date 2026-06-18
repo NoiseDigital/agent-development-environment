@@ -43,7 +43,15 @@ def upgrade() -> None:
               CREATE PUBLICATION datastream_pub FOR ALL TABLES;
             END IF;
             IF NOT EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = 'datastream_slot') THEN
+              -- A logical slot can only be created by a role that HAS the
+              -- REPLICATION attribute. The migrate job runs as the app user — a
+              -- cloudsqlsuperuser, but role attributes aren't inherited via
+              -- membership, so its own rolreplication is false. Grant it just long
+              -- enough to create the slot, then drop it. Datastream reads the slot
+              -- as the `datastream` user, which keeps REPLICATION.
+              EXECUTE format('ALTER ROLE %I WITH REPLICATION', current_user);
               PERFORM pg_create_logical_replication_slot('datastream_slot', 'pgoutput');
+              EXECUTE format('ALTER ROLE %I WITH NOREPLICATION', current_user);
             END IF;
           END IF;
         END $$;

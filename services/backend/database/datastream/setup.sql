@@ -30,4 +30,11 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO datastream;
 CREATE PUBLICATION datastream_pub FOR ALL TABLES;
 
 -- 4. Replication slot Datastream reads from, via the built-in pgoutput plugin.
+--    Creating a slot needs the CURRENT role to have the REPLICATION attribute,
+--    which a cloudsqlsuperuser does NOT have by default (attributes aren't
+--    inherited via membership). Grant it just for this, then drop it — Datastream
+--    reads the slot as the `datastream` user, which keeps REPLICATION.
+--    Replace `app` if you're connected as a different cloudsqlsuperuser.
+ALTER ROLE app WITH REPLICATION;
 SELECT pg_create_logical_replication_slot('datastream_slot', 'pgoutput');
+ALTER ROLE app WITH NOREPLICATION;
