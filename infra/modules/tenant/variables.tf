@@ -62,16 +62,16 @@ variable "vertex_location" {
 }
 
 # ── Server-side tagging (sGTM) ──────────────────────────────────────────────
-variable "sgtm_container_config" {
-  type        = string
+variable "enable_sgtm" {
+  type        = bool
   description = <<-EOT
-    CONTAINER_CONFIG from a GTM *Server* container (tagmanager.google.com →
-    Admin → Create Container → Server). Empty (default) disables sGTM entirely —
-    no service, secret, or SA is created. When set, it's stored in Secret Manager
-    and the sgtm Cloud Run service is deployed.
+    Provision the server-side GTM service + its Secret Manager secret + SA.
+    Committed per-tenant (terraform.tfvars), so routine applies never tear it
+    down. The CONTAINER_CONFIG value is NOT a Terraform input — it's added
+    out-of-band to the `sgtm-container-config` secret and never touches tfvars or
+    state. See services/backend/tagging/sgtm/README.md.
   EOT
-  default     = ""
-  sensitive   = true
+  default     = false
 }
 
 # ── Datastream CDC (Postgres → BigQuery) ────────────────────────────────────

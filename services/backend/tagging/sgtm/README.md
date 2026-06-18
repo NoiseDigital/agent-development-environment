@@ -6,7 +6,7 @@ instead of straight to Google; the tags/triggers you author in the GTM UI then
 shape it and route it onward to GA4 (and anywhere else you configure).
 
 ```
-browser (gtag.js, NEXT_PUBLIC_GA_MEASUREMENT_ID)
+frontend (gtag.js, NEXT_PUBLIC_GA_MEASUREMENT_ID)
    │  server_container_url
    ▼
 sGTM  ──►  GA4  (+ other destinations)
@@ -21,21 +21,12 @@ image. The [Dockerfile](./Dockerfile) only pins the upstream image and
 re-publishes it into our Artifact Registry via CI, so deploys pull from our
 registry rather than `gcr.io/cloud-tagging-10302018` directly.
 
-## Prerequisite — the GTM Server container (one-time, manual)
-
-The container's tag config lives in GTM, referenced by a `CONTAINER_CONFIG`
-string. Only you can create it:
-
-1. <https://tagmanager.google.com> → **Admin → Create Container** (or *Add a new
-   account*) → **Target platform: Server**.
-2. When the container opens, choose **Manually provision tagging server** (NOT
-   "automatically provision" — that spins up an App Engine instance we don't
-   want; we run our own Cloud Run).
-3. Copy the **Container Config** string. (Later: container ID, top-right →
-   *Manually provision tagging server* to view it again.)
-
-That string is `SGTM_CONTAINER_CONFIG` (local) / the `sgtm-container-config`
-Secret (prod). Until it's set, the service is disabled everywhere — see below.
+The container's tag config lives in GTM (a *Server* container you create at
+tagmanager.google.com), referenced by a **`CONTAINER_CONFIG`** string. Locally
+that's `SGTM_CONTAINER_CONFIG` in `.env`; in prod it's the value of the
+`sgtm-container-config` Secret Manager secret (added out-of-band — never in the
+repo, tfvars, or state). Creating the container and wiring the value is part of
+deploy setup → **[DEPLOY.md §6](../../../../DEPLOY.md)**.
 
 ## Environment variables
 
@@ -64,26 +55,20 @@ The frontend's `gtag` then posts to `http://localhost:8090` (this service). To
 debug tags in the GTM UI, run a second container with
 `RUN_AS_PREVIEW_SERVER=true` and point `PREVIEW_SERVER_URL` at it.
 
-## Production
+## Deploying it
 
-Wired in [infra/modules/tenant/sgtm.tf](../../../../infra/modules/tenant/sgtm.tf),
-**config-gated**: nothing is created until `var.sgtm_container_config` is set, so
-a tenant without tagging deploys cleanly.
+Provisioned (gated) in [infra/modules/tenant/sgtm.tf](../../../../infra/modules/tenant/sgtm.tf);
+the ordered setup — GTM container, the `enable_sgtm` toggle, the out-of-band
+secret, rolling the real image, publishing the GA4 tag, and the frontend GitHub
+vars — is **[DEPLOY.md §6](../../../../DEPLOY.md)**.
 
-1. Provide the config (stored in Secret Manager, never the repo):
-   ```bash
-   TF_VAR_sgtm_container_config='<Container Config string>' terraform apply
-   ```
-2. CI builds + pushes `…/sgtm:$SHA` and rolls the service (the deploy step is
-   skipped automatically when the service isn't provisioned). After first
-   enabling it, run the deploy workflow (`workflow_dispatch`) to roll the real
-   image over the placeholder.
-3. Take the `sgtm_url` Terraform output and set it as the GitHub var
-   `NEXT_PUBLIC_GA_SERVER_CONTAINER_URL` (+ `NEXT_PUBLIC_GA_MEASUREMENT_ID`); the
-   next frontend build bakes them in.
-
-> sbx runs `min_instance_count = 0` to stay cheap. For a production tagging
-> server bump it to ≥ 1 — sGTM cold starts delay/drop measurement hits.
+**Design note.** Existence is a *committed* `enable_sgtm` toggle, kept separate
+from the *secret value* (which lives only in Secret Manager — Terraform seeds a
+`REPLACE_VIA_GCLOUD` placeholder version with `ignore_changes`, and the real value
+is added out-of-band). So a routine `terraform apply` can never destroy the
+service for a missing var, and the config never lands in the repo or state.
+sbx runs `min_instance_count = 0` to stay cheap; a production tagging server wants
+≥ 1 — sGTM cold starts delay/drop hits.
 
 ## References
 

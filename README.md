@@ -163,10 +163,11 @@ publish in the GTM UI.
   GTM UI and published; the container fetches its published config at runtime.
 - **Profile-gated** (`tagging`): needs `SGTM_CONTAINER_CONFIG` from a GTM Server
   container, so it stays off until configured — `docker compose --profile tagging up`.
-- **Prod:** config-gated in Terraform (`var.sgtm_container_config` → Secret
-  Manager); nothing is created until it's set.
+- **Prod:** gated on a committed `enable_sgtm` toggle; the CONTAINER_CONFIG value
+  lives only in Secret Manager (added out-of-band — never in tfvars or state).
 
-Full setup (the GTM container, the CONTAINER_CONFIG flow, local + prod) lives in
+Setup (local + the full prod runbook) is in [DEPLOY.md §6](DEPLOY.md); how the
+service works internally is in
 [services/backend/tagging/sgtm/README.md](services/backend/tagging/sgtm/README.md).
 
 ## Schema Migrations

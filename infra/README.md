@@ -42,51 +42,13 @@ No CORS anywhere (same-origin BFF). See `modules/tenant/cloudrun.tf` and
 
 ---
 
-## One-time bootstrap
+## Setting up / deploying
 
-Run by someone with project IAM admin, using their own credentials.
-
-```bash
-cd infra/bootstrap
-cp terraform.tfvars.example terraform.tfvars   # fill project, github_*, target_projects
-terraform init        # local state — it's creating the state buckets
-terraform apply
-```
-
-Note the outputs (`state_buckets`, `artifact_registry`, `ci_deployer_sa_email`,
-`workload_identity_provider`) — they feed the env backends and the GitHub repo
-variables below.
-
-### GitHub Environment vars (Settings → Environments → `<tenant>-<stage>`)
-
-Per-tenant deploy targets, so the 5 deploy vars live in a **GitHub Environment**
-named `<tenant>-<stage>` (e.g. `noise-sbx`), not repo-wide — `deploy.yml` selects
-it so `vars.*` resolve per tenant. Manual, once per stack. Full rationale + `gh`
-commands: [DEPLOY.md](../DEPLOY.md) → "CI deploy auth".
-
-| Variable | Value |
-| --- | --- |
-| `GCP_WORKLOAD_IDENTITY_PROVIDER` | bootstrap output `workload_identity_provider` |
-| `GCP_CI_SERVICE_ACCOUNT` | bootstrap output `ci_deployer_sa_email` |
-| `GCP_REGION` | `us-central1` |
-| `DEPLOY_PROJECT` | `nd-agentspace-sbx` |
-| `ARTIFACT_REGISTRY` | bootstrap output `artifact_registry` |
-
-## Provision a stage
-
-```bash
-cd infra/tenants/nd-agentspace/sbx
-# edit terraform.tfvars (github_owner/repo)
-terraform init        # uses the GCS backend from bootstrap
-terraform apply
-```
-
-Then push real images (the first `apply` seeds a placeholder image; CI rolls the
-real ones):
-
-```bash
-git push origin main      # triggers .github/workflows/deploy.yml → sbx
-```
+This file is the **architecture + module reference**. The ordered, end-to-end
+runbook — bootstrap, the GitHub Environment vars, provisioning a stage, secrets,
+the interactive console steps, first deploy, and the optional sGTM / Datastream
+components — is **[DEPLOY.md](../DEPLOY.md)**. Steps live there; they're not
+repeated here.
 
 ## Add a new stage (`-dev`, `-uat`, `-prod`)
 
@@ -127,27 +89,15 @@ Committed config (not provisioning): `firebase.json` (Auth emulator) and
 
 ## Outstanding / TODO
 
-- **TF-created projects.** Projects are assumed to exist (configure-existing).
-  To have Terraform create them, add a `google_project` (folder + billing) behind
-  a flag in `modules/tenant` and grant the runner org/folder admin. Not the CI
-  SA's job — keep that separation.
-- **MCP Toolbox image.** `mcp/images/toolbox/tools.yaml` hardcodes
-  `nd-agentspace-sbx` (project + dataset). Per stage, template it and bake a tiny
-  image (`FROM toolbox; COPY tools.yaml`), then set `mcp_toolbox_image` in the env
-  tfvars. Until set, the toolbox service is skipped (`count = 0`).
-- **apphosting.yaml values.** Replace the placeholders with
-  `terraform output firebase_web_config` + `gateway_url`; create the
-  `firebase-web-api-key` secret.
-- **`allowed_origins`.** After the first frontend deploy, set it to the App
-  Hosting domain and `terraform apply` (gateway CORS).
-- **Firebase Auth app code** — DONE. The BFF (Next.js) verifies the Firebase
-  session (httpOnly cookie) and forwards `X-User-*` to the gateway; the gateway
-  reads those + owns the `users` table. Sign-in: email/password (invite-only —
-  no signup) + Google. Access is gated by `ALLOWED_EMAIL_DOMAINS` in the BFF.
-- **Auth access hardening (prod).** The BFF domain allowlist is app-layer. Add,
-  for defence in depth: (1) OAuth consent screen set to **Internal** (Workspace
-  org only) so only org users can use Google sign-in; (2) an **Identity Platform
-  blocking function** (`beforeCreate`/`beforeSignIn`) that rejects disallowed
-  domains at the IdP — blocks ALL providers before the account is even created.
-- **Invite list.** Extend the gate to also permit specific external emails from
-  the `users` table (invite), not just whole domains.
+- **TF-created projects.** Projects are assumed to exist (configure-existing). To
+  have Terraform create them, add a `google_project` (folder + billing) behind a
+  flag in `modules/tenant` and grant the runner org/folder admin — kept off the CI
+  SA to preserve that separation.
+- **Per-stage MCP Toolbox config.** `mcp/images/toolbox/tools.yaml` hardcodes the
+  `nd-agentspace-sbx` project/dataset. For another stage, template it before the
+  image build.
+- **Auth hardening (prod)** — defence in depth beyond the BFF/`access_rules`
+  allowlist (already invite-by-email + domain, with the OAuth consent screen
+  Internal per [DEPLOY.md §3](../DEPLOY.md)): an Identity Platform **blocking
+  function** that rejects disallowed domains at the IdP (blocks every provider
+  pre-account), and Firebase **App Check**.
