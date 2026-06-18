@@ -511,7 +511,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.116.0" },
     { name = "google-auth", specifier = ">=2.0.0" },
     { name = "httpx", specifier = ">=0.28.0" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.2.0" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
     { name = "toolbox-core", specifier = ">=0.5.4" },
     { name = "uvicorn", specifier = ">=0.35.0" },
 ]
