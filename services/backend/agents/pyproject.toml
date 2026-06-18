@@ -7,7 +7,7 @@ name = "adk-agents"
 version = "0.3.2"
 description = "ADK Agent Development Environment"
 readme = "README.md"
-requires-python = "==3.13.*"
+requires-python = "==3.14.*"
 dependencies = [
     # ADK is pinned EXACT (not >=) because we depend on the experimental
     # `ContextCacheConfig` feature (see media_performance_agent/agent.py and

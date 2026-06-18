@@ -5,7 +5,7 @@
 # To update to a newer version, change the GOOGLE_ADS_MCP_REF build arg.
 # Re-build and push via CI or: docker compose build mcp-google-ads
 
-FROM python:3.13-slim
+FROM python:3.14-slim
 
 ARG GOOGLE_ADS_MCP_REF=main
 
