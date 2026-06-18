@@ -15,4 +15,4 @@ admin_emails = ["ethan.domokos@noisedigital.com"]
 # for logical decoding). Then run services/backend/database/datastream/setup.sql
 # and flip datastream_create_stream = true to start streaming.
 enable_datastream        = true
-datastream_create_stream = false
+datastream_create_stream = true

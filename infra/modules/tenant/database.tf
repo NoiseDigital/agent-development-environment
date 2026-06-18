@@ -29,14 +29,19 @@ resource "google_sql_database_instance" "postgres" {
       private_network = google_compute_network.vpc.id
     }
 
-    # Logical decoding (pgoutput) so Datastream can read the WAL for CDC. Gated on
-    # enable_datastream so non-CDC tenants don't take the flag's instance restart.
-    # See datastream.tf.
+    # Datastream needs logical decoding (pgoutput) to read the WAL, and its
+    # parallel backfill opens many short-lived connections — enough to exhaust a
+    # small instance's slots — so raise max_connections too. Both gated on
+    # enable_datastream so non-CDC tenants don't take the (restart-triggering)
+    # flag changes. See datastream.tf.
     dynamic "database_flags" {
-      for_each = var.enable_datastream ? [1] : []
+      for_each = var.enable_datastream ? {
+        "cloudsql.logical_decoding" = "on"
+        "max_connections"           = "100"
+      } : {}
       content {
-        name  = "cloudsql.logical_decoding"
-        value = "on"
+        name  = database_flags.key
+        value = database_flags.value
       }
     }
 

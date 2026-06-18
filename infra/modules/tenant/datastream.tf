@@ -210,6 +210,10 @@ resource "google_datastream_stream" "this" {
     postgresql_source_config {
       publication      = local.ds_publication
       replication_slot = local.ds_replication_slot
+      # Cap parallel backfill connections — Datastream's default fan-out exhausted
+      # the f1-micro's connection slots. Backfill is one-time and the DB is small,
+      # so a modest value is plenty.
+      max_concurrent_backfill_tasks = 5
       # A schema with no table filter = every table in it (current + future).
       include_objects {
         postgresql_schemas {
