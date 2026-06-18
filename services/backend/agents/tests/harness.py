@@ -97,7 +97,7 @@ def _extract_ui_components(text: str) -> list[str]:
     except json.JSONDecodeError:
         try:
             payload = ast.literal_eval(blob)
-        except (ValueError, SyntaxError):
+        except ValueError, SyntaxError:
             return []
     if not isinstance(payload, dict):
         return []

@@ -6,11 +6,17 @@ exclude: ^services/backend/agents/adk_agents\.egg-info/
 # silently never run.
 default_install_hook_types: [pre-commit, commit-msg]
 
+# Run the Python-language hooks (check-ast, debug-statements, mypy) under 3.14 to
+# match the services — so they parse 3.14 syntax (incl. PEP 758's unparenthesized
+# `except`). The devcontainer provides 3.14 as the default python (uv --default).
+default_language_version:
+  python: python3.14
+
 repos:
 
   # Ruff — Python linter + formatter (replaces flake8/black/isort)
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.10
+    rev: v0.15.18
     hooks:
       - id: ruff
         args: [--fix]

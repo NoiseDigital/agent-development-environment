@@ -143,7 +143,7 @@ def _coerce_cell(v: Any) -> Any:
         return v
     try:
         n = float(v)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return v
     if n != n or n in (float("inf"), float("-inf")):  # NaN / inf
         return v

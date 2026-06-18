@@ -1,0 +1,3 @@
+# Explicit ruff syntax target for the whole repo.
+
+target-version = "py314"

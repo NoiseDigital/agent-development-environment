@@ -13,15 +13,6 @@ RUN apt-get update -y \
        jq \
        make \
        shellcheck \
-       # System Python for repo TOOLING (pre-commit, AST checks, scripts). The
-       # google/cloud-sdk base bundles Python privately for gcloud only
-       # (CLOUDSDK_PYTHON) and puts no python3 on PATH, so install one explicitly.
-       # This is 3.13 (Debian trixie's default) — fine for tooling. The SERVICES
-       # run on 3.14 (requires-python = "==3.14.*"); uv provides that interpreter
-       # for `uv sync`/`uv run` (see `uv python install 3.14` below), independent
-       # of this system Python. python-is-python3 adds the `python` alias.
-       python3.13 \
-       python-is-python3 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -66,6 +57,10 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
 RUN uv tool install pre-commit
 
-# Pre-fetch the services' Python (requires-python = "==3.14.*") so backend
-# `uv sync`/`uv run` in the devcontainer match the service images + locks.
-RUN uv python install 3.14
+# The image's Python: uv-managed 3.14, installed as the DEFAULT `python`/`python3`
+# on PATH (--default). One interpreter for everything — the services
+# (requires-python = "==3.14.*"), `uv sync`/`uv run`, and the lint tooling
+# (pre-commit check-ast, mypy) — so all parse the same 3.14 syntax (incl. PEP 758).
+# The google/cloud-sdk base keeps its own private Python for gcloud
+# (CLOUDSDK_PYTHON), untouched.
+RUN uv python install 3.14 --default

@@ -30,7 +30,11 @@ jobs:
           cache: pip
 
       - name: Install linting tools
-        run: pip install ruff mypy
+        # Pin ruff to the SAME version as the pre-commit hook
+        # (.pre-commit-config.yaml rev) so CI and local formatting can't drift —
+        # an unpinned ruff floats and reformats differently, failing CI on
+        # already-clean code. Syntax target is set in /ruff.toml (py313).
+        run: pip install ruff==0.15.18 mypy
 
       - name: Install project dependencies
         run: pip install -e ".[dev]" --quiet || pip install -e . --quiet || true
