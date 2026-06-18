@@ -1,8 +1,11 @@
 import asyncio
+import datetime
 import json
 import os
+from contextvars import ContextVar
 from typing import Any
 
+import asyncpg
 import httpx
 import uvicorn
 from dotenv import load_dotenv
@@ -10,6 +13,7 @@ from mcp import types as mcp_types
 from mcp.server.lowlevel import Server
 from mcp.server.sse import SseServerTransport
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
@@ -21,6 +25,114 @@ TASK_OPT_FIELDS = (
     "name,completed,due_on,notes,permalink_url,assignee.name,projects.name"
 )
 
+current_user_id: ContextVar[str | None] = ContextVar("current_user_id", default=None)
+_db_pool = None
+
+
+def _get_db_url() -> str:
+    db_url = os.environ.get("DATABASE_URL", "")
+    if db_url.startswith("postgresql+asyncpg://"):
+        db_url = db_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+    return db_url
+
+
+async def get_db_pool():
+    global _db_pool
+    if _db_pool is None:
+        db_url = _get_db_url()
+        if not db_url:
+            return None
+        _db_pool = await asyncpg.create_pool(db_url)
+    return _db_pool
+
+
+async def close_db_pool():
+    global _db_pool
+    if _db_pool is not None:
+        await _db_pool.close()
+        _db_pool = None
+
+
+class AsanaUserMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            user_id = None
+            for key, value in scope.get("headers", []):
+                if key == b"x-asana-user-id":
+                    user_id = value.decode("utf-8")
+                    break
+            token = current_user_id.set(user_id)
+            try:
+                await self.app(scope, receive, send)
+            finally:
+                current_user_id.reset(token)
+        else:
+            await self.app(scope, receive, send)
+
+
+async def get_user_token(user_id: str) -> dict[str, Any] | None:
+    pool = await get_db_pool()
+    if not pool:
+        return None
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT user_id, access_token, refresh_token, expires_at FROM user_asana_tokens WHERE user_id = $1",
+            user_id,
+        )
+        if row:
+            return dict(row)
+        return None
+
+
+async def update_user_token(
+    user_id: str,
+    access_token: str,
+    refresh_token: str,
+    expires_at: datetime.datetime,
+) -> None:
+    pool = await get_db_pool()
+    if not pool:
+        return
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO user_asana_tokens (user_id, access_token, refresh_token, expires_at, updated_at)
+            VALUES ($1, $2, $3, $4, now())
+            ON CONFLICT (user_id) DO UPDATE
+            SET access_token = EXCLUDED.access_token,
+                refresh_token = EXCLUDED.refresh_token,
+                expires_at = EXCLUDED.expires_at,
+                updated_at = now()
+            """,
+            user_id,
+            access_token,
+            refresh_token,
+            expires_at,
+        )
+
+
+async def refresh_asana_token(refresh_token: str) -> dict[str, Any]:
+    client_id = os.environ.get("ASANA_CLIENT_ID", "")
+    client_secret = os.environ.get("ASANA_CLIENT_SECRET", "")
+    if not client_id or not client_secret:
+        raise RuntimeError("ASANA_CLIENT_ID or ASANA_CLIENT_SECRET is not set")
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://app.asana.com/-/oauth_token",
+            data={
+                "grant_type": "refresh_token",
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "refresh_token": refresh_token,
+            },
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return response.json()
+
 
 async def asana_request(
     method: str,
@@ -28,9 +140,41 @@ async def asana_request(
     params: dict[str, Any] | None = None,
     body: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    token = os.environ.get("ASANA_ACCESS_TOKEN", "")
+    user_id = current_user_id.get()
+    token = None
+    if user_id:
+        token_data = await get_user_token(user_id)
+        if token_data:
+            expires_at = token_data["expires_at"]
+            now_utc = datetime.datetime.now(datetime.timezone.utc)
+            if expires_at - now_utc < datetime.timedelta(minutes=1):
+                try:
+                    refreshed = await refresh_asana_token(token_data["refresh_token"])
+                    new_access = refreshed["access_token"]
+                    new_refresh = refreshed.get(
+                        "refresh_token", token_data["refresh_token"]
+                    )
+                    new_expires_in = refreshed.get("expires_in", 3600)
+                    new_expires_at = datetime.datetime.now(
+                        datetime.timezone.utc
+                    ) + datetime.timedelta(seconds=new_expires_in)
+                    await update_user_token(
+                        user_id, new_access, new_refresh, new_expires_at
+                    )
+                    token = new_access
+                except Exception as e:
+                    import sys
+
+                    sys.stderr.write(f"Failed to refresh Asana token: {e}\n")
+
+            if not token:
+                token = token_data["access_token"]
     if not token:
-        raise RuntimeError("ASANA_ACCESS_TOKEN is not set")
+        token = os.environ.get("ASANA_ACCESS_TOKEN", "")
+    if not token:
+        raise RuntimeError(
+            "No active token found for user and ASANA_ACCESS_TOKEN is not set"
+        )
     async with httpx.AsyncClient(
         base_url=ASANA_API_BASE,
         headers={"Authorization": f"Bearer {token}"},
@@ -75,6 +219,10 @@ async def get_tasks(
         params["completed_since"] = completed_since
     if project_gid:
         params["project"] = project_gid
+        if assignee:
+            params["assignee"] = assignee
+            params["workspace"] = await default_workspace_gid()
+
     else:
         params["assignee"] = assignee or "me"
         params["workspace"] = await default_workspace_gid()
@@ -343,6 +491,10 @@ starlette_app = Starlette(
         Route("/get_tasks", endpoint=handle_get_tasks),
         Mount("/messages/", app=sse.handle_post_message),
     ],
+    middleware=[
+        Middleware(AsanaUserMiddleware),
+    ],
+    on_shutdown=[close_db_pool],
 )
 
 if __name__ == "__main__":

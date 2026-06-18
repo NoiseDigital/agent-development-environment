@@ -15,6 +15,14 @@ def get_root_agent_model():
     return "gemini-2.5-flash"
 
 
+def get_flash_model():
+    return "gemini-2.5-flash"
+
+
+def get_pro_model():
+    return "gemini-2.5-pro"
+
+
 ### DEPLOYMENT CONSTANTS ###
 
 

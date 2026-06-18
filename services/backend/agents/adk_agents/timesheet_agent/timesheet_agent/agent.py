@@ -1,8 +1,5 @@
-"""
-Agent definition
-"""
-
 from .utils.constants import get_agent_name, get_agent_description, get_root_agent_model
+from .utils.model_router import before_model_callback
 from .prompts.root_agent import get_root_agent_prompt
 from .tools.intacct_tools import (
     get_user_docket_ids,
@@ -23,8 +20,14 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
 ASANA_MCP_URL = os.getenv("ASANA_MCP_URL", "http://mcp-asana:8080")
 
+
+def _asana_headers(ctx) -> dict[str, str]:
+    return {"X-Asana-User-Id": ctx.user_id} if ctx.user_id else {}
+
+
 asana_toolset = MCPToolset(
     connection_params=SseConnectionParams(url=f"{ASANA_MCP_URL}/sse"),
+    header_provider=_asana_headers,
     tool_filter=[
         "get_asana_tasks",
         "get_task",
@@ -62,6 +65,7 @@ root_agent = Agent(
     description=DESCRIPTION,
     instruction=SYSTEM_INSTRUCTIONS,
     generate_content_config=generate_content_config,
+    before_model_callback=before_model_callback,
     tools=[
         asana_toolset,
         get_outlook_calendar_events,

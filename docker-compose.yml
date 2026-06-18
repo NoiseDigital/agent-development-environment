@@ -6,6 +6,11 @@ services:
     build:
       context: ./services/backend/agents
       dockerfile: Dockerfile
+    env_file:
+      - path: ./.env
+        required: false
+      - path: ./services/backend/mcp/asana/.env
+        required: false
     volumes:
       - ./services/backend/agents:/workspace
       - gcloud_config:/root/.config/gcloud:ro
@@ -96,11 +101,20 @@ services:
   mcp-asana:
     build:
       context: ./services/backend/mcp/asana
+    env_file:
+      - path: ./.env
+        required: false
+      - path: ./services/backend/mcp/asana/.env
+        required: false
     ports:
       - "${ASANA_MCP_PORT:-5003}:8080"
     environment:
       - ASANA_ACCESS_TOKEN=${ASANA_ACCESS_TOKEN:-}
       - ASANA_WORKSPACE_GID=${ASANA_WORKSPACE_GID:-}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://user:password@postgres:5432/postgres}
+    depends_on:
+      postgres:
+        condition: service_healthy
     profiles:
       - asana
     stdin_open: true
