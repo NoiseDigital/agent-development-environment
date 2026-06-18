@@ -30,6 +30,16 @@ depends_on: str | None = None
 
 
 def upgrade() -> None:
+    # Three steps because creating a logical replication slot has two awkward
+    # constraints: it needs the CURRENT role to have the REPLICATION attribute
+    # (which a cloudsqlsuperuser does NOT inherit via membership), AND it cannot
+    # run in a transaction that has already performed writes. So:
+    #   1. Transactional: roles, grants, publication, and a transient REPLICATION
+    #      on the migrate role. Guarded on the `datastream` role existing.
+    #   2. Autocommit block: alembic commits step 1 first, then creates the slot
+    #      in its own write-free transaction (the DO block does only reads before
+    #      the slot call).
+    #   3. Transactional: drop the transient REPLICATION from the migrate role.
     op.execute(
         """
         DO $$
@@ -42,17 +52,31 @@ def upgrade() -> None:
             IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'datastream_pub') THEN
               CREATE PUBLICATION datastream_pub FOR ALL TABLES;
             END IF;
-            IF NOT EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = 'datastream_slot') THEN
-              -- A logical slot can only be created by a role that HAS the
-              -- REPLICATION attribute. The migrate job runs as the app user — a
-              -- cloudsqlsuperuser, but role attributes aren't inherited via
-              -- membership, so its own rolreplication is false. Grant it just long
-              -- enough to create the slot, then drop it. Datastream reads the slot
-              -- as the `datastream` user, which keeps REPLICATION.
-              EXECUTE format('ALTER ROLE %I WITH REPLICATION', current_user);
-              PERFORM pg_create_logical_replication_slot('datastream_slot', 'pgoutput');
-              EXECUTE format('ALTER ROLE %I WITH NOREPLICATION', current_user);
-            END IF;
+            EXECUTE format('ALTER ROLE %I WITH REPLICATION', current_user);
+          END IF;
+        END $$;
+        """
+    )
+
+    with op.get_context().autocommit_block():
+        op.execute(
+            """
+            DO $$
+            BEGIN
+              IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'datastream')
+                 AND NOT EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = 'datastream_slot') THEN
+                PERFORM pg_create_logical_replication_slot('datastream_slot', 'pgoutput');
+              END IF;
+            END $$;
+            """
+        )
+
+    op.execute(
+        """
+        DO $$
+        BEGIN
+          IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'datastream') THEN
+            EXECUTE format('ALTER ROLE %I WITH NOREPLICATION', current_user);
           END IF;
         END $$;
         """

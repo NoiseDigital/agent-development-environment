@@ -114,7 +114,7 @@ jobs:
           docker push "$AR/frontend:$SHA"
 
       # ── Migrate FIRST (only when the gateway/migrations changed) ─────────────
-      - name: Run DB migrations (one-shot job)
+      - name: Run DB migrations
         if: ${{ steps.changed.outputs.gateway == 'true' || github.event_name == 'workflow_dispatch' }}
         run: |
           set -euo pipefail
@@ -134,8 +134,7 @@ jobs:
         if: ${{ steps.changed.outputs.mcp_stats == 'true' || github.event_name == 'workflow_dispatch' }}
         run: gcloud run deploy "mcp-stats" --image "$AR/mcp-stats:$SHA" --region "$REGION" --project "$PROJECT"
       # sgtm is config-gated in Terraform (no service until sgtm_container_config
-      # is set), so only roll it when it actually exists — otherwise `gcloud run
-      # deploy` would create it WITHOUT its TF config (secret, SA, ingress).
+      # is set)
       - name: Deploy sgtm
         if: ${{ steps.changed.outputs.sgtm == 'true' || github.event_name == 'workflow_dispatch' }}
         run: |
@@ -153,12 +152,7 @@ jobs:
         run: gcloud run deploy "frontend" --image "$AR/frontend:$SHA" --region "$REGION" --project "$PROJECT"
 
       # ── Post-deploy smoke test ───────────────────────────────────────────────
-      # Hits the public frontend on the REAL request path — no bespoke endpoint,
-      # no auth, no synthetic shortcuts. Catches the prod-only failure modes that
-      # matter at this surface: a broken production build, broken static serving,
-      # and a broken BFF→IAM-token→gateway hop. Deeper authenticated hops
-      # (agents/toolbox/stats, real runs) need an authenticated smoke and are
-      # intentionally out of scope here. Always runs (verifies the live state
+      # Hits the public frontend on the request path — verifies the live state
       # even on a push that didn't roll a given service).
       - name: Post-deploy smoke test
         run: |
