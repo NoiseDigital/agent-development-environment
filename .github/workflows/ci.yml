@@ -189,11 +189,11 @@ jobs:
         working-directory: infra
         run: terraform fmt -check -recursive
 
-      # Validate the whole module tree through a concrete env (the sbx tenant
+      # Validate the whole module tree through a concrete env (the noise tenant
       # calls module.tenant, so this validates the module too). -backend=false
       # skips the GCS backend; validate needs no var values.
       - name: terraform validate
-        working-directory: infra/tenants/nd-agentspace/sbx
+        working-directory: infra/tenants/noise
         run: |
           terraform init -backend=false
           terraform validate
