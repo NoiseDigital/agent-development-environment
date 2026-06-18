@@ -95,13 +95,54 @@ gh variable set GCP_REGION                     --env $ENV -R $REPO -b "us-centra
 gh variable set DEPLOY_PROJECT                 --env $ENV -R $REPO -b "<project_id>"
 ```
 
+### Environment variables — complete checklist
+
+Everything that lives on the `<tenant>-<stage>` GitHub Environment, and what each
+one switches on. All are **variables**, not secrets (keyless WIF is the trust;
+the one real secret, the Firebase API key, stays in Secret Manager). The first
+five are required for *any* deploy; the rest are added at the step noted as you
+turn features on.
+
+| Variable | Enables / why | Set when |
+| --- | --- | --- |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | CI auths to GCP (keyless) | §1 — required |
+| `GCP_CI_SERVICE_ACCOUNT` | identity CI impersonates | §1 — required |
+| `DEPLOY_PROJECT` | which project CI deploys into | §1 — required |
+| `ARTIFACT_REGISTRY` | where images are pushed/pulled | §1 — required |
+| `GCP_REGION` | region for services/jobs | §1 — required |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | frontend auth (Firebase web app) | §4 — required for the app to work |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | gtag sends to this GA4 stream | §6 — only with sGTM/GA |
+| `NEXT_PUBLIC_GA_SERVER_CONTAINER_URL` | routes gtag through your sGTM | §6 — only with sGTM/GA |
+
+The `NEXT_PUBLIC_*` are inlined at **build** time, so a change needs a new
+frontend build (re-run deploy) to take effect. Unset analytics vars simply make
+`gtag` a no-op — the app is unaffected.
+
 ## 2. Provision the tenant stack
 
+One config dir per tenant serves all its stages; per-stage values live in
+`env/<stage>.tfvars` and the state backend in `backend/<stage>.hcl`. The
+`infra/Makefile` selects the matching pair so they can never be mismatched:
+
+```text
+infra/tenants/noise/
+  main.tf variables.tf versions.tf   # the config — written once, all stages
+  env/sbx.tfvars                      # stage values (committed, non-secret)
+  backend/sbx.hcl                     # GCS bucket+prefix for this stage's state
+```
+
 ```bash
-cd infra/tenants/nd-agentspace/sbx
-# edit terraform.tfvars: set admin_emails (the bootstrap admin who can invite others)
-terraform init     # uses the GCS backend from step 1
-terraform apply    # Cloud SQL + VPC take ~10–15 min
+cd infra
+# edit tenants/noise/env/sbx.tfvars: set admin_emails (the bootstrap admin)
+make apply TENANT=noise STAGE=sbx    # Cloud SQL + VPC take ~10–15 min
+```
+
+`make` just wraps Terraform — the equivalent raw commands (run from
+`infra/tenants/noise`) are:
+
+```bash
+terraform init -reconfigure -backend-config=backend/sbx.hcl
+terraform apply -var-file=env/sbx.tfvars
 ```
 
 Creates: VPC + private Cloud SQL, all Cloud Run services (incl. the public
@@ -123,25 +164,22 @@ Email/password works out of the box; this adds Google sign-in.
    **OAuth consent screen** to **Internal** (Workspace-only — your first hard
    access gate).
 2. **Provide the credentials.** The client id is non-secret; the secret is. Put
-   both in a **gitignored** `secrets.auto.tfvars` (matched by `*.auto.tfvars` in
-   `infra/.gitignore`, so it's auto-loaded on every apply — no destroy footgun):
+   both in a **gitignored** per-stage secrets file (matched by
+   `tenants/*/env/*.secret.tfvars` in `infra/.gitignore`); the Makefile includes
+   it automatically when present:
    ```hcl
-   # infra/tenants/<tenant>/<stage>/secrets.auto.tfvars   (gitignored)
+   # infra/tenants/noise/env/sbx.secret.tfvars   (gitignored)
    google_oauth_client_id     = "....apps.googleusercontent.com"
    google_oauth_client_secret = "..."
    ```
-3. `terraform apply` → enables the Google IdP. The frontend's Cloud Run URL is
-   added to the Identity Platform authorized domains automatically.
+3. `make apply TENANT=noise STAGE=sbx` → enables the Google IdP. The frontend's
+   Cloud Run URL is added to the Identity Platform authorized domains
+   automatically.
 
 ## 4. Frontend build config (GitHub vars)
 
-`NEXT_PUBLIC_*` are inlined into the client bundle at **build** time, so they're
-GitHub Environment **variables** (the Firebase API key is the exception — it's in
-Secret Manager and read by CI at build). Set in the tenant's Environment:
-
-| Variable | Value |
-| --- | --- |
-| `NEXT_PUBLIC_FIREBASE_APP_ID` | from `terraform output firebase_web_config` |
+Set `NEXT_PUBLIC_FIREBASE_APP_ID` on the tenant's Environment (see the checklist
+in §1) to the `app_id` from `terraform output firebase_web_config`.
 
 `project_id` + `auth_domain` derive from the project; the API key comes from the
 `firebase-web-api-key` secret (created by `terraform apply` from the Firebase
@@ -179,8 +217,8 @@ Setup:
    platform **Server** → **Manually provision tagging server** (NOT automatic —
    that spins up an App Engine instance we don't use) → copy the **Container
    Config** string.
-2. **Enable it** — `enable_sgtm = true` in the tenant's `terraform.tfvars`
-   (committed), then `terraform apply` (creates the service, `sgtm-container-config`
+2. **Enable it** — `enable_sgtm = true` in `env/<stage>.tfvars` (committed), then
+   `make apply TENANT=noise STAGE=sbx` (creates the service, `sgtm-container-config`
    secret with a placeholder version, and SA).
 3. **Add the Container Config out-of-band** (the only place the value lives):
    ```bash
@@ -211,8 +249,8 @@ works / the proxy-VM rationale** →
 [services/backend/database/datastream/README.md](services/backend/database/datastream/README.md).
 Three phases (a migration runs the SQL prereqs between them):
 
-1. **Provision** — `enable_datastream = true` in `terraform.tfvars` (committed),
-   then `terraform apply`. Creates the proxy VM, private connection, connection
+1. **Provision** — `enable_datastream = true` in `env/<stage>.tfvars` (committed),
+   then `make apply ...`. Creates the proxy VM, private connection, connection
    profiles, the `platform_cdc` BigQuery dataset, and the `datastream` DB user —
    and **restarts the instance once** (for `cloudsql.logical_decoding` +
    `max_connections`).
@@ -222,8 +260,8 @@ Three phases (a migration runs the SQL prereqs between them):
    manual SQL.** Order matters: the `datastream` role (phase 1) must exist before
    this runs, which it does if you apply before merging.
 3. **Start the stream** — set `datastream_create_stream = true` in
-   `terraform.tfvars` (committed), then `terraform apply`. It backfills all tables
-   then tails changes into `platform_cdc`.
+   `env/<stage>.tfvars` (committed), then `make apply ...`. It backfills all
+   tables then tails changes into `platform_cdc`.
 
 Verify: BigQuery → `platform_cdc` fills (backfill, then ~15-min-fresh merges), and
 the Datastream console shows the stream healthy.
@@ -232,11 +270,20 @@ the Datastream console shows the stream healthy.
 
 ## Adding a stage or tenant
 
-See [infra/README.md](infra/README.md) → "Add a new stage". A new stage =
-`tenants/nd-agentspace/<stage>/`; a new tenant = `tenants/<tenant>/`. Add the
-project to bootstrap `target_projects` and re-apply, then repeat §1's *CI deploy
-auth* (a new GitHub Environment with that stack's 5 vars) — the one manual,
-per-stack step. Deploy it via the `workflow_dispatch` `environment` input.
+**New stage** (e.g. `noise/prod`) — two small files, no config copy:
+1. `tenants/noise/env/prod.tfvars` (`stage = "prod"`, bigger `db_tier`, toggles).
+2. `tenants/noise/backend/prod.hcl` (`bucket`/`prefix` for prod state — a fresh
+   stage starts fresh state, so use `prefix = "tenants/noise/prod"`).
+3. Add the project to bootstrap `target_projects`, re-apply bootstrap.
+4. `make apply TENANT=noise STAGE=prod`.
+
+**New tenant** — `cp -r tenants/noise tenants/<new>`, edit the `tenant_id` +
+`project_prefix` locals in its `main.tf`, and keep one `env/`+`backend/` pair per
+stage. (`prod`/`uat` auto-get deletion protection, regional SQL HA, and PITR.)
+
+Either way, repeat §1's *CI deploy auth*: a new GitHub Environment `<tenant>-<stage>`
+with that stack's variables (see the §1 checklist) — the one manual, per-stack
+step. Deploy it via the `workflow_dispatch` `environment` input.
 
 ## Hardening follow-ups (not blocking)
 

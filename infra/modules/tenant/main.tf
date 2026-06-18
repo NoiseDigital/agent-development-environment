@@ -11,7 +11,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 locals {
-  project_id   = "${var.tenant_id}-${var.stage}"
+  # project_id is the real (immutable) GCP project. It defaults to the tenant/stage
+  # convention but can be set explicitly when the tenant *name* differs from the
+  # project id (e.g. tenant_id = "noise", project = "nd-agentspace-sbx").
+  project_id   = var.project_id != "" ? var.project_id : "${var.tenant_id}-${var.stage}"
   name_prefix  = "${var.tenant_id}-${var.stage}"
   gcs_bucket   = "${local.project_id}-uploads"
   is_protected = var.stage == "prod" || var.stage == "uat"

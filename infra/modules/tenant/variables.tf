@@ -1,7 +1,7 @@
 # ── Identity ────────────────────────────────────────────────────────────────
 variable "tenant_id" {
   type        = string
-  description = "Tenant root id, e.g. \"nd-agentspace\"."
+  description = "Tenant root id (label / folder name), e.g. \"noise\"."
 }
 
 variable "stage" {
@@ -11,6 +11,16 @@ variable "stage" {
     condition     = contains(["sbx", "dev", "uat", "prod"], var.stage)
     error_message = "stage must be one of: sbx, dev, uat, prod."
   }
+}
+
+variable "project_id" {
+  type        = string
+  description = <<-EOT
+    GCP project id. Defaults to "<tenant_id>-<stage>"; set it explicitly when the
+    tenant name and the project id differ (project ids are immutable, tenant_id is
+    just a label/folder name).
+  EOT
+  default     = ""
 }
 
 variable "region" {

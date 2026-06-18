@@ -1,10 +1,14 @@
 # Infrastructure (deploy-as-code)
 
 Everything here is Terraform + GitHub Actions. No clicking in consoles, no
-`firebase init`. Single tenant per GCP project; stages are project suffixes.
+`firebase init`. Single tenant per GCP project; one env dir per (tenant, stage).
+
+The tenant id (folder name) and the GCP `project_id` are **decoupled** — set
+`project_id` explicitly in the env's `main.tf`. It defaults to `<tenant_id>-<stage>`
+when blank, but need not match:
 
 ```
-project_id = "<tenant_id>-<stage>"     e.g. nd-agentspace-sbx, nd-agentspace-prod
+tenant "noise", stage "sbx"  →  project_id = "nd-agentspace-sbx"
 ```
 
 ## Layout
@@ -13,7 +17,8 @@ project_id = "<tenant_id>-<stage>"     e.g. nd-agentspace-sbx, nd-agentspace-pro
 |------|------------|
 | `bootstrap/` | One-time, admin-run: TF state bucket, Artifact Registry, Workload Identity Federation, CI deployer SA. |
 | `modules/tenant/` | The reusable per-(tenant,stage) backend stack: APIs, Cloud SQL, Cloud Run (gateway/agent/mcp-stats + migrate job), VPC + private SQL, GCS, Secret Manager, IAM, Firebase. |
-| `tenants/<tenant>/<stage>/` | One thin dir per tenant-stage — calls the module, owns its **isolated** state (GCS prefix `tenants/<tenant>/<stage>`). New tenant = new folder under `tenants/`; new stage = new folder under the tenant. |
+| `tenants/<tenant>/` | One config dir per tenant (`main.tf`/`variables.tf`/`versions.tf` with a **partial** GCS backend). Each stage is just `env/<stage>.tfvars` (committed) + `backend/<stage>.hcl` (its isolated state) — no config copy per stage. |
+| `Makefile` | Picks a stage's tfvars + backend together and runs Terraform: `make apply TENANT=noise STAGE=sbx` (so they can't be mismatched). |
 
 What deploys where:
 
@@ -52,14 +57,20 @@ repeated here.
 
 ## Add a new stage (`-dev`, `-uat`, `-prod`)
 
-1. `cp -r infra/tenants/nd-agentspace/sbx infra/tenants/nd-agentspace/prod` (new stage)
-   or `cp -r infra/tenants/nd-agentspace infra/tenants/<new-tenant>` (new tenant)
-2. In the copy: set `stage = "prod"` (main.tf locals) and the backend `prefix`
-   to `tenants/nd-agentspace/prod` (versions.tf).
+Stages share the tenant's one config — a new stage is two small files:
+
+1. `tenants/noise/env/prod.tfvars` — `stage = "prod"` (project id derives as
+   `<project_prefix>-prod`; set `project_id` only to override), a prod-sized
+   `db_tier`, and feature toggles.
+2. `tenants/noise/backend/prod.hcl` — `bucket` + `prefix = "tenants/noise/prod"`
+   (a fresh stage starts fresh state).
 3. Add the project to `target_projects` in `bootstrap` and re-apply bootstrap
    (so the CI SA can deploy into it).
 4. Add a `.firebaserc` alias (`"prod": "nd-agentspace-prod"`).
-5. `terraform init && terraform apply` in the new env dir.
+5. `make apply TENANT=noise STAGE=prod` (from `infra/`).
+
+A new **tenant** = `cp -r tenants/noise tenants/<new>`, then edit the `tenant_id`
++ `project_prefix` locals in its `main.tf`.
 
 `prod`/`uat` automatically get deletion protection, regional SQL HA, and PITR
 (see `local.is_protected`).

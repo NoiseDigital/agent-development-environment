@@ -11,6 +11,7 @@ RUN apt-get update -y \
        curl \
        gnupg \
        jq \
+       make \
        shellcheck \
        nodejs \
        # System Python for repo tooling (pre-commit hooks, scripts). The
