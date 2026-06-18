@@ -106,6 +106,10 @@ export function useChat(initialApp?: string, userId: string = getCurrentUser().u
   }, [initialApp, selectedApp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
+    // Exposed so URL-driven loads can gate on a RESOLVED identity. On a deployed
+    // reload this is "" until Firebase auth resolves; selecting a session with an
+    // empty uid 404s, so consumers wait for it + re-run when it populates.
+    userId,
     availableApps,
     selectedApp,
     setSelectedApp,

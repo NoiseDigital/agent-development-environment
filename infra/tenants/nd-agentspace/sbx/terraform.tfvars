@@ -9,3 +9,10 @@ admin_emails = ["ethan.domokos@noisedigital.com"]
 # still works):
 #   google_oauth_client_id     = "....apps.googleusercontent.com"
 #   google_oauth_client_secret = "..."
+
+# Datastream CDC → BigQuery. Phase 1: provisions the proxy VM, private connection,
+# profiles, BigQuery dataset, and `datastream` DB user (and restarts the DB once
+# for logical decoding). Then run services/backend/database/datastream/setup.sql
+# and flip datastream_create_stream = true to start streaming.
+enable_datastream        = true
+datastream_create_stream = false

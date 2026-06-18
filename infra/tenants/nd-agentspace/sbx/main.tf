@@ -46,6 +46,11 @@ module "tenant" {
   # TF_VAR_sgtm_container_config to light up the sgtm service (stored as a secret).
   sgtm_container_config = var.sgtm_container_config
 
+  # Datastream CDC → BigQuery. enable_datastream provisions the infra; run
+  # setup.sql, then flip datastream_create_stream to start streaming.
+  enable_datastream        = var.enable_datastream
+  datastream_create_stream = var.datastream_create_stream
+
   # sbx is a sandbox — keep it cheap.
   db_tier = "db-f1-micro"
 }
@@ -67,4 +72,9 @@ output "firebase_web_config" {
 # server_container_url (wire it into vars.NEXT_PUBLIC_GA_SERVER_CONTAINER_URL).
 output "sgtm_url" {
   value = module.tenant.sgtm_url
+}
+
+# BigQuery dataset receiving the Postgres CDC mirror (empty until enabled).
+output "datastream_bq_dataset" {
+  value = module.tenant.datastream_bq_dataset
 }

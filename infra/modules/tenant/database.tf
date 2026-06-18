@@ -29,6 +29,17 @@ resource "google_sql_database_instance" "postgres" {
       private_network = google_compute_network.vpc.id
     }
 
+    # Logical decoding (pgoutput) so Datastream can read the WAL for CDC. Gated on
+    # enable_datastream so non-CDC tenants don't take the flag's instance restart.
+    # See datastream.tf.
+    dynamic "database_flags" {
+      for_each = var.enable_datastream ? [1] : []
+      content {
+        name  = "cloudsql.logical_decoding"
+        value = "on"
+      }
+    }
+
     backup_configuration {
       enabled                        = true
       point_in_time_recovery_enabled = local.is_protected

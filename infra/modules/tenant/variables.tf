@@ -74,6 +74,29 @@ variable "sgtm_container_config" {
   sensitive   = true
 }
 
+# ── Datastream CDC (Postgres → BigQuery) ────────────────────────────────────
+variable "enable_datastream" {
+  type        = bool
+  description = <<-EOT
+    Provision the Datastream CDC infra (proxy VM, private connection, connection
+    profiles, BigQuery dataset, datastream DB user). Default off — only tenants
+    that want a live BigQuery mirror pay for the proxy VM. After enabling + apply,
+    run services/backend/database/datastream/setup.sql, then set
+    datastream_create_stream to start the stream.
+  EOT
+  default     = false
+}
+
+variable "datastream_create_stream" {
+  type        = bool
+  description = <<-EOT
+    Create the Datastream stream itself. Requires enable_datastream AND the SQL
+    prerequisites (publication + replication slot) to already exist, or stream
+    creation fails. Two-phase on purpose: apply infra → run setup.sql → flip this.
+  EOT
+  default     = false
+}
+
 # ── Google sign-in (Workspace SSO) ──────────────────────────────────────────
 variable "google_oauth_client_id" {
   type        = string
