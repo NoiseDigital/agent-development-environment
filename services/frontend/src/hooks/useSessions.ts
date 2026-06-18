@@ -199,6 +199,13 @@ export function useSessions({
     try {
       const session = await adkApi.getSession(selectedApp, userId, sessionId);
       setCurrentSession(session);
+      // Opening an existing conversation that already has turns = a resume. A
+      // brand-new chat goes through createNewSession (tracked as new_conversation),
+      // so anything with events here is a genuine re-open. Skip empty placeholders.
+      const eventCount = session.events?.length ?? 0;
+      if (eventCount > 0) {
+        track('session_resumed', { app: selectedApp, event_count: eventCount });
+      }
     } catch (err) {
       onError(`Failed to select session: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
@@ -217,6 +224,7 @@ export function useSessions({
     }
     try {
       await sessionNamesApi.hide(selectedApp, sessionId, userId);
+      track('conversation_deleted', { app: selectedApp });
     } catch (err) {
       // Roll back the optimistic hide so the user can retry.
       setHiddenSessions((prev) => {
