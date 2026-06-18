@@ -10,6 +10,9 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  // `next lint` (removed in Next 16) implicitly ignored build output; running
+  // eslint directly does not, so ignore it here or CI lints .next/ artifacts.
+  { ignores: [".next/**", "out/**", "build/**", "next-env.d.ts"] },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
 ];
 
