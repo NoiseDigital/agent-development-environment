@@ -13,6 +13,12 @@ updates:
       # One PR for routine minor/patch bumps to cut noise; majors stay separate.
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # eslint 10 breaks eslint-config-next@16 — its plugins (react/import/
+      # jsx-a11y) peer-require eslint <=9, and v10's validator crashes on them.
+      # Hold at v9 until eslint-config-next ships eslint-10-compatible plugins.
+      - dependency-name: eslint
+        update-types: [version-update:semver-major]
 
   # ── Python backends (uv / pyproject.toml).
   - package-ecosystem: uv
