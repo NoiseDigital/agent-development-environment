@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from .auth import CurrentUser, current_user
-from .db import get_pool
+from api.auth import CurrentUser, current_user
+from api.db import get_pool
 
 router = APIRouter(prefix="/clients", tags=["clients"])
 

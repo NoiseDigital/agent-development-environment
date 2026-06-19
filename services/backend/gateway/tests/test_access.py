@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from api.access import normalize_pattern
+from api.access.routes import normalize_pattern
 from api.auth import _role_for_email
 from .conftest import FakePool
 

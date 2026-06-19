@@ -22,8 +22,8 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from ._idtoken import id_token_for
-from .auth import CurrentUser, current_user
+from api._idtoken import id_token_for
+from api.auth import CurrentUser, current_user
 
 STATS_URL = os.getenv("STATS_URL", "http://mcp-stats:8080")
 

@@ -26,8 +26,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from .auth import CurrentUser, current_user
-from .toolbox import get_toolbox_client, normalise_rows
+from api.auth import CurrentUser, current_user
+from api.toolbox import get_toolbox_client, normalise_rows
 
 router = APIRouter(prefix="/dashboards", tags=["dashboards"])
 

@@ -12,6 +12,17 @@ dependencies = [
     "fastapi>=0.137.2",
     "uvicorn>=0.49.0",
     "httpx>=0.28.0",
+    # Parses the MCP toolbox config (tools.yaml) for the query-catalog route
+    # (api/tool_catalog.py), migrated from the agents service.
+    "pyyaml>=6.0.0",
+    # Source-upload handling, migrated from the agents service (api/sources):
+    # multipart form parsing for the upload endpoint (FastAPI UploadFile),
+    # spreadsheet schema-peek (openpyxl), the GCS storage backend, and the
+    # BigQuery catalog browse.
+    "python-multipart>=0.0.32",
+    "openpyxl>=3.1.5",
+    "google-cloud-storage>=3.12.0",
+    "google-cloud-bigquery>=3.42.0",
     # Schema migrations for every platform-owned Postgres table. ADK manages
     # its own tables and ships its own migrations; we never touch those.
     "alembic>=1.13.0",

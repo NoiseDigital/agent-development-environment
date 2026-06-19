@@ -2,7 +2,7 @@
 
 A source is a URI-style string identifying what to analyze:
 
-  - upload:<uuid>                a user-uploaded file — looked up via the agent
+  - upload:<uuid>                a user-uploaded file — looked up via the gateway
                                  API, then read from the shared uploads volume.
   - bigquery:<dataset>.<table>   a live BigQuery table — read directly from
                                  BigQuery; large tables are randomly sampled.
@@ -19,7 +19,7 @@ import pandas as pd
 from engine import clean_dataframe
 from idtoken import id_token_for
 
-AGENT_URL = os.environ.get("AGENT_URL", "http://agent:8000")
+GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://gateway:8080")
 STORAGE_BACKEND = os.environ.get("STORAGE_BACKEND", "local").lower()
 STORAGE_PATH = os.environ.get("STORAGE_LOCAL_PATH", "/data/uploads")
 GCS_BUCKET = os.environ.get("GCS_BUCKET")
@@ -50,12 +50,12 @@ def load_source(source: str, sheet: Optional[str] = None) -> pd.DataFrame:
 
 
 def _read_upload(source_id: str, sheet: Optional[str]) -> pd.DataFrame:
-    # The agent is internal-ingress behind Cloud Run IAM — authenticate with a
-    # Google-signed ID token (audience = the agent URL). None off-GCP (local).
-    token = id_token_for(AGENT_URL)
+    # The gateway is internal-ingress behind Cloud Run IAM — authenticate with a
+    # Google-signed ID token (audience = the gateway URL). None off-GCP (local).
+    token = id_token_for(GATEWAY_URL)
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     resp = httpx.get(
-        f"{AGENT_URL}/api/sources/{source_id}", headers=headers, timeout=30.0
+        f"{GATEWAY_URL}/api/sources/{source_id}", headers=headers, timeout=30.0
     )
     resp.raise_for_status()
     source = resp.json()

@@ -29,7 +29,7 @@ from .auth import CurrentUser, current_user
 
 log = logging.getLogger(__name__)
 
-AGENT_URL = os.getenv("AGENT_URL", "http://agent:8000")
+AGENT_URL = os.getenv("AGENT_URL", "http://agents:8000")
 
 # Per https://www.rfc-editor.org/rfc/rfc7230#section-6.1 these are not safe to
 # forward across a proxy hop. Lowercase keys; we filter case-insensitively.
@@ -67,9 +67,11 @@ def _filter_request_headers(
         for k, v in headers.items()
         if k.lower() not in HOP_BY_HOP and k.lower() not in STRIPPED_FROM_CLIENT
     }
-    # The agent reads identity from this header (the real Firebase uid in any
-    # deployed env). The next hardening step is a forwarded ID token the agent
-    # verifies itself, rather than trusting this header over the IAM boundary.
+    # Forward the gateway-verified user as X-User-Id. The ADK runtime itself
+    # reads user_id from the request PATH (/apps/{app}/users/{uid}/...), so this
+    # header is belt-and-suspenders today — kept for any future agent-side route
+    # that wants the identity, and because the inbound x-user-* is stripped above
+    # so a browser can never spoof it.
     out["X-User-Id"] = user.uid
     return out
 

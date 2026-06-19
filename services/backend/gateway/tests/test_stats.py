@@ -14,7 +14,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-import api.stats as stats_module
+import api.stats.routes as stats_module
 from main import app
 
 

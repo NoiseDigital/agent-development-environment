@@ -86,10 +86,9 @@ resource "google_cloud_run_v2_service" "agent" {
         name  = "GOOGLE_CLOUD_LOCATION"
         value = var.vertex_location
       }
-      env {
-        name  = "STORAGE_BACKEND"
-        value = "gcs"
-      }
+      # ADK artifact service (contextual chat files) → GcsArtifactService in prod;
+      # the local filesystem in dev when unset. NOT the platform's data sources
+      # (those are the gateway's, in Postgres + the bucket via its own API).
       env {
         name  = "GCS_BUCKET"
         value = google_storage_bucket.uploads.name
@@ -142,8 +141,8 @@ resource "google_cloud_run_v2_service" "mcp_stats" {
       image = var.placeholder_image
       ports { container_port = 8080 }
       env {
-        name  = "AGENT_URL"
-        value = local.run_url["agents"]
+        name  = "GATEWAY_URL"
+        value = local.run_url["gateway"]
       }
       env {
         name  = "STORAGE_BACKEND"
@@ -248,6 +247,17 @@ resource "google_cloud_run_v2_service" "gateway" {
       env {
         name  = "STATS_URL"
         value = local.run_url["mcp-stats"]
+      }
+      # Uploaded data sources — the sources API moved here from the agent, so the
+      # gateway is now the storage writer (objectAdmin on the uploads bucket; see
+      # storage.tf). mcp-stats reads files back from the same bucket.
+      env {
+        name  = "STORAGE_BACKEND"
+        value = "gcs"
+      }
+      env {
+        name  = "GCS_BUCKET"
+        value = google_storage_bucket.uploads.name
       }
       # The gateway is the dashboards BFF — it queries the Toolbox for tile data
       # (api/toolbox.py). Without this it falls back to the local-compose
@@ -401,9 +411,11 @@ resource "google_cloud_run_v2_service_iam_member" "internal_invokers" {
     # the agent loads Toolbox toolsets and (media agent) the stats MCP directly.
     toolbox_from_agent = { service = google_cloud_run_v2_service.mcp_toolbox.name, caller = google_service_account.agent.email }
     stats_from_agent   = { service = google_cloud_run_v2_service.mcp_stats.name, caller = google_service_account.agent.email }
-    # mcp-stats calls back to the agent to resolve an upload's storage key
-    # (services/backend/mcp/stats/resolve.py).
-    agents_from_stats = { service = google_cloud_run_v2_service.agent.name, caller = google_service_account.mcp_stats.email }
+    # mcp-stats calls the gateway to resolve an upload's storage key
+    # (services/backend/mcp/stats/resolve.py). Safe from an apply cycle: the
+    # gateway reaches mcp-stats via local.run_url (a deterministic string, NOT a
+    # resource ref), so there's no gateway→stats resource edge to close the loop.
+    gateway_from_stats = { service = google_cloud_run_v2_service.gateway.name, caller = google_service_account.mcp_stats.email }
   }
   project  = local.project_id
   location = var.region

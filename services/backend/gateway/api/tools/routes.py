@@ -1,13 +1,14 @@
-"""Builds a name → SQL catalog from the MCP toolbox config (tools.yaml).
+"""MCP toolbox query catalog (admin).
 
-A tool call only carries a tool name and arguments — never the SQL. The toolbox
-config is the source of truth for the statement each bigquery-sql tool runs, so
-the UI reconstructs "what executed" by pairing a call's args with the statement
-from here.
+Reconstructs the SQL a bigquery-sql tool call executed by pairing the call's args
+with the statement in the toolbox config (tools.yaml) — the call itself never
+carries the statement. Moved here from the agents service: it's a platform BFF
+concern, not part of the ADK runtime.
 
-tools.yaml lives with the toolbox image, not the agent source, so it is mounted
-read-only into this container (see docker-compose.yml). A missing/unreadable
-config yields an empty catalog — the feature degrades to "no queries shown".
+tools.yaml lives with the toolbox image, not this source, so it's mounted
+read-only into the gateway container (see docker-compose.yml). A missing/
+unreadable config yields an empty catalog — the feature degrades to "no queries
+shown" (which is already the case in prod, where no config is mounted).
 """
 
 from __future__ import annotations
@@ -16,6 +17,11 @@ import os
 from pathlib import Path
 
 import yaml
+from fastapi import APIRouter
+
+# Unversioned to match the path the frontend already calls (it used to fall
+# through the gateway proxy to the agent); mounted before the catch-all proxy.
+router = APIRouter(prefix="/api", tags=["tools"])
 
 # Where docker-compose mounts services/backend/mcp/images/toolbox.
 DEFAULT_CONFIG_PATH = "/toolbox-config/tools.yaml"
@@ -52,3 +58,9 @@ def load_catalog() -> dict[str, dict]:
         ]
         catalog[name] = {"statement": str(statement).strip(), "params": params}
     return catalog
+
+
+@router.get("/tools/catalog")
+async def tools_catalog():
+    """Name → { statement, params } for every bigquery-sql toolbox tool."""
+    return {"tools": load_catalog()}

@@ -11,8 +11,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 
-from .auth import CurrentUser, require_role
-from .db import get_pool
+from api.auth import CurrentUser, require_role
+from api.db import get_pool
 
 router = APIRouter(prefix="/access-rules", tags=["access-rules"])
 

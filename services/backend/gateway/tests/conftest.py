@@ -82,18 +82,18 @@ def client(
     async def _get_pool() -> FakePool:
         return fake_pool
 
-    import api.access
+    import api.access.routes
     import api.auth
-    import api.clients
+    import api.clients.routes
     import api.db
-    import api.me
-    import api.users
+    import api.me.routes
+    import api.users.routes
 
     monkeypatch.setattr(api.db, "get_pool", _get_pool)
-    monkeypatch.setattr(api.clients, "get_pool", _get_pool)
-    monkeypatch.setattr(api.me, "get_pool", _get_pool)
-    monkeypatch.setattr(api.users, "get_pool", _get_pool)
-    monkeypatch.setattr(api.access, "get_pool", _get_pool)
+    monkeypatch.setattr(api.clients.routes, "get_pool", _get_pool)
+    monkeypatch.setattr(api.me.routes, "get_pool", _get_pool)
+    monkeypatch.setattr(api.users.routes, "get_pool", _get_pool)
+    monkeypatch.setattr(api.access.routes, "get_pool", _get_pool)
     monkeypatch.setattr(api.auth, "get_pool", _get_pool)
 
     from main import app

@@ -27,14 +27,19 @@ import logging
 
 from fastapi import APIRouter, FastAPI
 
-from api.access import router as access_router
-from api.clients import router as clients_router
-from api.dashboards import router as dashboards_router
+from api.access.routes import router as access_router
+from api.clients.routes import router as clients_router
+from api.dashboards.routes import router as dashboards_router
+from api.events.routes import router as events_router
 from api.health import router as health_router
-from api.me import router as me_router
+from api.me.routes import router as me_router
+from api.pins.routes import router as pins_router
 from api.proxy import router as proxy_router
-from api.stats import router as stats_router
-from api.users import router as users_router
+from api.sessions.routes import router as sessions_router
+from api.sources.routes import router as sources_router
+from api.stats.routes import router as stats_router
+from api.tools.routes import router as tool_catalog_router
+from api.users.routes import router as users_router
 
 
 class _MuteLivenessAccessLog(logging.Filter):
@@ -63,9 +68,23 @@ api_v1.include_router(me_router)
 api_v1.include_router(users_router)
 api_v1.include_router(access_router)
 
+# Platform CRUD migrated out of the agents service (the schema lives here, in
+# Alembic). These keep the UNVERSIONED `/api/...` paths the frontend already
+# calls — they used to fall through the proxy to the agent; now the gateway
+# serves them directly. Mounted AFTER api_v1 and BEFORE the proxy so they
+# intercept instead of proxying. (Versioning under /api/v1 is a separate,
+# additive change — intentionally not coupled to this migration.)
+platform = APIRouter()
+platform.include_router(tool_catalog_router)
+platform.include_router(pins_router)
+platform.include_router(events_router)
+platform.include_router(sessions_router)
+platform.include_router(sources_router)
+
 # Order matters — the proxy is a catch-all and must be the LAST router added,
 # so explicit gateway-owned routes match before falling through to the agent.
 # `/healthz` and the agent passthrough are deliberately UNVERSIONED.
 app.include_router(health_router)
 app.include_router(api_v1)
+app.include_router(platform)
 app.include_router(proxy_router)

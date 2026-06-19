@@ -116,7 +116,9 @@ class TestProxyForwarding:
         assert req["url"].endswith("/apps")
 
     def test_forwards_query_params(self, proxy_client: TestClient) -> None:
-        proxy_client.get("/api/sources?app_name=mp&user_id=u")
+        # Use an ADK path that falls through to the agent — /api/sources is now a
+        # gateway-owned route (migrated), so it would be served here, not proxied.
+        proxy_client.get("/apps?app_name=mp&user_id=u")
         assert last_request()["params"] == {"app_name": "mp", "user_id": "u"}
 
     def test_forwards_body_on_post(self, proxy_client: TestClient) -> None:

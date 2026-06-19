@@ -93,7 +93,7 @@ repos:
         alias: mypy-gateway
         name: mypy (gateway)
         files: ^services/backend/gateway/.*\.py$
-        additional_dependencies: [pydantic, fastapi, sqlalchemy, alembic, httpx]
+        additional_dependencies: [pydantic, fastapi, sqlalchemy, alembic, httpx, types-PyYAML]
         args: [--ignore-missing-imports, --follow-imports=silent]
 
   # Local hooks — fast checks that only fire when the relevant files change so

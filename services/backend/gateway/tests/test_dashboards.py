@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-import api.dashboards as dashboards_module
+import api.dashboards.routes as dashboards_module
 from main import app
 
 
