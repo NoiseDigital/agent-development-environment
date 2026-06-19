@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.3.3](https://github.com/NoiseDigital/agent-platform/compare/v0.3.2...v0.3.3) (2026-06-19)
+
+
+### Features
+
+* **agents:** set media-performance and timesheet agents to gemini-3.5-flash ([415d901](https://github.com/NoiseDigital/agent-platform/commit/415d901b327f5d2b98b2672f0205e7fab1f3a839))
+* **infra:** add datastream && vm for private connection ([29c9436](https://github.com/NoiseDigital/agent-platform/commit/29c94367f88daf889ccac3946dbf2d8364fa0243))
+* **infra:** add datastream module ([#67](https://github.com/NoiseDigital/agent-platform/issues/67)) ([29c9436](https://github.com/NoiseDigital/agent-platform/commit/29c94367f88daf889ccac3946dbf2d8364fa0243))
+
+
+### Bug Fixes
+
+* **chat:** don't sweep empty sessions younger than 5min so a fresh chat survives refresh ([b3393ec](https://github.com/NoiseDigital/agent-platform/commit/b3393ec70e07d2a86ef65f0a79b662b534a6a0bf))
+* **chat:** source userId reactively from auth context so session loads survive a deployed reload ([b3393ec](https://github.com/NoiseDigital/agent-platform/commit/b3393ec70e07d2a86ef65f0a79b662b534a6a0bf))
+* **chat:** source userId reactively from auth context so session loads survive a deployed reload ([b3393ec](https://github.com/NoiseDigital/agent-platform/commit/b3393ec70e07d2a86ef65f0a79b662b534a6a0bf))
+* **ci:** point terraform validate at the renamed noise tenant dir ([b3393ec](https://github.com/NoiseDigital/agent-platform/commit/b3393ec70e07d2a86ef65f0a79b662b534a6a0bf))
+* **datastream:** create the replication slot in an alembic autocommit_block (can't run in a write txn) ([8492e59](https://github.com/NoiseDigital/agent-platform/commit/8492e5982a433bf6fe4f0f42a33c9ab4aec2f997))
+* **datastream:** grant migrate role REPLICATION to create the logical slot (Cloud SQL attr not inherited) ([688bbd5](https://github.com/NoiseDigital/agent-platform/commit/688bbd53e8509c753090860eb64772ffe1b8c1ef))
+* **datastream:** raise max_connections + cap backfill concurrency to avoid Cloud SQL slot exhaustion ([f074445](https://github.com/NoiseDigital/agent-platform/commit/f074445b4903c90b304d6dcdc11c2a9f02343b17))
+* **frontend:** decouple uid fetch race causing session load error ([29c9436](https://github.com/NoiseDigital/agent-platform/commit/29c94367f88daf889ccac3946dbf2d8364fa0243))
+* **frontend:** migrate lint off the removed `next lint` to the eslint CLI ([3db923c](https://github.com/NoiseDigital/agent-platform/commit/3db923c4349b28af7ca7d9dacb4f10f39abdf092))
+* **frontend:** pin webpack bundler — Next 16's Turbopack default breaks the webpack canvas stub + bundle-analyzer ([6ab70a5](https://github.com/NoiseDigital/agent-platform/commit/6ab70a54ef0922e827bb61bbec2591909dbc5910))
+* **infra:** realign noise/sbx env to enable_sgtm toggle after the folder move ([b3393ec](https://github.com/NoiseDigital/agent-platform/commit/b3393ec70e07d2a86ef65f0a79b662b534a6a0bf))
+* **pre-commit:** wire commit-msg hook so commitizen lints messages locally ([b3393ec](https://github.com/NoiseDigital/agent-platform/commit/b3393ec70e07d2a86ef65f0a79b662b534a6a0bf))
+
+
+### Documentation
+
+* **infra:** rewrite DEPLOY.md + README for Option B and add GitHub Environment variable checklist ([b3393ec](https://github.com/NoiseDigital/agent-platform/commit/b3393ec70e07d2a86ef65f0a79b662b534a6a0bf))
+* make DEPLOY.md the single end-to-end setup runbook; de-duplicate steps from infra/component READMEs ([b3393ec](https://github.com/NoiseDigital/agent-platform/commit/b3393ec70e07d2a86ef65f0a79b662b534a6a0bf))
+* rename agent-&gt;agents and fix the agent invoker (per-SA run.invoker, not allUsers) ([b3dfab1](https://github.com/NoiseDigital/agent-platform/commit/b3dfab1cc639862483222562bc66b597a850f314))
+
+
+### Code Refactoring
+
+* **api:** move platform CRUD from the agents service to the gateway ([5506b5a](https://github.com/NoiseDigital/agent-platform/commit/5506b5ac5375e00ab64ae93ff9426df065bc2206))
+* **infra:** rename tenant nd-agentspace → noise and decouple tenant_id from project_id ([b3393ec](https://github.com/NoiseDigital/agent-platform/commit/b3393ec70e07d2a86ef65f0a79b662b534a6a0bf))
+* **sgtm:** gate on a committed enable_sgtm toggle; keep CONTAINER_CONFIG out-of-band in Secret Manager ([b3393ec](https://github.com/NoiseDigital/agent-platform/commit/b3393ec70e07d2a86ef65f0a79b662b534a6a0bf))
+
 ## [0.3.2](https://github.com/NoiseDigital/agent-platform/compare/v0.3.1...v0.3.2) (2026-06-17)
 
 
