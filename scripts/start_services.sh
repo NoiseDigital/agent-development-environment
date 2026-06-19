@@ -210,6 +210,31 @@ for svc in gateway agents mcp-stats; do
     fi
 done
 
+# Reconcile the frontend's node_modules volume with package-lock.json. The volume
+# (frontend_node_modules) masks the image's node_modules so source can be bind-
+# mounted without the host's platform-wrong native modules leaking in — but it
+# persists across image rebuilds, so a dependency bump leaves it stale (the same
+# trap that bites the Python venvs above). npm ci is a full clean install, not a
+# cheap no-op, so gate it on a hash of the lockfile: instant when unchanged,
+# reinstall only when the lock actually moved.
+echo "Reconciling frontend node_modules to package-lock.json…"
+if docker compose --project-directory "$HOST_PROJECT_ROOT" \
+    -f "$PROJECT_ROOT/docker-compose.yml" \
+    exec -T frontend sh -c '
+        want=$(sha256sum package-lock.json | cut -d" " -f1)
+        have=$(cat node_modules/.deps-hash 2>/dev/null || echo none)
+        if [ "$want" = "$have" ]; then
+            echo "  frontend ✓ (up to date)"
+        else
+            echo "  frontend — lockfile changed, running npm ci…"
+            npm ci --no-audit --no-fund && printf "%s" "$want" > node_modules/.deps-hash
+        fi
+    '; then
+    :
+else
+    echo "  frontend — reconcile skipped (container not running?)"
+fi
+
 echo ""
 echo "✔ All services running."
 echo ""
