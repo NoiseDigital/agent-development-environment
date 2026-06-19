@@ -12,7 +12,7 @@ def get_agent_description():
 
 
 def get_root_agent_model():
-    return ""
+    return "gemini-3.5-flash"
 
 
 ### DEPLOYMENT CONSTANTS ###

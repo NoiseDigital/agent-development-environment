@@ -45,7 +45,7 @@ from .subagents.vega_charts_agent import root_agent as vega_charts_root_agent
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = "gemini-3.5-flash"
 
 
 def today() -> str:

@@ -21,7 +21,7 @@ from .prompts.vega_charts_agent import get_vega_charts_agent_prompt
 
 def _build_vega_charts_agent() -> LlmAgent:
     return LlmAgent(
-        model="gemini-2.5-flash",
+        model="gemini-3.5-flash",
         name="VegaChartsAgent",
         description=(
             "Turns the parent's analysis intent + tool results into a clean "

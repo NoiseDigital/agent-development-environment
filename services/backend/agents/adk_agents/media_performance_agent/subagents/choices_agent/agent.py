@@ -14,7 +14,7 @@ def _build_choices_agent() -> LlmAgent:
     toolbox = get_toolbox_client()
     tools = toolbox.load_toolset("media_performance_query")
     return LlmAgent(
-        model="gemini-2.5-flash",
+        model="gemini-3.5-flash",
         name="ChoicesAgent",
         description="Turn an ambiguous request into one data-grounded choices block of clarifying questions.",
         instruction=get_choices_agent_prompt(),
