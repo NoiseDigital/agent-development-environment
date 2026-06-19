@@ -31,7 +31,7 @@
 - Runs `scripts/start_services.sh`
 - Creates `.env` from `.env.example` if it doesn't exist — review `GOOGLE_CLOUD_PROJECT` before first use
 - Prompts for GCP authentication if credentials are missing — click the URL, sign in, paste the code back
-- Starts core app services (`postgres`, `mcp-toolbox`, `agent`, `frontend`)
+- Starts core app services (`postgres`, `mcp-toolbox`, `agents`, `frontend`)
 - Bootstraps optional MCP profile env files from `.env.example` to `.env` under `services/backend/mcp/images/` (except `google-ads`, which is synced from Secret Manager)
 
    On subsequent opens, if credentials already exist the auth step is skipped and services start immediately.
@@ -87,7 +87,7 @@ terraform/                          # GCP infrastructure
 ### Service topology
 
 ```text
-browser ─► gateway (8080) ─┬─► agent (8000)            ─► postgres
+browser ─► gateway (8080) ─┬─► agents (8000)           ─► postgres
                            │     ├─► mcp-toolbox (5000) ─► BigQuery
                            │     └─► mcp-stats (5003)   ─► uploads
                            ├─► mcp-toolbox (dashboard query)
@@ -100,7 +100,7 @@ browser ─► gateway (8080) ─┬─► agent (8000)            ─► postgr
 
 The frontend talks **only** to the gateway. The gateway is the public seam
 for every backend service:
-- ADK runtime (sessions, `/run_sse`, …) → proxied to `agent` via the catch-all.
+- ADK runtime (sessions, `/run_sse`, …) → proxied to `agents` via the catch-all.
 - Dashboard queries → `/api/dashboards/query` calls the MCP Toolbox directly.
 - Analyze stats (correlate / qa / describe) → `/api/stats/<endpoint>` proxies
   to `mcp-stats`.
@@ -179,7 +179,7 @@ ships its own migrations on version updates — we never touch those.
 On `docker compose up`, the gateway's entrypoint runs `alembic upgrade head`
 against Postgres and only then starts uvicorn — its `/healthz` flips green
 once both steps complete. Any service that touches the platform tables
-(currently just `agent`) waits on `gateway: service_healthy`, so the schema
+(currently just `agents`) waits on `gateway: service_healthy`, so the schema
 is always at head before anyone reads it. Migrations are idempotent, so a
 restart is safe. CI applies them to a fresh Postgres on every PR.
 

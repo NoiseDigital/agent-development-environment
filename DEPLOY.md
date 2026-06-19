@@ -201,7 +201,7 @@ Verify:
   bootstrap admin from `admin_emails`) → app works.
 - `curl https://<gateway-url>/healthz` from outside **fails** (internal ingress);
   the app still works because the BFF reaches the gateway over the VPC.
-- Dashboards load (agent → toolbox → BigQuery).
+- Dashboards load (agents → toolbox → BigQuery).
 
 ---
 

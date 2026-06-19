@@ -16,13 +16,13 @@ tenant "noise", stage "sbx"  →  project_id = "nd-agentspace-sbx"
 | Path | What it is |
 |------|------------|
 | `bootstrap/` | One-time, admin-run: TF state bucket, Artifact Registry, Workload Identity Federation, CI deployer SA. |
-| `modules/tenant/` | The reusable per-(tenant,stage) backend stack: APIs, Cloud SQL, Cloud Run (gateway/agent/mcp-stats + migrate job), VPC + private SQL, GCS, Secret Manager, IAM, Firebase. |
+| `modules/tenant/` | The reusable per-(tenant,stage) backend stack: APIs, Cloud SQL, Cloud Run (gateway/agents/mcp-stats + migrate job), VPC + private SQL, GCS, Secret Manager, IAM, Firebase. |
 | `tenants/<tenant>/` | One config dir per tenant (`main.tf`/`variables.tf`/`versions.tf` with a **partial** GCS backend). Each stage is just `env/<stage>.tfvars` (committed) + `backend/<stage>.hcl` (its isolated state) — no config copy per stage. |
 | `Makefile` | Picks a stage's tfvars + backend together and runs Terraform: `make apply TENANT=noise STAGE=sbx` (so they can't be mismatched). |
 
 What deploys where:
 
-- **Backend** (gateway, agent, mcp-stats) → Cloud Run, via `.github/workflows/deploy.yml`.
+- **Backend** (gateway, agents, mcp-stats) → Cloud Run, via `.github/workflows/deploy.yml`.
 - **Database** → Cloud SQL Postgres (private IP only).
 - **Migrations** → a Cloud Run **job** (`<stage>-migrate`), run by CI *before* new API revisions take traffic.
 - **Frontend** → Cloud Run (public ingress, standalone Next.js build), via the same `.github/workflows/deploy.yml`.
@@ -37,10 +37,12 @@ Its `/gw` proxy forwards to the gateway server-side. Nothing in the backend is p
   the **frontend service account** (the BFF reaches it via Direct VPC egress,
   authenticating with a Cloud Run IAM ID token whose audience is the gateway's
   custom audience).
-- **agent / mcp-stats / mcp-toolbox** — `INGRESS_TRAFFIC_INTERNAL_ONLY`; invoker
-  is `allUsers`, so the network is the boundary. This is a single-tenant project
-  (only this tenant's own services are in the VPC), so internal ingress alone is
-  sufficient; tighten to per-SA IAM if tenants are ever co-located.
+- **agents / mcp-stats / mcp-toolbox** — `INGRESS_TRAFFIC_INTERNAL_ONLY` **and**
+  per-SA `run.invoker`: each caller SA is granted invoker on exactly the services
+  it calls (the `internal_invokers` map in `cloudrun.tf` — e.g. the gateway SA on
+  agents/stats/toolbox; the agent SA on toolbox/stats; the stats SA on the
+  gateway). So it's defence-in-depth: internal ingress (network) **plus** IAM
+  (identity), not network alone.
 
 No CORS anywhere (same-origin BFF). See `modules/tenant/cloudrun.tf` and
 `services/frontend/src/app/gw/[...path]/route.ts`.
