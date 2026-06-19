@@ -1,3 +1,6 @@
-# Explicit ruff syntax target for the whole repo.
-
+# Ruff syntax target — matches the runtime: everything (services, CI, tooling)
+# runs on Python 3.14, so ruff may use 3.14 syntax, including PEP 758's
+# unparenthesized `except A, B:`. Set explicitly (not inferred from each service's
+# requires-python) so CI (run from a service dir) and pre-commit (run from the
+# repo root) always agree on the target.
 target-version = "py314"

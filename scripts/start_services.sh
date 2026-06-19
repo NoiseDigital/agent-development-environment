@@ -180,11 +180,11 @@ docker volume create agent-platform_gcloud_config >/dev/null 2>&1 || true
 docker compose \
     --project-directory "$PROJECT_ROOT" \
     -f "$PROJECT_ROOT/docker-compose.yml" \
-    build gateway agent frontend mcp-stats migrate firebase-emulator "${TAGGING_SERVICES[@]}"
+    build gateway agents frontend mcp-stats migrate firebase-emulator "${TAGGING_SERVICES[@]}"
 
 # Up ordering:
 #   postgres (healthcheck) → migrate (one-shot `alembic upgrade head`, runs to
-#   completion) → gateway + agent (both wait on migrate via
+#   completion) → gateway + agents (both wait on migrate via
 #   service_completed_successfully) → mcp-stats / frontend. firebase-emulator
 #   starts alongside for local Firebase Auth. `--wait` blocks until every
 #   long-running service is healthy (the one-shot migrate just needs exit 0).
@@ -192,7 +192,23 @@ COMPOSE_IGNORE_ORPHANS=1 docker compose \
     --project-directory "$HOST_PROJECT_ROOT" \
     -f "$PROJECT_ROOT/docker-compose.yml" \
     up -d --no-build --wait --wait-timeout 180 \
-    postgres mcp-toolbox migrate firebase-emulator gateway agent frontend mcp-stats "${TAGGING_SERVICES[@]}"
+    postgres mcp-toolbox migrate firebase-emulator gateway agents frontend mcp-stats "${TAGGING_SERVICES[@]}"
+
+# Reconcile each Python service's /opt/venv with its (bind-mounted) uv.lock.
+# `uv run` only syncs at container *start*, and `up` won't recreate an already-
+# running container — so a dependency bump applied while the stack is up would
+# otherwise leave a stale venv (missing/old packages). This is dev-only: Cloud
+# Run images bake deps at build time and run `uv run --no-sync` (no VPC egress).
+echo "Syncing Python service environments to uv.lock…"
+for svc in gateway agents mcp-stats; do
+    if docker compose --project-directory "$HOST_PROJECT_ROOT" \
+        -f "$PROJECT_ROOT/docker-compose.yml" \
+        exec -T "$svc" uv sync --frozen >/dev/null 2>&1; then
+        echo "  $svc ✓"
+    else
+        echo "  $svc — sync skipped (container not running?)"
+    fi
+done
 
 echo ""
 echo "✔ All services running."
