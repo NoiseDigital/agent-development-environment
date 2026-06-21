@@ -2,15 +2,18 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { sourcesApi } from '../../lib/api/sources';
-import { statsApi, type CorrelateResult, type QaResult, type ColumnProfile } from '../../lib/api/stats';
+import { statsApi, type CorrelateResult, type QaResult, type ColumnProfile, type RegressResult, type PairsResult, type ColumnStat } from '../../lib/api/stats';
+import { downloadCsv, downloadJson } from '../../lib/analyze/export';
 import { track } from '../../lib/analytics/track';
 import type { Upload, SourceRef, BigQueryTableRef } from '../../types/source';
 import { sourceUri, sourceLabel } from '../../types/source';
-import { heatmapSpec } from '../../lib/charts/specs';
+import { heatmapSpec, scatterSpec } from '../../lib/charts/specs';
 import { buildAnalyzeContext } from '../../lib/agent/analyze-context';
 import VegaChart from '../../components/VegaChart';
 import InfoHint from '../../components/ui/InfoHint';
 import AnalyzeAssistantPanel from '../../components/analyze/AnalyzeAssistantPanel';
+import RegressionResults from '../../components/analyze/RegressionResults';
+import ColumnProfileTable from '../../components/analyze/ColumnProfileTable';
 
 // ── Layout primitive — a card-shaped section used in the controls rail. ────
 
@@ -154,11 +157,15 @@ export default function AnalyzePage() {
   const [bqTables, setBqTables] = useState<BigQueryTableRef[]>([]);
   const [bqTable, setBqTable] = useState('');
   const [columnProfiles, setColumnProfiles] = useState<ColumnProfile[]>([]);
+  const [columnStats, setColumnStats] = useState<ColumnStat[]>([]);
   const [describing, setDescribing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  // Analysis controls
+  // Analysis mode
+  const [mode, setMode] = useState<'correlate' | 'regress'>('correlate');
+
+  // Correlation controls
   const [setA, setSetA] = useState<string[]>([]);
   const [setB, setSetB] = useState<string[]>([]);
   const [method, setMethod] = useState<'pearson' | 'spearman'>('pearson');
@@ -170,11 +177,29 @@ export default function AnalyzePage() {
   const [zscore, setZscore] = useState(false);
   const [difference, setDifference] = useState(false);
 
+  // Segmentation (shared by correlate + regress)
+  const [groupCol, setGroupCol] = useState('');
+  const [groupVal, setGroupVal] = useState('');
+  const [timeCol, setTimeCol] = useState('');
+
+  // Regression controls
+  const [regY, setRegY] = useState('');
+  const [regX, setRegX] = useState<string[]>([]);
+  const [regConst, setRegConst] = useState(true);
+  const [regZscore, setRegZscore] = useState(false);
+  const [regDiff, setRegDiff] = useState(false);
+  const [regLag, setRegLag] = useState(0);
+
   // Results
   const [result, setResult] = useState<CorrelateResult | null>(null);
+  const [regResult, setRegResult] = useState<RegressResult | null>(null);
   const [qa, setQa] = useState<QaResult | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Scatter explorer — populated when a Top-signal row is clicked.
+  const [scatter, setScatter] = useState<PairsResult | null>(null);
+  const [scatterLoading, setScatterLoading] = useState(false);
 
   // ── Derived source + columns ────────────────────────────────────────────
   const selectedUpload = uploads.find((u) => u.id === uploadId) || null;
@@ -190,6 +215,7 @@ export default function AnalyzePage() {
         : bqDataset && bqTable
           ? { kind: 'bigquery', dataset: bqDataset, table: bqTable }
           : null,
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     [sourceKind, selectedUpload, bqDataset, bqTable],
   );
   const sourceRefUri = source ? sourceUri(source) : '';
@@ -204,6 +230,7 @@ export default function AnalyzePage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadUploads();
     sourcesApi.bigQueryDatasets().then(setBqDatasets).catch(() => setBqDatasets([]));
   }, [loadUploads]);
@@ -211,16 +238,29 @@ export default function AnalyzePage() {
   // Reset analysis, then profile the columns + run QA whenever the resolved
   // source (or sheet) changes. `describe` drives the dtype-aware column picker.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSetA([]);
     setSetB([]);
     setResult(null);
+    setRegY('');
+    setRegX([]);
+    setRegResult(null);
+    setGroupCol('');
+    setGroupVal('');
+    setTimeCol('');
+    setScatter(null);
     setError(null);
     if (!sourceRefUri) {
       setQa(null);
       setColumnProfiles([]);
+      setColumnStats([]);
       return;
     }
     statsApi.qa(sourceRefUri, sheet || undefined).then(setQa).catch(() => setQa(null));
+    statsApi
+      .profile(sourceRefUri, sheet || undefined)
+      .then((p) => setColumnStats(p.columns))
+      .catch(() => setColumnStats([]));
     setDescribing(true);
     statsApi
       .describe(sourceRefUri, sheet || undefined)
@@ -267,6 +307,7 @@ export default function AnalyzePage() {
     if (!source) return;
     setRunning(true);
     setError(null);
+    setScatter(null);
     try {
       setResult(
         await statsApi.correlate({
@@ -282,6 +323,9 @@ export default function AnalyzePage() {
           log1p,
           zscore,
           difference,
+          group_col: groupCol,
+          group_val: groupVal,
+          time_col: timeCol,
         }),
       );
       track('analysis_run', { method, source_kind: sourceUri(source).split(':')[0] });
@@ -291,6 +335,91 @@ export default function AnalyzePage() {
     } finally {
       setRunning(false);
     }
+  };
+
+  const runRegress = async () => {
+    if (!source || !regY || regX.length === 0) return;
+    setRunning(true);
+    setError(null);
+    try {
+      setRegResult(
+        await statsApi.regress({
+          source: sourceUri(source),
+          sheet: sheet || undefined,
+          y: regY,
+          x: regX,
+          add_constant: regConst,
+          zscore: regZscore,
+          difference: regDiff,
+          lag: regLag,
+          group_col: groupCol,
+          group_val: groupVal,
+          time_col: timeCol,
+        }),
+      );
+      track('regression_run', { source_kind: sourceUri(source).split(':')[0] });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Regression failed');
+      setRegResult(null);
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  // Numeric columns — the only ones a regression can use for Y / X.
+  const numericColumns = columnProfiles.filter((c) => c.kind === 'numeric').map((c) => c.name);
+  // Segmentation column options.
+  const segmentColumns = columnProfiles
+    .filter((c) => c.kind === 'categorical' || c.kind === 'datetime')
+    .map((c) => c.name);
+  const datetimeColumns = columnProfiles.filter((c) => c.kind === 'datetime').map((c) => c.name);
+  const groupValues = columnProfiles.find((c) => c.name === groupCol)?.values ?? [];
+
+  // Fetch the (x,y) points for a column pair when the user clicks a Top signal.
+  const openScatter = async (a: string, b: string) => {
+    if (!source) return;
+    setScatterLoading(true);
+    try {
+      setScatter(
+        await statsApi.pairs({
+          source: sourceUri(source),
+          sheet: sheet || undefined,
+          a,
+          b,
+          method,
+          lag,
+          winsorize,
+          log1p,
+          zscore,
+          difference,
+          group_col: groupCol,
+          group_val: groupVal,
+          time_col: timeCol,
+        }),
+      );
+    } catch {
+      setScatter(null);
+    } finally {
+      setScatterLoading(false);
+    }
+  };
+
+  // Export the correlation result — top-signals CSV + a reproducible run-details
+  // JSON. The heatmap PNG is exported from its own chart toolbar (saveable).
+  const exportResults = () => {
+    if (!result) return;
+    downloadCsv(
+      'analyze-top-signals.csv',
+      result.top_signals.map((s) => ({ a: s.a, b: s.b, r: s.r, p: s.p })),
+    );
+    downloadJson('analyze-run-details.json', {
+      source: sourceRefUri,
+      method: result.method,
+      rows_used: result.n_rows_used,
+      set_a: setA,
+      set_b: setB,
+      ...result.params,
+    });
   };
 
   const heatmapChart = result
@@ -310,6 +439,7 @@ export default function AnalyzePage() {
     () =>
       buildAnalyzeContext({
         source,
+        columns: columnProfiles,
         setA,
         setB,
         result,
@@ -318,7 +448,7 @@ export default function AnalyzePage() {
         alpha,
         lag,
       }),
-    [source, setA, setB, result, qa, winsorize, log1p, zscore, difference, alpha, lag],
+    [source, columnProfiles, setA, setB, result, qa, winsorize, log1p, zscore, difference, alpha, lag],
   );
 
   return (
@@ -437,6 +567,64 @@ export default function AnalyzePage() {
               )}
             </Section>
 
+            {/* Analysis mode */}
+            <Section title="Analysis" hint="Correlation surfaces which variables move together. Regression fits an outcome (Y) on one or more predictors (X) and reports each driver's effect.">
+              <div className="flex gap-1 rounded-lg border border-line bg-surface p-1">
+                {(['correlate', 'regress'] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setMode(m)}
+                    className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                      mode === m ? 'bg-surface-raised text-foreground' : 'text-faint hover:text-muted'
+                    }`}
+                  >
+                    {m === 'regress' ? 'Regression' : 'Correlation'}
+                  </button>
+                ))}
+              </div>
+            </Section>
+
+            {/* Segmentation — applies to both modes; the time column also fixes
+                the ordering used by Difference / Lag (otherwise raw row order). */}
+            <Section title="Segmentation" hint="Optional. Segment to one slice (e.g. one channel), and set a time column so Difference / Lag order rows correctly.">
+              <label className="mb-1 block text-[11px] font-medium text-subtle">Group by</label>
+              <select
+                value={groupCol}
+                onChange={(e) => { setGroupCol(e.target.value); setGroupVal(''); }}
+                disabled={describing}
+                className="mb-2 w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground outline-none transition-colors focus:border-line-strong disabled:opacity-50"
+              >
+                <option value="">(whole dataset)</option>
+                {segmentColumns.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+              {groupCol && groupValues.length > 0 && (
+                <>
+                  <label className="mb-1 block text-[11px] font-medium text-subtle">Value</label>
+                  <select
+                    value={groupVal}
+                    onChange={(e) => setGroupVal(e.target.value)}
+                    className="mb-2 w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground outline-none transition-colors focus:border-line-strong"
+                  >
+                    <option value="">(all values)</option>
+                    {groupValues.map((v) => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </>
+              )}
+              <label className="mb-1 block text-[11px] font-medium text-subtle">Time column</label>
+              <select
+                value={timeCol}
+                onChange={(e) => setTimeCol(e.target.value)}
+                disabled={describing}
+                className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground outline-none transition-colors focus:border-line-strong disabled:opacity-50"
+              >
+                <option value="">(none)</option>
+                {datetimeColumns.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </Section>
+
+            {mode === 'correlate' && (
+            <>
             {/* Columns */}
             <Section title="Columns">
               <ColumnSelect label="Set A" hint="drivers" tip="Variables you think influence the outcome — e.g. spend, impressions. Only numeric columns can be correlated." columns={columnProfiles} selected={setA} onChange={setSetA} loading={describing} />
@@ -477,17 +665,60 @@ export default function AnalyzePage() {
               <Slider label="Lag B" value={lag} min={-12} max={12} step={1} onChange={setLag} hint="Shift Set B by N periods to test lead/lag — e.g. does spend predict next-week clicks." />
               <Slider label="Top N" value={topN} min={5} max={200} step={5} onChange={setTopN} hint="How many of the strongest correlations to list under Top signals." />
             </Section>
+            </>
+            )}
+
+            {mode === 'regress' && (
+            <>
+            {/* Target & predictors */}
+            <Section title="Target & predictors">
+              <label className="mb-1.5 block text-[11px] font-medium text-subtle">Outcome (Y)</label>
+              <select
+                value={regY}
+                onChange={(e) => setRegY(e.target.value)}
+                disabled={describing}
+                className="mb-3 w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground outline-none transition-colors focus:border-line-strong disabled:opacity-50"
+              >
+                <option value="">{describing ? 'Profiling…' : 'Select outcome…'}</option>
+                {numericColumns.map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+              <ColumnSelect
+                label="Predictors (X)"
+                hint="numeric"
+                tip="One or more drivers to fit the outcome on. Only numeric columns can be used."
+                columns={columnProfiles.filter((c) => c.name !== regY)}
+                selected={regX}
+                onChange={setRegX}
+                loading={describing}
+              />
+            </Section>
+
+            {/* Options */}
+            <Section title="Options">
+              <div className="grid grid-cols-2 gap-2">
+                <Toggle label="Intercept" checked={regConst} onChange={setRegConst} hint="Add a constant term — fits the baseline level of Y when all predictors are 0." />
+                <Toggle label="Z-Score" checked={regZscore} onChange={setRegZscore} hint="Standardize columns so coefficients are comparable across different scales." />
+                <Toggle label="Difference" checked={regDiff} onChange={setRegDiff} hint="Fit on period-over-period change — removes shared trends before regressing." />
+              </div>
+              <div className="mt-2">
+                <Slider label="Lag X" value={regLag} min={-12} max={12} step={1} onChange={setRegLag} hint="Shift the predictors by N periods to test lead/lag — does X predict a later Y." />
+              </div>
+            </Section>
+            </>
+            )}
           </div>
 
           {/* Run button — pinned to the bottom of the rail so it's always reachable. */}
           <div className="shrink-0 border-t border-line/60 p-3">
             <button
               type="button"
-              onClick={run}
-              disabled={!source || running}
+              onClick={mode === 'regress' ? runRegress : run}
+              disabled={!source || running || (mode === 'regress' && (!regY || regX.length === 0))}
               className="w-full rounded-lg bg-inverse px-3 py-2.5 text-xs font-semibold text-inverse-foreground transition-colors hover:bg-inverse/90 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {running ? 'Running…' : 'Run analysis'}
+              {running ? 'Running…' : mode === 'regress' ? 'Run regression' : 'Run analysis'}
             </button>
           </div>
         </aside>
@@ -531,10 +762,31 @@ export default function AnalyzePage() {
             );
           })()}
 
-          {!result ? (
-            <EmptyResults source={source} running={running} />
-          ) : (
+          {columnStats.length > 0 && (
+            <div className="mb-4 max-w-4xl">
+              <ColumnProfileTable columns={columnStats} />
+            </div>
+          )}
+
+          {mode === 'regress' ? (
+            regResult ? (
+              <RegressionResults result={regResult} alpha={alpha} />
+            ) : (
+              <EmptyResults source={source} running={running} />
+            )
+          ) : result ? (
             <div className="max-w-4xl space-y-6">
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={exportResults}
+                  title="Download top signals (CSV) + run details (JSON)"
+                  className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-medium text-muted transition-colors hover:border-line-strong hover:text-foreground"
+                >
+                  ⤓ Export
+                </button>
+              </div>
+
               {/* Heatmap */}
               {heatmapChart && (
                 <div className="rounded-xl border border-line/80 bg-surface-sunken/40 p-3">
@@ -542,17 +794,47 @@ export default function AnalyzePage() {
                 </div>
               )}
 
-              {/* Top signals */}
+              {/* Top signals — click a row to plot the pair below */}
               <TopSignalsTable
                 signals={result.top_signals}
                 alpha={alpha}
+                onRowClick={openScatter}
               />
+
+              {/* Scatter explorer */}
+              {(scatter || scatterLoading) && (
+                <div className="rounded-xl border border-line/80 bg-surface-sunken/40 p-3">
+                  {scatterLoading ? (
+                    <p className="px-2 py-10 text-center text-xs text-faint">Loading scatter…</p>
+                  ) : scatter && scatter.points.length > 0 ? (
+                    <VegaChart
+                      spec={scatterSpec({
+                        title: `${scatter.a} vs ${scatter.b}`,
+                        subtitle:
+                          scatter.r != null
+                            ? `r ${scatter.r.toFixed(3)} · ${scatter.n.toLocaleString()} points`
+                            : `${scatter.n} points`,
+                        data: scatter.points,
+                        xLabel: scatter.a,
+                        yLabel: scatter.b,
+                      })}
+                      saveable
+                    />
+                  ) : (
+                    <p className="px-2 py-10 text-center text-xs text-faint">
+                      Not enough points to plot this pair.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
+          ) : (
+            <EmptyResults source={source} running={running} />
           )}
         </main>
 
         {/* ── Analyze Assistant (pinned right rail) ─────────────────────── */}
-        <AnalyzeAssistantPanel contextPrefix={contextPrefix} />
+        <AnalyzeAssistantPanel contextPrefix={contextPrefix} sourceKey={sourceRefUri} />
       </div>
     </div>
   );
@@ -588,9 +870,11 @@ function EmptyResults({ source, running }: { source: SourceRef | null; running: 
 function TopSignalsTable({
   signals,
   alpha,
+  onRowClick,
 }: {
   signals: CorrelateResult['top_signals'];
   alpha: number;
+  onRowClick?: (a: string, b: string) => void;
 }) {
   const [sortKey, setSortKey] = useState<'r' | 'p'>('r');
 
@@ -650,7 +934,9 @@ function TopSignalsTable({
               return (
                 <tr
                   key={i}
-                  className="border-b border-line/60 transition-colors last:border-0 hover:bg-surface/30"
+                  onClick={() => onRowClick?.(s.a, s.b)}
+                  title="Plot this pair"
+                  className="cursor-pointer border-b border-line/60 transition-colors last:border-0 hover:bg-surface/30"
                 >
                   <Td><span className="text-muted">{s.a}</span></Td>
                   <Td><span className="text-muted">{s.b}</span></Td>

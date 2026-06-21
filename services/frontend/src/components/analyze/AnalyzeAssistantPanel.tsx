@@ -17,12 +17,19 @@ import ChatMessage from '../chat/ChatMessage';
 
 const ASSISTANT_AGENT = 'analyze_assistant_agent';
 
+// Sent automatically the first time a data source is selected, so the assistant
+// opens with a guided greeting instead of waiting. The [Analyze context]
+// preamble (columns + qa) rides along hidden, so this is all the user sees.
+const GREET_TRIGGER = "I just selected a data source — what should I analyze, and how?";
+
 interface PanelProps {
-  /** The current analysis preamble — empty string means "no analysis yet". */
+  /** The current analysis preamble — empty string means "no source selected". */
   contextPrefix: string;
+  /** Stable id of the selected source; a change re-greets for the new dataset. */
+  sourceKey: string;
 }
 
-export default function AnalyzeAssistantPanel({ contextPrefix }: PanelProps) {
+export default function AnalyzeAssistantPanel({ contextPrefix, sourceKey }: PanelProps) {
   const [input, setInput] = useState('');
   const { messages, isLoading, error, feedback, rateMessage, sendMessage, createNewSession } =
     useChat(ASSISTANT_AGENT);
@@ -31,6 +38,7 @@ export default function AnalyzeAssistantPanel({ contextPrefix }: PanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastMsgRef = useRef<HTMLDivElement>(null);
   const initRef = useRef(false);
+  const greetedKey = useRef<string | null>(null);
 
   // Create one session per panel mount so the user gets a clean transcript.
   useEffect(() => {
@@ -39,9 +47,17 @@ export default function AnalyzeAssistantPanel({ contextPrefix }: PanelProps) {
     createNewSession(ASSISTANT_AGENT);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useChatAutoScroll({ containerRef, endRef: messagesEndRef, lastMsgRef, messages });
-
   const ready = contextPrefix.length > 0;
+
+  // Auto-greet once per data source: when a source's context first becomes
+  // available, kick off the guided setup. Re-greets if the user switches source.
+  useEffect(() => {
+    if (!ready || !sourceKey || greetedKey.current === sourceKey) return;
+    greetedKey.current = sourceKey;
+    sendMessage(GREET_TRIGGER, contextPrefix);
+  }, [ready, sourceKey, contextPrefix]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useChatAutoScroll({ containerRef, endRef: messagesEndRef, lastMsgRef, messages });
 
   const handleSend = () => {
     const text = input.trim();
@@ -69,7 +85,7 @@ export default function AnalyzeAssistantPanel({ contextPrefix }: PanelProps) {
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-foreground">Analyze Assistant</p>
           <p className="text-[11px] text-faint">
-            {ready ? 'Reading your latest correlation result' : 'Run an analysis to start'}
+            {ready ? 'Guiding your analysis' : 'Pick a data source to start'}
           </p>
         </div>
         <button
@@ -119,7 +135,7 @@ export default function AnalyzeAssistantPanel({ contextPrefix }: PanelProps) {
                 handleSend();
               }
             }}
-            placeholder={ready ? 'Ask about this analysis…' : 'Run an analysis first…'}
+            placeholder={ready ? 'Ask about your data or this analysis…' : 'Pick a data source first…'}
             rows={2}
             disabled={!ready}
             className="flex-1 resize-none bg-transparent text-[13px] text-foreground placeholder-disabled outline-none disabled:cursor-not-allowed disabled:opacity-50"
@@ -153,9 +169,9 @@ function EmptyState({ ready, onAsk }: { ready: boolean; onAsk: (q: string) => vo
               d="M9 17v-2a4 4 0 014-4h0M5 12V7a4 4 0 014-4h0m6 18v-2a4 4 0 00-4-4H7m12 6v-2a4 4 0 00-4-4h-1" />
           </svg>
         </div>
-        <p className="text-sm font-semibold text-foreground">No analysis yet</p>
+        <p className="text-sm font-semibold text-foreground">Pick a data source</p>
         <p className="mt-1 text-xs leading-relaxed text-faint">
-          Pick a data source on the left, choose your columns, and click <b>Run analysis</b>. I&apos;ll help interpret what comes back.
+          Choose a source on the left and I&apos;ll greet you, suggest which columns are drivers vs KPIs, and walk you through running the analysis.
         </p>
       </div>
     );
