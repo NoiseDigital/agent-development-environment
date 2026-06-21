@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   signInWithEmailAndPassword,
@@ -10,6 +11,7 @@ import {
 
 import { auth, googleProvider } from "@/lib/firebase/client";
 import { track } from "@/lib/analytics/track";
+import { branding } from "@/config/tenant";
 
 // Exchange a freshly-signed-in user for an httpOnly session cookie, then go to
 // the originally-requested page. Surfaces the server's reason (e.g. a domain
@@ -82,8 +84,16 @@ function LoginForm() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
       <div className="w-full max-w-sm rounded-2xl border border-line bg-surface p-8 shadow-lg">
-        <h1 className="mb-1 text-2xl font-semibold text-foreground">NoiseOS</h1>
-        <p className="mb-6 text-sm text-foreground/60">Sign in to continue.</p>
+        <div className="mb-6 flex flex-col items-center text-center">
+          <Image
+            src={branding.logo}
+            alt={branding.brandName}
+            width={120}
+            height={32}
+            className={`mb-3 h-8 w-auto${branding.logoInvertOnLight ? " light:invert" : ""}`}
+          />
+          <p className="text-sm text-foreground/60">Sign in to continue.</p>
+        </div>
 
         <button
           onClick={onGoogle}
@@ -105,7 +115,7 @@ function LoginForm() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@noisedigital.com"
+            placeholder={`you@${branding.emailDomain}`}
             className="w-full rounded-lg border border-line bg-canvas px-3 py-2.5 text-sm text-foreground outline-none focus:border-foreground/30"
           />
           <input

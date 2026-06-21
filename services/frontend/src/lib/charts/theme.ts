@@ -2,11 +2,15 @@
 // declared once and applied to every chart shape, including ones no one has
 // hand-coded a renderer for.
 //
-// House style: emerald primary, rounded bar tops, faint dashed grid, no axis
-// domain lines, muted labels. The saturated data colors (emerald/blue/amber…)
-// are shared across themes so a chart's identity is stable; only the *chrome*
-// — label/title/grid/rule colors and the point halo — flips per theme. Build a
-// theme from one neutral palette so light and dark can never drift apart.
+// House style: rounded bar tops, faint dashed grid, no axis domain lines, muted
+// labels. The saturated DATA colors (bar/line/categorical/heatmap/ramp) come
+// from the active tenant's `branding.charts` (Noise = emerald/blue, its current
+// look); only the *chrome* — label/title/grid/rule colors and the point halo —
+// flips per theme. Build a theme from one neutral palette so light and dark can
+// never drift apart.
+import { branding } from '@/config/tenant';
+
+const CH = branding.charts;
 
 interface VegaNeutral {
   title: string; // chart + header title
@@ -83,10 +87,10 @@ function buildVegaTheme(c: VegaNeutral) {
     // is the fallback for hand-authored point marks so they match the line. The
     // point's thin stroke is the surface color so points read as "punched out"
     // of the line on either theme.
-    bar: { cornerRadiusEnd: 4, color: '#10b981' },
-    line: { stroke: '#3b82f6', strokeWidth: 2.5, interpolate: 'monotone', point: { filled: true, size: 45 } },
-    point: { fill: '#3b82f6', size: 45, filled: true, stroke: c.pointHalo, strokeWidth: 1 },
-    area: { line: { color: '#3b82f6', strokeWidth: 2 }, opacity: 0.9 },
+    bar: { cornerRadiusEnd: 4, color: CH.bar },
+    line: { stroke: CH.line, strokeWidth: 2.5, interpolate: 'monotone', point: { filled: true, size: 45 } },
+    point: { fill: CH.line, size: 45, filled: true, stroke: c.pointHalo, strokeWidth: 1 },
+    area: { line: { color: CH.line, strokeWidth: 2 }, opacity: 0.9 },
     rule: { color: c.rule },
     text: { fill: c.label, fontSize: 10 },
 
@@ -107,11 +111,11 @@ function buildVegaTheme(c: VegaNeutral) {
       titleColor: c.subtitle,
     },
 
-    // Palettes — emerald-led categorical, shared across themes.
+    // Palettes — from branding.charts (shared across light/dark per tenant).
     range: {
-      category: ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316'],
-      heatmap: ['#0b3b2e', '#0f766e', '#10b981', '#6ee7b7'],
-      ramp: ['#172554', '#1e40af', '#3b82f6', '#93c5fd'],
+      category: [...CH.categorical],
+      heatmap: [...CH.heatmap],
+      ramp: [...CH.ramp],
     },
   };
 }

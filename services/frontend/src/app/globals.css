@@ -52,6 +52,14 @@
   --c-accent-950: #172554;
   --c-accent:     #60a5fa;      /* readable accent on dark surfaces */
 
+  /* Ambient "ultrablur" field hues (the drifting neural orbs). Tokenized so a
+     tenant can re-tint the background via branding.palette; these defaults keep
+     Noise's look. */
+  --c-orb-a: rgba(16, 185, 129, 0.55);  /* emerald */
+  --c-orb-b: rgba(59, 130, 246, 0.55);  /* blue    */
+  --c-orb-c: rgba(139, 92, 246, 0.50);  /* violet  */
+  --c-orb-d: rgba(236, 72, 153, 0.42);  /* pink    */
+
   /* Status — semantic. Tinted backgrounds (bg-positive/10 …) read fine on both
      themes; these tokens carry the text/icon/border color. */
   --c-positive: #34d399;        /* success / online             (emerald-400) */
@@ -126,6 +134,7 @@
   --color-warning:  var(--c-warning);
 
   --font-sans: var(--font-geist-sans);
+  --font-display: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -391,10 +400,10 @@ body {
 
 /* Per-orb placement / palette / cadence. Durations are mutually prime so the
  * four orbs never beat-sync into a visible "everything lines up" moment. */
-.neural-orb-a { --size: 46rem; --x: 6%;  --y: 14%; --hue: rgba(16, 185, 129, 0.55); --base-op: 0.55; --drift: neuralDriftA; --dur: 41s; --breath: 17s; }
-.neural-orb-b { --size: 52rem; --x: 50%; --y: 38%; --hue: rgba(59, 130, 246, 0.55); --base-op: 0.55; --drift: neuralDriftB; --dur: 53s; --breath: 21s; }
-.neural-orb-c { --size: 40rem; --x: 28%; --y: 56%; --hue: rgba(139, 92, 246, 0.50); --base-op: 0.48; --drift: neuralDriftC; --dur: 47s; --breath: 19s; }
-.neural-orb-d { --size: 34rem; --x: 68%; --y: 4%;  --hue: rgba(236, 72, 153, 0.42); --base-op: 0.40; --drift: neuralDriftD; --dur: 59s; --breath: 23s; }
+.neural-orb-a { --size: 46rem; --x: 6%;  --y: 14%; --hue: var(--c-orb-a); --base-op: 0.55; --drift: neuralDriftA; --dur: 41s; --breath: 17s; }
+.neural-orb-b { --size: 52rem; --x: 50%; --y: 38%; --hue: var(--c-orb-b); --base-op: 0.55; --drift: neuralDriftB; --dur: 53s; --breath: 21s; }
+.neural-orb-c { --size: 40rem; --x: 28%; --y: 56%; --hue: var(--c-orb-c); --base-op: 0.48; --drift: neuralDriftC; --dur: 47s; --breath: 19s; }
+.neural-orb-d { --size: 34rem; --x: 68%; --y: 4%;  --hue: var(--c-orb-d); --base-op: 0.40; --drift: neuralDriftD; --dur: 59s; --breath: 23s; }
 
 @keyframes neuralBreathe {
   0%, 100% { transform: scale(0.95); }
