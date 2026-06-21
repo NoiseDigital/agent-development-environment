@@ -1,6 +1,8 @@
 {
   "projects": {
     "default": "nd-agentspace-sbx",
-    "sbx": "nd-agentspace-sbx"
+    "sbx": "nd-agentspace-sbx",
+    "noise-sbx": "nd-agentspace-sbx",
+    "csa-sbx": "nd-csa-sbx"
   }
 }

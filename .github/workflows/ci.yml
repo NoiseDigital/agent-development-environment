@@ -13,6 +13,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ── Discover tenants ──────────────────────────────────────────────────────
+  # Emits the tenant list from tenants/*.json so the per-tenant matrices below
+  # auto-cover every tenant — adding a tenant = drop a manifest, no CI edit.
+  discover-tenants:
+    name: Discover tenants
+    runs-on: ubuntu-latest
+    outputs:
+      tenants: ${{ steps.list.outputs.tenants }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: list
+        run: |
+          t=$(for f in tenants/*.json; do
+                b=$(basename "$f" .json)
+                [ "$b" != modules ] && printf '%s\n' "$b"
+              done | jq -R . | jq -sc .)
+          echo "tenants=$t" >> "$GITHUB_OUTPUT"
+          echo "tenants: $t"
+
   # ── Python backend lint + type check ──────────────────────────────────────
   backend-lint:
     name: Backend — ruff + mypy
@@ -69,6 +88,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Tenant manifests must be internally consistent (modules/agents/services
+      # exist, branding complete) before anything builds on them.
+      - name: Lint tenant manifests
+        run: node ../../scripts/lint-tenants.mjs
+
+      # The frontend tenant config is generated from tenants/*.json (the canonical
+      # manifests) into a committed file, since the Docker build can't read
+      # repo-root manifests. Verify it's in sync — like a lockfile freshness check.
+      - name: Tenant config is generated & committed
+        run: |
+          node ../../scripts/gen-tenant-config.mjs
+          git diff --exit-code src/config/tenants.gen.ts \
+            || { echo "::error::tenants.gen.ts is stale — run 'node scripts/gen-tenant-config.mjs' and commit it."; exit 1; }
+
       - name: ESLint
         run: npm run lint
 
@@ -77,6 +110,33 @@ jobs:
 
       - name: Vitest unit tests
         run: npm test
+
+  # ── Per-tenant frontend build ─────────────────────────────────────────────
+  # tsc/eslint/vitest run tenant-agnostic (default noise). A real production build
+  # per tenant catches build-time breaks the typecheck can't — a branding value
+  # that breaks the inline accent <style>, a module-gated import, a bad tenant.
+  # Auto-covers new tenants via the discover job.
+  frontend-build:
+    name: Frontend — build
+    runs-on: ubuntu-latest
+    needs: discover-tenants
+    strategy:
+      matrix:
+        tenant: ${{ fromJSON(needs.discover-tenants.outputs.tenants) }}
+    defaults:
+      run:
+        working-directory: services/frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: services/frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Build (tenant=${{ matrix.tenant }})
+        run: NEXT_PUBLIC_TENANT=${{ matrix.tenant }} npm run build
 
   # ── Backend unit tests (agent harness + lib tests) ────────────────────────
   backend-test:
@@ -184,6 +244,14 @@ jobs:
   terraform-check:
     name: Terraform — fmt + validate
     runs-on: ubuntu-latest
+    needs: discover-tenants
+    strategy:
+      matrix:
+        # Each tenant env calls module.tenant, so validating every tenant also
+        # validates the module through its DIFFERENT module-enablement path (noise
+        # deploys the toolbox, csa gates it off via count=0, exercising the [0]
+        # refs). Auto-covers new tenants via the discover job.
+        tenant: ${{ fromJSON(needs.discover-tenants.outputs.tenants) }}
     steps:
       - uses: actions/checkout@v7
 
@@ -193,11 +261,9 @@ jobs:
         working-directory: infra
         run: terraform fmt -check -recursive
 
-      # Validate the whole module tree through a concrete env (the noise tenant
-      # calls module.tenant, so this validates the module too). -backend=false
-      # skips the GCS backend; validate needs no var values.
-      - name: terraform validate
-        working-directory: infra/tenants/noise
+      # -backend=false skips the GCS backend; validate needs no var values.
+      - name: terraform validate (${{ matrix.tenant }})
+        working-directory: infra/tenants/${{ matrix.tenant }}
         run: |
           terraform init -backend=false
           terraform validate

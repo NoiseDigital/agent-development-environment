@@ -9,4 +9,4 @@ github_repo  = "agent-platform" # repo name (no owner)
 # State buckets are created as "<project>-tfstate" per entry below.
 
 # Tenant-stage projects the CI deployer may deploy into. Add stages as created.
-target_projects = ["nd-agentspace-sbx"]
+target_projects = ["nd-agentspace-sbx", "nd-csa-sbx"]

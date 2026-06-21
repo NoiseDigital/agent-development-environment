@@ -1,0 +1,43 @@
+{
+  "_comment": "Noise — the full platform tenant. enabledModules '*' means no gating: every module, every agent (ADK loads all of adk_agents/, ENABLED_AGENTS stays empty), every service. This keeps Noise byte-identical to the pre-multi-tenant platform.",
+  "id": "noise",
+  "projectPrefix": "nd-agentspace",
+  "enabledModules": "*",
+  "branding": {
+    "brandName": "NoiseOS",
+    "logo": "/noise/noise_white.svg",
+    "logoAlt": "Noise",
+    "logoInvertOnLight": true,
+    "emailDomain": "noisedigital.com",
+    "favicon": "/noise/noise_favicon.ico",
+    "accent": {
+      "100": "#dbeafe",
+      "300": "#93c5fd",
+      "400": "#60a5fa",
+      "500": "#3b82f6",
+      "600": "#2563eb",
+      "900": "#1e3a8a",
+      "950": "#172554",
+      "onDark": "#60a5fa",
+      "onLight": "#2563eb"
+    },
+    "defaultTheme": "system",
+    "font": {
+      "sans": "var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif",
+      "display": "var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif"
+    },
+    "charts": {
+      "bar": "#10b981",
+      "line": "#3b82f6",
+      "categorical": ["#10b981", "#3b82f6", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16", "#f97316"],
+      "heatmap": ["#0b3b2e", "#0f766e", "#10b981", "#6ee7b7"],
+      "ramp": ["#172554", "#1e40af", "#3b82f6", "#93c5fd"]
+    },
+    "palette": {
+      "--c-orb-a": "rgba(16, 185, 129, 0.55)",
+      "--c-orb-b": "rgba(59, 130, 246, 0.55)",
+      "--c-orb-c": "rgba(139, 92, 246, 0.50)",
+      "--c-orb-d": "rgba(236, 72, 153, 0.42)"
+    }
+  }
+}

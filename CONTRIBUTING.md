@@ -2,7 +2,7 @@
 
 ## Devcontainer Setup
 
-Open the repo in VS Code and select **Reopen in Container**. The **Start Services** task runs automatically on open and runs `scripts/start_services.sh`. It handles `.env` creation, GCP authentication, and starting core services (`postgres`, `mcp-toolbox`, `agent`, `frontend`). Optional profile MCP servers are started manually. See [README](README.md) for the full flow.
+Open the repo in VS Code and select **Reopen in Container**. Services are not auto-started — run a tenant task (**Terminal → Run Task → Start Services: noise**, or another tenant) to run `scripts/start_services.sh` for that tenant. It handles `.env` creation, GCP authentication, and starting that tenant's services (e.g. noise: `postgres`, `mcp-toolbox`, `agents`, `frontend`). Only one tenant's stack runs locally at a time. Optional profile MCP servers are started manually. See [README](README.md) for the full flow.
 
 **Git identity** — ensure git is configured on your host before opening the container, so your identity is available inside:
 

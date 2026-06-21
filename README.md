@@ -21,26 +21,26 @@
 
 ## Getting Started
 
-1. Enable automatic tasks:
-   - Command Palette → **Tasks: Manage Automatic Tasks in Folder** → **Allow Automatic Tasks in Folder**
+1. Open the repo in VS Code and select **Reopen in Container**.
 
-2. Open the repo in VS Code and select **Reopen in Container**.
+2. Pick a tenant to run: **Terminal → Run Task → Start Services: noise** (the full
+   platform) or **Start Services: csa**. Services are **not** auto-started — you
+   choose a tenant, since only one tenant's stack runs locally at a time (they
+   share host ports). The task runs `scripts/start_services.sh TENANT=<tenant>` and:
 
-3. The **Start Services** task runs automatically in a terminal panel and handles everything:
-
-- Runs `scripts/start_services.sh`
 - Creates `.env` from `.env.example` if it doesn't exist — review `GOOGLE_CLOUD_PROJECT` before first use
 - Prompts for GCP authentication if credentials are missing — click the URL, sign in, paste the code back
-- Starts core app services (`postgres`, `mcp-toolbox`, `agents`, `frontend`)
+- Starts that tenant's service set (e.g. noise runs `postgres`, `mcp-toolbox`, `agents`, `frontend`; csa drops `mcp-toolbox`), tearing down any other tenant's leftover services
 - Bootstraps optional MCP profile env files from `.env.example` to `.env` under `services/backend/mcp/images/` (except `google-ads`, which is synced from Secret Manager)
 
-   On subsequent opens, if credentials already exist the auth step is skipped and services start immediately.
+   On subsequent runs, if credentials already exist the auth step is skipped.
 
 1. Pre-commit hooks are installed automatically on first container create.
 
 2. All services should be up and running, attachable in their own VSCode windows
 
-> To restart services: **Terminal → Run Task → Start Services**
+> To switch/restart: run a different **Start Services: \<tenant\>** task (it tears
+> down the previous tenant's stack first).
 > To inspect compose logs: **Terminal → Run Task → Compose Logs**
 > GCP credentials are stored in the `gcloud_config` Docker volume and shared with all services that need ADC.
 

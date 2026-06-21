@@ -28,6 +28,9 @@ services:
       - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-global}
       - TOOLBOX_ENDPOINT=${TOOLBOX_ENDPOINT:-http://mcp-toolbox:5000}
       - MCP_STATS_URL=${MCP_STATS_URL:-http://mcp-stats:8080/sse}
+      # Agent allowlist for the active tenant (empty = load all). Set by
+      # start_services.sh from the module catalog; mirrors the deployed env.
+      - ENABLED_AGENTS=${ENABLED_AGENTS:-}
       - UV_LINK_MODE=copy
     depends_on:
       postgres:
@@ -296,6 +299,10 @@ services:
       # gateway URL stays private and the gateway can be internal-ingress in
       # prod. (Gateway proxies onward to the private agent / toolbox / stats.)
       - GATEWAY_URL=${GATEWAY_URL:-http://gateway:8080}
+      # Which tenant build to run (branding + enabled modules). Set by
+      # start_services.sh; the dev server reads it live (NEXT_PUBLIC_* is baked
+      # at build for the deployed image — see services/frontend/Dockerfile).
+      - NEXT_PUBLIC_TENANT=${NEXT_PUBLIC_TENANT:-noise}
       # Firebase Auth (client SDK, runs in the browser). Dev values pair with the
       # local emulator; the emulator host is the *browser-reachable* address
       # (published port on localhost), not the docker-network name. Per-tenant

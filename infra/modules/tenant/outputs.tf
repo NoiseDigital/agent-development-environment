@@ -40,7 +40,7 @@ output "service_accounts" {
     gateway   = google_service_account.gateway.email
     agent     = google_service_account.agent.email
     mcp_stats = google_service_account.mcp_stats.email
-    toolbox   = google_service_account.toolbox.email
+    toolbox   = local.deploy_toolbox ? google_service_account.toolbox[0].email : ""
   }
 }
 

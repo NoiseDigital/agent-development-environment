@@ -23,6 +23,8 @@ resource "google_service_account" "mcp_stats" {
 }
 
 resource "google_service_account" "toolbox" {
+  # Only created for tenants that deploy the toolbox (modules.tf).
+  count        = local.deploy_toolbox ? 1 : 0
   project      = local.project_id
   account_id   = "mcp-toolbox"
   display_name = "MCP toolbox runtime (${local.name_prefix})"
@@ -36,17 +38,22 @@ resource "google_service_account" "frontend" {
   display_name = "Frontend / BFF (${local.name_prefix})"
 }
 
-# Project-level role grants, flattened from a (sa_email -> roles) map.
+# Project-level role grants, flattened from a (sa_email -> roles) map. The
+# toolbox grant only exists for tenants that deploy the toolbox (modules.tf).
 locals {
+  _base_role_grants = {
+    (google_service_account.gateway.email) = ["roles/cloudsql.client", "roles/cloudtrace.agent"]
+    (google_service_account.agent.email)   = ["roles/cloudsql.client", "roles/aiplatform.user", "roles/cloudtrace.agent"]
+    # firebaseauth.admin: createSessionCookie/verifySessionCookie via the
+    # Identity Toolkit API (the BFF's session-cookie auth).
+    (google_service_account.frontend.email) = ["roles/firebaseauth.admin"]
+  }
+  _toolbox_role_grants = local.deploy_toolbox ? {
+    (google_service_account.toolbox[0].email) = ["roles/bigquery.dataViewer", "roles/bigquery.jobUser"]
+  } : {}
+
   project_role_grants = merge([
-    for sa, roles in {
-      (google_service_account.gateway.email) = ["roles/cloudsql.client", "roles/cloudtrace.agent"]
-      (google_service_account.agent.email)   = ["roles/cloudsql.client", "roles/aiplatform.user", "roles/cloudtrace.agent"]
-      (google_service_account.toolbox.email) = ["roles/bigquery.dataViewer", "roles/bigquery.jobUser"]
-      # firebaseauth.admin: createSessionCookie/verifySessionCookie via the
-      # Identity Toolkit API (the BFF's session-cookie auth).
-      (google_service_account.frontend.email) = ["roles/firebaseauth.admin"]
-      } : {
+    for sa, roles in merge(local._base_role_grants, local._toolbox_role_grants) : {
       for role in roles : "${sa}::${role}" => { sa = sa, role = role }
     }
   ]...)

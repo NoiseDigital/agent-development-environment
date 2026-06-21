@@ -1,0 +1,52 @@
+{
+  "_comment": "Platform module catalog — the single structural source of truth for what a 'module' is. A module bundles its frontend route, the ADK agents it needs, the extra backend services it requires, and any platform capabilities it switches on. Tenants enable a set of modules (see tenants/<id>.json); enabling a module flips its frontend nav/routes, its agents (ENABLED_AGENTS), and its infra services together. Consumed natively by Terraform (jsondecode), start_services.sh (jq), and the frontend (via scripts/gen-tenant-config.mjs). Keep agent/service names exactly matching the adk_agents/<name> dirs and the docker-compose / cloudrun service names.",
+
+  "core": {
+    "_comment": "Always deployed for every tenant, regardless of enabled modules.",
+    "agents": ["session_naming_agent"],
+    "services": ["gateway", "agents", "mcp-stats", "frontend"]
+  },
+
+  "modules": {
+    "plan": {
+      "label": "Plan",
+      "route": "/plan",
+      "description": "Build and edit media plans by client. Campaigns, lines, creatives — joined to live performance.",
+      "agents": ["data_agent"],
+      "services": ["mcp-toolbox"],
+      "capabilities": []
+    },
+    "dashboards": {
+      "label": "Dashboards",
+      "route": "/dashboards",
+      "description": "Access your reports and shared dashboards. Monitor performance across campaigns, clients, and channels.",
+      "agents": ["dashboard_insights_agent", "dashboard_editor_agent"],
+      "services": ["mcp-toolbox"],
+      "capabilities": ["floatingAssistant"]
+    },
+    "analyze": {
+      "label": "Analyze",
+      "route": "/analyze",
+      "description": "Correlate drivers against KPIs across any data source. Upload data, run the analysis, save the visuals.",
+      "agents": ["analyze_assistant_agent"],
+      "services": [],
+      "capabilities": []
+    },
+    "competitive": {
+      "label": "Competitive",
+      "route": "/competitive",
+      "description": "Estimate competitor media spend, share-of-voice, and model support from MediaRadar / Pathmatics exports.",
+      "agents": ["competitive_assistant_agent", "competitive_insights_agent"],
+      "services": [],
+      "capabilities": []
+    },
+    "agents": {
+      "label": "Agents",
+      "route": "/agents",
+      "description": "AI-powered agents for media analysis, timesheets, and more. Pick one to start a conversation.",
+      "agents": ["media_performance_agent", "timesheet_agent", "dashboard_editor_agent"],
+      "services": ["mcp-toolbox"],
+      "capabilities": ["floatingAssistant"]
+    }
+  }
+}

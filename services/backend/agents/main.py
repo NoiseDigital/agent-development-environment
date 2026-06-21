@@ -6,6 +6,7 @@ from pathlib import Path
 
 import uvicorn
 from google.adk.cli.fast_api import get_fast_api_app
+from google.adk.cli.utils.agent_loader import AgentLoader
 
 # Note: session naming + dashboard insights are no longer custom routes that
 # build their own genai.Client. They are now real ADK agents (the
@@ -28,6 +29,40 @@ logging.getLogger("uvicorn.access").addFilter(_MuteLivenessAccessLog())
 
 AGENTS_DIR = str(Path(__file__).resolve().parent / "adk_agents")
 
+
+class _AllowlistAgentLoader(AgentLoader):
+    """Restrict the ADK runtime to a tenant's enabled agents.
+
+    A tenant that enables only a subset of modules (e.g. CSA = analyze) sets
+    ENABLED_AGENTS to that subset's agents. `list_agents()` gates discovery
+    (/list-apps and the dev UI, which derives its list from it); `load_agent()`
+    enforces it so a disabled agent can't be reached by name either. When
+    ENABLED_AGENTS is empty (the full-platform tenant, Noise) the default
+    AgentLoader is used and every agent in adk_agents/ loads."""
+
+    def __init__(self, agents_dir: str, allowed: set[str]) -> None:
+        super().__init__(agents_dir)
+        self._allowed = frozenset(allowed)
+
+    def list_agents(self) -> list[str]:
+        return [name for name in super().list_agents() if name in self._allowed]
+
+    def load_agent(self, agent_name: str):
+        if agent_name not in self._allowed:
+            raise ValueError(f"Agent '{agent_name}' is not enabled for this tenant")
+        return super().load_agent(agent_name)
+
+
+# A tenant deploying a module subset constrains the runtime to those modules'
+# agents via ENABLED_AGENTS (comma-separated, set by Terraform / start_services
+# from the module catalog). Empty → load everything (Noise).
+_enabled_agents = {
+    a.strip() for a in os.environ.get("ENABLED_AGENTS", "").split(",") if a.strip()
+}
+_agent_loader = (
+    _AllowlistAgentLoader(AGENTS_DIR, _enabled_agents) if _enabled_agents else None
+)
+
 # ADK's artifact service handles CONTEXTUAL files within a chat — files a user
 # attaches to a message, and files an agent generates during a turn (read/written
 # via context.load_artifact / save_artifact). Backed by GCS in prod
@@ -37,6 +72,7 @@ AGENTS_DIR = str(Path(__file__).resolve().parent / "adk_agents")
 _gcs_bucket = os.environ.get("GCS_BUCKET")
 app = get_fast_api_app(
     agents_dir=AGENTS_DIR,
+    agent_loader=_agent_loader,
     session_service_uri=os.environ.get("DATABASE_URL"),
     artifact_service_uri=f"gs://{_gcs_bucket}" if _gcs_bucket else None,
     allow_origins=os.environ.get("ALLOWED_ORIGINS", "http://localhost").split(","),

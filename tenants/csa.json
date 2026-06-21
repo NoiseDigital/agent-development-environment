@@ -1,0 +1,44 @@
+{
+  "_comment": "CSA tenant. enabledModules is an explicit subset — 'analyze' (correlation) + 'competitive' (media spend estimator). Both run on the same minimal backend (gateway+agents+mcp-stats+frontend, no mcp-toolbox); ENABLED_AGENTS = session_naming_agent + analyze_assistant_agent; FloatingAssistant off.",
+  "_branding": "Vivid red ramp anchored on the Converged.AI brand red (#e50914). To retune: edit accent + run `node scripts/gen-tenant-config.mjs`. onDark/onLight = the readable accent text colour per theme. (Surfaces/fonts are the shared theme; ask to extend branding to override those too.)",
+  "id": "csa",
+  "projectPrefix": "nd-csa",
+  "enabledModules": ["analyze", "competitive"],
+  "branding": {
+    "brandName": "CSA",
+    "logo": "/csa/csa_white.png",
+    "logoAlt": "CSA",
+    "logoInvertOnLight": true,
+    "emailDomain": "globalservs.com",
+    "favicon": "/csa/csa_favicon.ico",
+    "accent": {
+      "100": "#fde3e4",
+      "300": "#f59a9e",
+      "400": "#ee5158",
+      "500": "#e50914",
+      "600": "#c20510",
+      "900": "#6b070f",
+      "950": "#45060a",
+      "onDark": "#f4636b",
+      "onLight": "#c20510"
+    },
+    "defaultTheme": "dark",
+    "font": {
+      "sans": "var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif",
+      "display": "var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif"
+    },
+    "charts": {
+      "bar": "#e50914",
+      "line": "#f4636b",
+      "categorical": ["#e50914", "#f4636b", "#c20510", "#ff8a93", "#f59e0b", "#06b6d4", "#84cc16", "#8b5cf6"],
+      "heatmap": ["#3c050e", "#6b070f", "#c20510", "#f4636b"],
+      "ramp": ["#45060a", "#6b070f", "#e50914", "#f4636b"]
+    },
+    "palette": {
+      "--c-orb-a": "rgba(229, 9, 20, 0.5)",
+      "--c-orb-b": "rgba(180, 5, 16, 0.42)",
+      "--c-orb-c": "rgba(120, 5, 12, 0.4)",
+      "--c-orb-d": "rgba(255, 82, 92, 0.32)"
+    }
+  }
+}

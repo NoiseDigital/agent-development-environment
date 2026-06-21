@@ -65,6 +65,56 @@ echo "Resolved compose host root:  $HOST_PROJECT_ROOT"
 
 cd "$PROJECT_ROOT"
 
+# ── Tenant selection ──────────────────────────────────────────────────────────
+# Which tenant's stack to run locally. Defaults to `noise` (the full platform),
+# so existing dev flow is unchanged. The enabled modules in tenants/<tenant>.json
+# derive the agent allowlist (ENABLED_AGENTS) and whether mcp-toolbox starts —
+# the SAME module catalog (tenants/modules.json) that Terraform uses for deploys,
+# so local and cloud agree on what a tenant gets. Override with: TENANT=csa.
+TENANT="${TENANT:-noise}"
+if [ ! -f "$PROJECT_ROOT/tenants/${TENANT}.json" ]; then
+    echo "✘ Unknown tenant '$TENANT' — no tenants/${TENANT}.json. Available:"
+    for f in "$PROJECT_ROOT"/tenants/*.json; do
+        b="$(basename "$f" .json)"
+        [ "$b" != "modules" ] && echo "    $b"
+    done
+    exit 1
+fi
+echo "Tenant: $TENANT"
+
+# Derive, from the module catalog: the agent allowlist (empty = load every
+# agent), whether mcp-toolbox is needed, and STOP_SERVICES — module services
+# this tenant does NOT use but another tenant might (so we tear them down when
+# switching tenants, since the stack shares one compose project + host ports).
+eval "$(python3 - "$TENANT" <<'PY'
+import json, pathlib, sys
+root = pathlib.Path("tenants")
+t = json.loads((root / f"{sys.argv[1]}.json").read_text())
+cat = json.loads((root / "modules.json").read_text())
+mods = t["enabledModules"]
+all_mod_svcs = set()
+for m in cat["modules"].values():
+    all_mod_svcs |= set(m.get("services", []))
+if mods == "*":
+    this_svcs = set(cat["core"].get("services", [])) | all_mod_svcs
+    print("ENABLED_AGENTS=")
+    print("WANT_TOOLBOX=1")
+else:
+    agents = set(cat["core"].get("agents", []))
+    this_svcs = set(cat["core"].get("services", []))
+    for m in mods:
+        agents |= set(cat["modules"][m]["agents"])
+        this_svcs |= set(cat["modules"][m]["services"])
+    print("ENABLED_AGENTS=" + ",".join(sorted(agents)))
+    print("WANT_TOOLBOX=" + ("1" if "mcp-toolbox" in this_svcs else "0"))
+print("STOP_SERVICES=" + " ".join(sorted(all_mod_svcs - this_svcs)))
+PY
+)"
+WANT_TOOLBOX="${WANT_TOOLBOX:-1}"
+export TENANT
+export NEXT_PUBLIC_TENANT="$TENANT"
+export ENABLED_AGENTS="${ENABLED_AGENTS:-}"
+
 # ── 1. Bootstrap .env ─────────────────────────────────────────────────────────
 if [ ! -f .env ]; then
     cp .env.example .env
@@ -96,6 +146,10 @@ set -a
 . ./.env
 set +a
 
+# GCP project for Gemini/Vertex is your dev project (GOOGLE_CLOUD_PROJECT from
+# .env) — the same for every tenant locally. A tenant's OWN GCP project is a
+# DEPLOY property (Terraform provisions per-tenant projects); locally the Gemini
+# call is stateless and no tenant data lives there, so there's nothing to isolate.
 GCLOUD_IMPERSONATION_ARGS=()
 if [ -n "${GOOGLE_IMPERSONATE_SERVICE_ACCOUNT:-}" ]; then
     GCLOUD_IMPERSONATION_ARGS=(--impersonate-service-account "$GOOGLE_IMPERSONATE_SERVICE_ACCOUNT")
@@ -188,11 +242,27 @@ docker compose \
 #   service_completed_successfully) → mcp-stats / frontend. firebase-emulator
 #   starts alongside for local Firebase Auth. `--wait` blocks until every
 #   long-running service is healthy (the one-shot migrate just needs exit 0).
+# The service set follows the tenant's enabled modules: mcp-toolbox only starts
+# for tenants whose modules need it (analyze-only tenants like csa skip it).
+UP_SERVICES=(postgres)
+[ "$WANT_TOOLBOX" = "1" ] && UP_SERVICES+=(mcp-toolbox)
+UP_SERVICES+=(migrate firebase-emulator gateway agents frontend mcp-stats "${TAGGING_SERVICES[@]}")
+
+# Tear down module services a PREVIOUS tenant left running that this tenant
+# doesn't use (one compose project + shared host ports, so they'd otherwise
+# linger). Profile-gated MCPs (google-ads/math/asana) are opt-in and untouched.
+if [ -n "${STOP_SERVICES:-}" ]; then
+    echo "Stopping services not in the $TENANT tenant: $STOP_SERVICES"
+    # shellcheck disable=SC2086 # intentional word-splitting of the service list
+    docker compose --project-directory "$HOST_PROJECT_ROOT" \
+        -f "$PROJECT_ROOT/docker-compose.yml" rm -sf $STOP_SERVICES >/dev/null 2>&1 || true
+fi
+
 COMPOSE_IGNORE_ORPHANS=1 docker compose \
     --project-directory "$HOST_PROJECT_ROOT" \
     -f "$PROJECT_ROOT/docker-compose.yml" \
     up -d --no-build --wait --wait-timeout 180 \
-    postgres mcp-toolbox migrate firebase-emulator gateway agents frontend mcp-stats "${TAGGING_SERVICES[@]}"
+    "${UP_SERVICES[@]}"
 
 # Reconcile each Python service's /opt/venv with its (bind-mounted) uv.lock.
 # `uv run` only syncs at container *start*, and `up` won't recreate an already-

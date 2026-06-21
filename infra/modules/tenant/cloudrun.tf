@@ -93,14 +93,22 @@ resource "google_cloud_run_v2_service" "agent" {
         name  = "GCS_BUCKET"
         value = google_storage_bucket.uploads.name
       }
-      # Internal service URLs the agent calls (mirrors compose).
+      # Internal service URLs the agent calls (mirrors compose). Toolbox endpoint
+      # is empty when this tenant doesn't deploy the toolbox (e.g. analyze-only).
       env {
         name  = "TOOLBOX_ENDPOINT"
-        value = local.run_url["mcp-toolbox"]
+        value = local.deploy_toolbox ? local.run_url["mcp-toolbox"] : ""
       }
       env {
         name  = "MCP_STATS_URL"
         value = "${local.run_url["mcp-stats"]}/sse"
+      }
+      # Restrict the ADK runtime to this tenant's enabled modules' agents. Empty
+      # for the full-platform tenant (load all). Derived from the module catalog
+      # in modules.tf.
+      env {
+        name  = "ENABLED_AGENTS"
+        value = local.enabled_agents
       }
     }
   }
@@ -166,6 +174,9 @@ resource "google_cloud_run_v2_service" "mcp_stats" {
 # (the upstream toolbox image with tools.yaml baked in). Seeded with the
 # placeholder; CI rolls the real image.
 resource "google_cloud_run_v2_service" "mcp_toolbox" {
+  # Only tenants whose enabled modules need the toolbox deploy it (derived in
+  # modules.tf). Analyze-only tenants (e.g. csa) skip it entirely.
+  count               = local.deploy_toolbox ? 1 : 0
   project             = local.project_id
   name                = "mcp-toolbox"
   location            = var.region
@@ -178,7 +189,7 @@ resource "google_cloud_run_v2_service" "mcp_toolbox" {
   custom_audiences = [local.run_url["mcp-toolbox"]]
 
   template {
-    service_account = google_service_account.toolbox.email
+    service_account = google_service_account.toolbox[0].email
     containers {
       image = var.placeholder_image
       ports { container_port = 8080 }
@@ -260,11 +271,12 @@ resource "google_cloud_run_v2_service" "gateway" {
         value = google_storage_bucket.uploads.name
       }
       # The gateway is the dashboards BFF — it queries the Toolbox for tile data
-      # (api/toolbox.py). Without this it falls back to the local-compose
-      # hostname and can't resolve it on Cloud Run.
+      # (api/toolbox.py). Empty when the tenant doesn't deploy the toolbox; the
+      # client is lazy and only the dashboards/plan routes touch it (gated off in
+      # the frontend for those tenants).
       env {
         name  = "TOOLBOX_ENDPOINT"
-        value = local.run_url["mcp-toolbox"]
+        value = local.deploy_toolbox ? local.run_url["mcp-toolbox"] : ""
       }
       # Access control is enforced by default (the gateway only relaxes when
       # GATEWAY_DEV_AUTH is set, which Cloud Run never does). Bootstrap admins
@@ -402,21 +414,27 @@ resource "google_cloud_run_v2_service_iam_member" "gateway_from_bff" {
 # custom audience) AND must hold run.invoker on the target. One grant per
 # caller→target edge; the network boundary is defence-in-depth on top.
 resource "google_cloud_run_v2_service_iam_member" "internal_invokers" {
-  for_each = {
-    # the gateway proxies browser traffic to the agent + stats, and renders
-    # dashboard tiles via the toolbox.
-    agents_from_gateway  = { service = google_cloud_run_v2_service.agent.name, caller = google_service_account.gateway.email }
-    stats_from_gateway   = { service = google_cloud_run_v2_service.mcp_stats.name, caller = google_service_account.gateway.email }
-    toolbox_from_gateway = { service = google_cloud_run_v2_service.mcp_toolbox.name, caller = google_service_account.gateway.email }
-    # the agent loads Toolbox toolsets and (media agent) the stats MCP directly.
-    toolbox_from_agent = { service = google_cloud_run_v2_service.mcp_toolbox.name, caller = google_service_account.agent.email }
-    stats_from_agent   = { service = google_cloud_run_v2_service.mcp_stats.name, caller = google_service_account.agent.email }
-    # mcp-stats calls the gateway to resolve an upload's storage key
-    # (services/backend/mcp/stats/resolve.py). Safe from an apply cycle: the
-    # gateway reaches mcp-stats via local.run_url (a deterministic string, NOT a
-    # resource ref), so there's no gateway→stats resource edge to close the loop.
-    gateway_from_stats = { service = google_cloud_run_v2_service.gateway.name, caller = google_service_account.mcp_stats.email }
-  }
+  # Toolbox edges only exist for tenants that deploy the toolbox (modules.tf).
+  for_each = merge(
+    {
+      # the gateway proxies browser traffic to the agent + stats.
+      agents_from_gateway = { service = google_cloud_run_v2_service.agent.name, caller = google_service_account.gateway.email }
+      stats_from_gateway  = { service = google_cloud_run_v2_service.mcp_stats.name, caller = google_service_account.gateway.email }
+      # the agent (media agent) calls the stats MCP directly.
+      stats_from_agent = { service = google_cloud_run_v2_service.mcp_stats.name, caller = google_service_account.agent.email }
+      # mcp-stats calls the gateway to resolve an upload's storage key
+      # (services/backend/mcp/stats/resolve.py). Safe from an apply cycle: the
+      # gateway reaches mcp-stats via local.run_url (a deterministic string, NOT a
+      # resource ref), so there's no gateway→stats resource edge to close the loop.
+      gateway_from_stats = { service = google_cloud_run_v2_service.gateway.name, caller = google_service_account.mcp_stats.email }
+    },
+    local.deploy_toolbox ? {
+      # the gateway renders dashboard tiles via the toolbox; the agent loads
+      # Toolbox toolsets.
+      toolbox_from_gateway = { service = google_cloud_run_v2_service.mcp_toolbox[0].name, caller = google_service_account.gateway.email }
+      toolbox_from_agent   = { service = google_cloud_run_v2_service.mcp_toolbox[0].name, caller = google_service_account.agent.email }
+    } : {},
+  )
   project  = local.project_id
   location = var.region
   name     = each.value.service

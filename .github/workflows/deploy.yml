@@ -30,6 +30,11 @@ env:
   REGION: ${{ vars.GCP_REGION }}
   PROJECT: ${{ vars.DEPLOY_PROJECT }}
   AR: ${{ vars.ARTIFACT_REGISTRY }} # e.g. us-central1-docker.pkg.dev/<proj>/platform
+  # Which tenant build this environment deploys (branding + enabled modules,
+  # baked into the frontend image). Defaults to noise so existing envs need no
+  # change. The frontend image is tagged per-tenant (the brand is baked in);
+  # backend images are tenant-agnostic (config comes from Cloud Run env).
+  FE_TENANT: ${{ vars.NEXT_PUBLIC_TENANT || 'noise' }}
 
 jobs:
   deploy:
@@ -104,14 +109,15 @@ jobs:
           # Set vars.NEXT_PUBLIC_GA_MEASUREMENT_ID + vars.NEXT_PUBLIC_GA_SERVER_CONTAINER_URL
           # (the sgtm_url TF output) to light it up.
           docker build --target runner \
+            --build-arg NEXT_PUBLIC_TENANT="$FE_TENANT" \
             --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID="$PROJECT" \
             --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="$PROJECT.firebaseapp.com" \
             --build-arg NEXT_PUBLIC_FIREBASE_APP_ID="${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}" \
             --build-arg NEXT_PUBLIC_FIREBASE_API_KEY="$API_KEY" \
             --build-arg NEXT_PUBLIC_GA_MEASUREMENT_ID="${{ vars.NEXT_PUBLIC_GA_MEASUREMENT_ID }}" \
             --build-arg NEXT_PUBLIC_GA_SERVER_CONTAINER_URL="${{ vars.NEXT_PUBLIC_GA_SERVER_CONTAINER_URL }}" \
-            -t "$AR/frontend:$SHA" services/frontend
-          docker push "$AR/frontend:$SHA"
+            -t "$AR/frontend:$FE_TENANT-$SHA" services/frontend
+          docker push "$AR/frontend:$FE_TENANT-$SHA"
 
       # ── Migrate FIRST (only when the gateway/migrations changed) ─────────────
       - name: Run DB migrations
@@ -124,9 +130,17 @@ jobs:
             --region "$REGION" --project "$PROJECT" --wait
 
       # ── Roll the changed services (private ones first, gateway last) ─────────
+      # mcp-toolbox is module-gated in Terraform (tenants whose modules don't need
+      # it — e.g. csa/analyze-only — have no such service), so guard like sgtm.
       - name: Deploy mcp-toolbox
         if: ${{ steps.changed.outputs.mcp_toolbox == 'true' || github.event_name == 'workflow_dispatch' }}
-        run: gcloud run deploy "mcp-toolbox" --image "$AR/mcp-toolbox:$SHA" --region "$REGION" --project "$PROJECT"
+        run: |
+          set -euo pipefail
+          if gcloud run services describe "mcp-toolbox" --region "$REGION" --project "$PROJECT" >/dev/null 2>&1; then
+            gcloud run deploy "mcp-toolbox" --image "$AR/mcp-toolbox:$SHA" --region "$REGION" --project "$PROJECT"
+          else
+            echo "mcp-toolbox not provisioned for this tenant (no enabling module) — skipping deploy"
+          fi
       - name: Deploy agents
         if: ${{ steps.changed.outputs.agents == 'true' || github.event_name == 'workflow_dispatch' }}
         run: gcloud run deploy "agents" --image "$AR/agents:$SHA" --region "$REGION" --project "$PROJECT"
@@ -148,7 +162,7 @@ jobs:
         run: gcloud run deploy "gateway" --image "$AR/gateway:$SHA" --region "$REGION" --project "$PROJECT"
       - name: Deploy frontend
         if: ${{ steps.changed.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
-        run: gcloud run deploy "frontend" --image "$AR/frontend:$SHA" --region "$REGION" --project "$PROJECT"
+        run: gcloud run deploy "frontend" --image "$AR/frontend:$FE_TENANT-$SHA" --region "$REGION" --project "$PROJECT"
 
       # ── Post-deploy smoke test ───────────────────────────────────────────────
       # Hits the public frontend on the request path — verifies the live state
@@ -160,12 +174,11 @@ jobs:
           echo "Frontend: $FE"
 
           echo "→ app reachable (production build + middleware)"
+          # Tenant-agnostic: every tenant serves / and the login route. (No
+          # per-tenant asset check — brand assets differ across tenants.)
           code="$(curl -sS -o /dev/null -w '%{http_code}' "$FE/")"
           echo "  GET / -> $code"
           case "$code" in 2*|3*) ;; *) echo "::error::frontend not reachable ($code)"; exit 1 ;; esac
-
-          echo "→ static asset served (build output + middleware matcher)"
-          curl -fsS -o /dev/null -w "  GET /noise_white.svg -> %{http_code}\n" "$FE/noise_white.svg"
 
           echo "→ BFF → IAM token → gateway hop (unauthenticated /me must be a real 401)"
           # The body proves the request reached the gateway APP (its current_user
