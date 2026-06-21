@@ -69,10 +69,11 @@ export {
 // Hydrator for user-created dashboards.
 export { dashboardFromSpec } from './user-dashboards';
 
-// The registry of code-defined client dashboards. This replaces the old
-// `mockDashboards` export — same shape, clearer name (and no more
-// "mock", which lied: these are the canonical client dashboards).
-import { clientDashboards } from './clients';
+// The registry of code-defined client dashboards — sourced from the ACTIVE
+// tenant's content (data/tenants/<id>/, via the @tenant-content build alias).
+// Consumers keep importing it from this barrel; the per-tenant resolution is
+// invisible to them.
+import { clientDashboards } from '@tenant-content';
 import type { Dashboard } from './types';
 
 export { clientDashboards };

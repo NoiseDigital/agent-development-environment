@@ -11,8 +11,13 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     // Match the tsconfig `@/*` → `src/*` path alias so tests resolve it too.
+    // @tenant-content is a build-time alias (next.config.ts); tests run against
+    // the noise tenant's content. Keep these in sync with next.config.ts.
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@tenant-content': fileURLToPath(
+        new URL('./src/data/tenants/noise', import.meta.url),
+      ),
     },
   },
   test: {

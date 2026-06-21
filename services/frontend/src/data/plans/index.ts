@@ -32,4 +32,6 @@ export {
   PUBLISHERS,
 } from './primitives';
 
-export { clientPlans } from './clients';
+// Sourced from the ACTIVE tenant's content (data/tenants/<id>/, via the
+// @tenant-content build alias). Consumers import it from this barrel unchanged.
+export { clientPlans } from '@tenant-content';

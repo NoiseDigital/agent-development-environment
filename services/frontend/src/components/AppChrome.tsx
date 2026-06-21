@@ -11,6 +11,7 @@ import NeuralBackground from "./NeuralBackground";
 import Toaster from "./ui/Toaster";
 import { useAuth } from "@/lib/firebase/auth-context";
 import { AppsProvider } from "@/contexts/AppsContext";
+import { showFloatingAssistant } from "@/config/tenant";
 
 export default function AppChrome({
   children,
@@ -70,7 +71,7 @@ export default function AppChrome({
           {children}
         </div>
       </div>
-      <FloatingAssistant />
+      {showFloatingAssistant && <FloatingAssistant />}
       <Toaster />
     </AppsProvider>
   );

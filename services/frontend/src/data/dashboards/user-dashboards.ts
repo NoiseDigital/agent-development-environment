@@ -8,14 +8,14 @@
 // definitions — user dashboards are owned by the creator (ownership =
 // "owned"), not by a client, and they always use the standard tab set.
 
-import { clientBySlug } from '../clients';
+import { defaultClient } from '../clients';
 import type { UserDashboardSpec } from '../../lib/dashboards/user-dashboards';
 import type { Dashboard } from './types';
 import { buildStandardTabs } from './tabs';
 
 /** Hydrate a user-created dashboard spec into a full Dashboard. */
 export function dashboardFromSpec(spec: UserDashboardSpec): Dashboard {
-  const client = clientBySlug('noi'); // single client today
+  const client = defaultClient(); // scope to the tenant's primary client
   let tabs = buildStandardTabs(spec.id);
   if (spec.defaultTabId) {
     const i = tabs.findIndex((t) => t.id === spec.defaultTabId);

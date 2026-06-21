@@ -25,6 +25,12 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@tenant-content": [
+        "./src/data/tenants/noise"
+      ],
+      "@tenant-content/*": [
+        "./src/data/tenants/noise/*"
       ]
     }
   },

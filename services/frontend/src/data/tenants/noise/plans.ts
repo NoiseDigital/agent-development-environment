@@ -7,8 +7,8 @@
 // reshape `campaigns`. Everything else (the spreadsheet, the perf join,
 // the history drawer) reads off this shape with no other edits.
 
-import { clientBySlug } from '../../clients';
-import type { ClientPlan } from '../types';
+import { clientBySlug } from '@/data/clients';
+import type { ClientPlan } from '@/data/plans/types';
 
 const client = clientBySlug('noi');
 
@@ -80,3 +80,6 @@ export const noiPlan: ClientPlan = {
     },
   ],
 };
+
+// Registry of this tenant's code-defined client plans.
+export const clientPlans: ClientPlan[] = [noiPlan];

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { Dashboard } from '../../data/dashboards';
 import { canShareExternally, dashboardTitle } from '../../lib/dashboards/access';
 import { showToast } from '../../lib/toast';
+import { branding } from '../../config/tenant';
 
 // A modern share dialog — people + roles + general access, in the shape users
 // expect from Google Docs / Notion. Presentational for now: invites and roles
@@ -29,7 +30,7 @@ export default function ShareDashboardModal({
 }) {
   const externalShare = canShareExternally(dashboard);
   const [people, setPeople] = useState<Person[]>([
-    { name: 'You', email: 'you@noisedigital.com', role: 'Owner' },
+    { name: 'You', email: `you@${branding.emailDomain}`, role: 'Owner' },
   ]);
   const [invite, setInvite] = useState('');
   const [inviteRole, setInviteRole] = useState<Role>('Viewer');

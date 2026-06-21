@@ -4,9 +4,9 @@
 // changing the seed, and (only if needed) replacing `buildStandardTabs`
 // with a bespoke composition.
 
-import { clientBySlug } from '../../clients';
-import type { Dashboard } from '../types';
-import { buildStandardTabs } from '../tabs';
+import { clientBySlug } from '@/data/clients';
+import type { Dashboard } from '@/data/dashboards/types';
+import { buildStandardTabs } from '@/data/dashboards/tabs';
 
 export const noiDashboard: Dashboard = (() => {
   const client = clientBySlug('noi');
@@ -26,3 +26,6 @@ export const noiDashboard: Dashboard = (() => {
     tabs: buildStandardTabs('NOI'),
   };
 })();
+
+// Registry of this tenant's code-defined client dashboards.
+export const clientDashboards: Dashboard[] = [noiDashboard];

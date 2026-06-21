@@ -19,10 +19,12 @@ import type {
   PlanEdit,
   PlanLine,
 } from '../../data/plans/types';
-import { clientPlans } from '../../data/plans/clients';
+import { clientPlans } from '@/data/plans';
+import { TENANT } from '@/config/tenant';
 
-const OVERRIDES_KEY = 'noise:plan-overrides';
-const HISTORY_KEY = 'noise:plan-history';
+// Tenant-scoped so one tenant's local plan edits never bleed into another's.
+const OVERRIDES_KEY = `${TENANT}:plan-overrides`;
+const HISTORY_KEY = `${TENANT}:plan-history`;
 
 /** Most recent history entries kept per line. The drawer shows the latest
  *  N; deeper history will live server-side once persistence moves there. */

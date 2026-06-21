@@ -315,6 +315,281 @@ export function barSpec(opts: {
   };
 }
 
+/** A stacked bar — share-of-voice by brand within each market (normalized to
+ *  100%), or support-band counts per market. `category` is the x-axis group,
+ *  `series` is the stack color. Set `normalize` for share (% axis). */
+export function stackedBarSpec(opts: {
+  title?: string;
+  subtitle?: string;
+  data: { category: string; series: string; value: number }[];
+  categoryLabel?: string;
+  seriesLabel?: string;
+  /** compactNum format for the raw value (counts/spend); ignored when normalized. */
+  valueFormat?: string;
+  normalize?: boolean;
+}): VegaSpec {
+  const fmt = opts.valueFormat;
+  return {
+    ...(opts.title
+      ? { title: opts.subtitle ? { text: opts.title, subtitle: opts.subtitle } : opts.title }
+      : {}),
+    data: { values: opts.data },
+    mark: { type: 'bar', cursor: 'pointer' },
+    encoding: {
+      x: {
+        field: 'category',
+        type: 'nominal',
+        title: opts.categoryLabel ?? null,
+        axis: { labelAngle: 0, labelOverlap: true },
+      },
+      y: {
+        field: 'value',
+        type: 'quantitative',
+        stack: opts.normalize ? 'normalize' : 'zero',
+        title: null,
+        axis: opts.normalize
+          ? { format: '.0%' }
+          : { ...(fmt ? { format: fmt } : {}), formatType: 'compactNum' },
+      },
+      color: { field: 'series', type: 'nominal', title: opts.seriesLabel ?? null },
+      order: { field: 'value', type: 'quantitative', sort: 'descending' },
+      tooltip: [
+        { field: 'category', title: opts.categoryLabel ?? 'Group' },
+        { field: 'series', title: opts.seriesLabel ?? 'Series' },
+        {
+          field: 'value',
+          type: 'quantitative',
+          ...(opts.normalize
+            ? { format: '.1%' }
+            : { ...(fmt ? { format: fmt } : {}), formatType: 'compactNum' }),
+          title: 'Value',
+        },
+      ],
+    },
+  };
+}
+
+/** A low–high estimate range per category with a base-estimate tick. Horizontal
+ *  so long brand/market names fit. Communicates that the spend estimate is a
+ *  directional band, not a point. */
+export function rangeBarSpec(opts: {
+  title?: string;
+  subtitle?: string;
+  data: { name: string; low: number; base: number; high: number }[];
+  valueFormat?: string;
+}): VegaSpec {
+  const fmt = opts.valueFormat ?? '$';
+  return {
+    ...(opts.title
+      ? { title: opts.subtitle ? { text: opts.title, subtitle: opts.subtitle } : opts.title }
+      : {}),
+    data: { values: opts.data },
+    encoding: { y: { field: 'name', type: 'nominal', sort: '-x', title: null } },
+    layer: [
+      {
+        mark: { type: 'bar', opacity: 0.3, cornerRadius: 3 },
+        encoding: {
+          x: {
+            field: 'low',
+            type: 'quantitative',
+            title: null,
+            axis: { format: fmt, formatType: 'compactNum' },
+          },
+          x2: { field: 'high' },
+          tooltip: [
+            { field: 'name', title: 'Name' },
+            { field: 'low', type: 'quantitative', format: fmt, formatType: 'compactNum', title: 'Low' },
+            { field: 'base', type: 'quantitative', format: fmt, formatType: 'compactNum', title: 'Base' },
+            { field: 'high', type: 'quantitative', format: fmt, formatType: 'compactNum', title: 'High' },
+          ],
+        },
+      },
+      {
+        mark: { type: 'tick', thickness: 2.5, size: 18, color: '#a1a1aa' },
+        encoding: { x: { field: 'base', type: 'quantitative' } },
+      },
+    ],
+  };
+}
+
+/** A forecast fan chart — a modeled history line, a dashed central projection,
+ *  and nested 80/90/95% prediction-interval bands. Communicates that the
+ *  forecast is a widening cone of uncertainty, not a single line. */
+export function forecastFanSpec(opts: {
+  title?: string;
+  subtitle?: string;
+  history: { month: string; value: number }[];
+  forecast: {
+    month: string;
+    central: number;
+    lo80: number; hi80: number;
+    lo90: number; hi90: number;
+    lo95: number; hi95: number;
+  }[];
+  valueFormat?: string;
+}): VegaSpec {
+  const fmt = opts.valueFormat ?? '$';
+  const yAxis = fmt === '%' ? { format: '.0%' } : { format: fmt, formatType: 'compactNum' };
+  const valTip =
+    fmt === '%' ? { format: '.1%' } : { format: fmt, formatType: 'compactNum' };
+  const band = (lo: string, hi: string, opacity: number) => ({
+    data: { values: opts.forecast },
+    mark: { type: 'area', opacity, color: '#9ca3af' },
+    encoding: {
+      x: { field: 'month', type: 'temporal', title: null },
+      y: { field: lo, type: 'quantitative' },
+      y2: { field: hi },
+    },
+  });
+  return {
+    ...(opts.title
+      ? { title: opts.subtitle ? { text: opts.title, subtitle: opts.subtitle } : opts.title }
+      : {}),
+    layer: [
+      band('lo95', 'hi95', 0.12),
+      band('lo90', 'hi90', 0.16),
+      band('lo80', 'hi80', 0.22),
+      {
+        data: { values: opts.history },
+        mark: { type: 'line', point: { filled: true, size: 30 } },
+        encoding: {
+          x: { field: 'month', type: 'temporal', title: null },
+          y: { field: 'value', type: 'quantitative', title: null, axis: yAxis },
+          tooltip: [
+            { field: 'month', type: 'temporal', title: 'Month' },
+            { field: 'value', type: 'quantitative', ...valTip, title: 'Modeled' },
+          ],
+        },
+      },
+      {
+        data: { values: opts.forecast },
+        mark: { type: 'line', strokeDash: [4, 3], color: '#a1a1aa' },
+        encoding: {
+          x: { field: 'month', type: 'temporal' },
+          y: { field: 'central', type: 'quantitative' },
+          tooltip: [
+            { field: 'month', type: 'temporal', title: 'Month' },
+            { field: 'central', type: 'quantitative', ...valTip, title: 'Forecast' },
+            { field: 'lo90', type: 'quantitative', ...valTip, title: '90% low' },
+            { field: 'hi90', type: 'quantitative', ...valTip, title: '90% high' },
+          ],
+        },
+      },
+    ],
+  };
+}
+
+/** A multi-series temporal line — one line per series (brand), optional dashed
+ *  segments via a `phase` field (history vs forecast). */
+export function multiLineSpec(opts: {
+  title?: string;
+  subtitle?: string;
+  data: { month: string; value: number; series: string; phase?: string }[];
+  valueFormat?: string;
+}): VegaSpec {
+  const fmt = opts.valueFormat ?? '$';
+  const yAxis = fmt === '%' ? { format: '.0%' } : { format: fmt, formatType: 'compactNum' };
+  const valTip =
+    fmt === '%' ? { format: '.1%' } : { format: fmt, formatType: 'compactNum' };
+  return {
+    ...(opts.title
+      ? { title: opts.subtitle ? { text: opts.title, subtitle: opts.subtitle } : opts.title }
+      : {}),
+    data: { values: opts.data },
+    mark: { type: 'line', point: false },
+    encoding: {
+      x: { field: 'month', type: 'temporal', title: null },
+      y: { field: 'value', type: 'quantitative', title: null, axis: yAxis },
+      color: { field: 'series', type: 'nominal', title: null },
+      strokeDash: { field: 'phase', type: 'nominal', legend: null },
+      tooltip: [
+        { field: 'series', title: 'Brand' },
+        { field: 'month', type: 'temporal', title: 'Month' },
+        { field: 'value', type: 'quantitative', ...valTip, title: 'Value' },
+      ],
+    },
+  };
+}
+
+/** Actual-vs-predicted scatter for a regression fit. The dashed y=x reference
+ *  line is the perfect-fit diagonal: points hugging it are well-predicted, points
+ *  far from it are residuals worth inspecting. */
+export function fitScatterSpec(opts: {
+  title?: string;
+  subtitle?: string;
+  data: readonly { actual: number; predicted: number }[];
+}): VegaSpec {
+  const vals = opts.data.flatMap((d) => [d.actual, d.predicted]);
+  const lo = vals.length ? Math.min(...vals) : 0;
+  const hi = vals.length ? Math.max(...vals) : 1;
+  return {
+    ...(opts.title
+      ? { title: opts.subtitle ? { text: opts.title, subtitle: opts.subtitle } : opts.title }
+      : {}),
+    layer: [
+      {
+        data: { values: [{ v: lo }, { v: hi }] },
+        mark: { type: 'line', color: '#52525b', strokeDash: [4, 4], strokeWidth: 1 },
+        encoding: {
+          x: { field: 'v', type: 'quantitative' },
+          y: { field: 'v', type: 'quantitative' },
+        },
+      },
+      {
+        data: { values: opts.data },
+        mark: { type: 'point', filled: true, opacity: 0.6 },
+        encoding: {
+          x: { field: 'actual', type: 'quantitative', title: 'Actual', scale: { domain: [lo, hi] }, axis: { formatType: 'compactNum' } },
+          y: { field: 'predicted', type: 'quantitative', title: 'Predicted', scale: { domain: [lo, hi] }, axis: { formatType: 'compactNum' } },
+          tooltip: [
+            { field: 'actual', type: 'quantitative', formatType: 'compactNum', title: 'Actual' },
+            { field: 'predicted', type: 'quantitative', formatType: 'compactNum', title: 'Predicted' },
+          ],
+        },
+      },
+    ],
+  };
+}
+
+/** A pairwise scatter with an OLS trendline — the Analyze "scatter explorer".
+ *  Reveals whether a correlation is a clean linear relationship or outlier-driven
+ *  / non-linear. */
+export function scatterSpec(opts: {
+  title?: string;
+  subtitle?: string;
+  data: readonly { x: number; y: number }[];
+  xLabel: string;
+  yLabel: string;
+}): VegaSpec {
+  return {
+    ...(opts.title
+      ? { title: opts.subtitle ? { text: opts.title, subtitle: opts.subtitle } : opts.title }
+      : {}),
+    data: { values: opts.data },
+    layer: [
+      {
+        mark: { type: 'point', filled: true, opacity: 0.5 },
+        encoding: {
+          x: { field: 'x', type: 'quantitative', title: opts.xLabel, axis: { formatType: 'compactNum' } },
+          y: { field: 'y', type: 'quantitative', title: opts.yLabel, axis: { formatType: 'compactNum' } },
+          tooltip: [
+            { field: 'x', type: 'quantitative', formatType: 'compactNum', title: opts.xLabel },
+            { field: 'y', type: 'quantitative', formatType: 'compactNum', title: opts.yLabel },
+          ],
+        },
+      },
+      {
+        transform: [{ regression: 'y', on: 'x' }],
+        mark: { type: 'line', color: '#a1a1aa', strokeWidth: 2 },
+        encoding: {
+          x: { field: 'x', type: 'quantitative' },
+          y: { field: 'y', type: 'quantitative' },
+        },
+      },
+    ],
+  };
+}
+
 /** A 2-D quadrant scatter — efficiency-vs-engagement style. Each point is one
  *  category (publisher / format / market / …); x and y are two derived rates
  *  (e.g. CPC, CTR); the point size encodes a third measure (spend). The
@@ -492,6 +767,40 @@ export function heatmapSpec(opts: {
       });
     });
   });
+  // Only annotate cells with the numeric r when the grid is small enough to read
+  // (≤ 15×15); past that the labels overlap into noise (matches the notebook).
+  const annotate = opts.rows.length * opts.cols.length <= 225;
+  const layers: VegaSpec[] = [
+    {
+      mark: { type: 'rect', strokeWidth: 1.5 },
+      encoding: {
+        color: {
+          field: 'r',
+          type: 'quantitative',
+          title: 'r',
+          scale: { domain: [-1, 0, 1], range: ['#60a5fa', '#18181b', '#ef4444'] },
+          legend: { format: '.1f' },
+        },
+        // Statistically significant cells get a light border.
+        stroke: {
+          condition: { test: "datum.sig === 'yes'", value: '#fafafa' },
+          value: 'transparent',
+        },
+        tooltip: [
+          { field: 'row' },
+          { field: 'col' },
+          { field: 'r', type: 'quantitative', format: '.3f' },
+          { field: 'sig', title: 'significant' },
+        ],
+      },
+    },
+  ];
+  if (annotate) {
+    layers.push({
+      mark: { type: 'text', fontSize: 9 },
+      encoding: { text: { field: 'r', type: 'quantitative', format: '.2f' }, color: { value: '#e4e4e7' } },
+    });
+  }
   return {
     ...(opts.title
       ? { title: opts.subtitle ? { text: opts.title, subtitle: opts.subtitle } : opts.title }
@@ -501,34 +810,6 @@ export function heatmapSpec(opts: {
       x: { field: 'col', type: 'nominal', title: null, axis: { labelAngle: -45 } },
       y: { field: 'row', type: 'nominal', title: null },
     },
-    layer: [
-      {
-        mark: { type: 'rect', strokeWidth: 1.5 },
-        encoding: {
-          color: {
-            field: 'r',
-            type: 'quantitative',
-            title: 'r',
-            scale: { domain: [-1, 0, 1], range: ['#60a5fa', '#18181b', '#ef4444'] },
-            legend: { format: '.1f' },
-          },
-          // Statistically significant cells get a light border.
-          stroke: {
-            condition: { test: "datum.sig === 'yes'", value: '#fafafa' },
-            value: 'transparent',
-          },
-          tooltip: [
-            { field: 'row' },
-            { field: 'col' },
-            { field: 'r', type: 'quantitative', format: '.3f' },
-            { field: 'sig', title: 'significant' },
-          ],
-        },
-      },
-      {
-        mark: { type: 'text', fontSize: 9 },
-        encoding: { text: { field: 'r', type: 'quantitative', format: '.2f' }, color: { value: '#e4e4e7' } },
-      },
-    ],
+    layer: layers,
   };
 }

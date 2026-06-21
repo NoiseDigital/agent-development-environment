@@ -20,6 +20,8 @@ export type AnalyticsEvent =
   | 'feedback_submitted'
   | 'source_uploaded'
   | 'analysis_run'
+  | 'regression_run'
+  | 'competitive_run'
   | 'dashboard_created'
   | 'dashboard_viewed'
   | 'chart_pinned'

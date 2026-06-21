@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState, useMemo, type ReactNode } from 'react';
 import Image from 'next/image';
 import { agentConfigurations } from '../config/agent-config';
+import { enabledModules, branding, type ModuleKey } from '../config/tenant';
 import { track } from '../lib/analytics/track';
 import { useApps } from '../contexts/AppsContext';
 import { useSidebarCollapsed } from '../contexts/SidebarContext';
@@ -42,6 +43,23 @@ const AgentsIcon = () => (
   </svg>
 );
 
+// Concentric radar rings + a locator dot — "competitive intelligence / scan".
+const CompetitiveIcon = () => (
+  <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+      d="M12 21a9 9 0 110-18 9 9 0 010 18zm0-4.5a4.5 4.5 0 110-9 4.5 4.5 0 010 9zm0-2.5a2 2 0 100-4 2 2 0 000 4z" />
+  </svg>
+);
+
+// Module key → nav icon. Labels/routes/enablement come from the tenant config.
+const NAV_ICONS: Record<ModuleKey, ReactNode> = {
+  plan: <PlanIcon />,
+  dashboards: <DashboardsIcon />,
+  analyze: <AnalyzeIcon />,
+  competitive: <CompetitiveIcon />,
+  agents: <AgentsIcon />,
+};
+
 const ChevronRightIcon = ({ expanded }: { expanded: boolean }) => (
   <svg
     className={`w-3 h-3 shrink-0 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
@@ -65,6 +83,7 @@ export default function PlatformSidebar() {
   const router = useRouter();
 
   const inAgentsSection = pathname.startsWith('/agents') || pathname.startsWith('/chat');
+  const agentsEnabled = enabledModules.some((m) => m.key === 'agents');
   const [agentsExpanded, setAgentsExpanded] = useState(inAgentsSection);
   const [collapsed, setCollapsed] = useSidebarCollapsed('platform');
 
@@ -118,10 +137,16 @@ export default function PlatformSidebar() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
-          {collapsedItem(pathname.startsWith('/plan'), () => router.push('/plan'), 'Plan', <PlanIcon />)}
-          {collapsedItem(pathname.startsWith('/dashboards'), () => router.push('/dashboards'), 'Dashboards', <DashboardsIcon />)}
-          {collapsedItem(pathname.startsWith('/analyze'), () => router.push('/analyze'), 'Analyze', <AnalyzeIcon />)}
-          {collapsedItem(inAgentsSection, () => router.push('/agents'), 'Agents', <AgentsIcon />)}
+          {enabledModules.map((m) =>
+            <span key={m.key}>
+              {collapsedItem(
+                m.key === 'agents' ? inAgentsSection : pathname.startsWith(m.route),
+                () => router.push(m.route),
+                m.label,
+                NAV_ICONS[m.key],
+              )}
+            </span>,
+          )}
           {/* Theme switch pinned to the bottom of the rail */}
           <div className="mt-auto">
             <ThemeToggle />
@@ -132,9 +157,14 @@ export default function PlatformSidebar() {
       {/* Brand */}
       <div className="flex items-center justify-between pl-4 pr-2 h-14 shrink-0 border-b border-line">
         <div className="flex items-end gap-1.5 min-w-0 cursor-pointer" onClick={() => router.push('/')}>
-          {/* Logo art is white; invert it to dark ink on light surfaces. */}
-          <Image src="/noise_white.svg" alt="Noise" width={72} height={20} className="h-5 w-auto shrink-0 light:invert" />
-          <span className="text-subtle text-[11px] font-bold tracking-widest uppercase leading-none mb-[1px]">OS</span>
+          {/* Logo + readable accent flip come from the active tenant manifest. */}
+          <Image
+            src={branding.logo}
+            alt={branding.logoAlt}
+            width={72}
+            height={20}
+            className={`h-5 w-auto shrink-0${branding.logoInvertOnLight ? ' light:invert' : ''}`}
+          />
         </div>
         <button
           type="button"
@@ -148,41 +178,27 @@ export default function PlatformSidebar() {
         </button>
       </div>
 
-      {/* Navigation */}
+      {/* Navigation — only the tenant's enabled modules (tenants/modules.json) */}
       <nav className="flex-1 overflow-y-auto p-2 space-y-px">
 
-        {/* Plan — the one-stop media planning surface (first because it's
-            where a campaign starts before it ever reports). */}
-        <button
-          type="button"
-          onClick={() => router.push('/plan')}
-          className={navItem(pathname.startsWith('/plan'))}
-        >
-          <PlanIcon />
-          <span>Plan</span>
-        </button>
-
-        {/* Dashboards */}
-        <button
-          type="button"
-          onClick={() => router.push('/dashboards')}
-          className={navItem(pathname.startsWith('/dashboards'))}
-        >
-          <DashboardsIcon />
-          <span>Dashboards</span>
-        </button>
-
-        {/* Analyze */}
-        <button
-          type="button"
-          onClick={() => router.push('/analyze')}
-          className={navItem(pathname.startsWith('/analyze'))}
-        >
-          <AnalyzeIcon />
-          <span>Analyze</span>
-        </button>
+        {/* Simple sections (Plan / Dashboards / Analyze). Agents is special
+            (expandable sub-list) and rendered below. */}
+        {enabledModules
+          .filter((m) => m.key !== 'agents')
+          .map((m) => (
+            <button
+              key={m.key}
+              type="button"
+              onClick={() => router.push(m.route)}
+              className={navItem(pathname.startsWith(m.route))}
+            >
+              {NAV_ICONS[m.key]}
+              <span>{m.label}</span>
+            </button>
+          ))}
 
         {/* Agents — label navigates, chevron toggles */}
+        {agentsEnabled && (
         <div>
           <div className={`flex items-center w-full rounded-lg transition-colors duration-150 ${inAgentsSection ? 'bg-surface-raised' : 'hover:bg-surface'}`}>
             {/* Main clickable area → go to library */}
@@ -243,6 +259,7 @@ export default function PlatformSidebar() {
             </div>
           </Collapsible>
         </div>
+        )}
       </nav>
 
       {/* Footer */}

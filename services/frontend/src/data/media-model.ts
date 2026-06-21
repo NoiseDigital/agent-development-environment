@@ -1,10 +1,8 @@
-// Client registry — the only entity here that survives the move to all-BQ
-// data. The previous mock pipeline (Campaign → AdLine → PerformanceDay) and
-// its three placeholder clients (Horizon / Bloom / NorthEdge) were removed
-// once every dashboard tile went live against
-// `media_campaign_performance_NOI`. When more clients land, each one needs
-// its OWN live dataset — adding an entry here without that wiring would
-// re-introduce the mock pattern this cleanup deleted.
+// The Client shape — the only entity here that survives the move to all-BQ
+// data. The per-tenant client REGISTRY (the array) now lives under
+// data/tenants/<id>/clients.ts and resolves through the @tenant-content build
+// alias; the shared facade (@/data/clients) reads it. When more clients land,
+// each needs its OWN live dataset (don't reintroduce the deleted mock pattern).
 
 export interface Client {
   id: string;
@@ -15,7 +13,3 @@ export interface Client {
    *  back to a rendered initials badge when this is absent. */
   logoPath?: string;
 }
-
-export const clients: Client[] = [
-  { id: 'noi', name: 'Noise', initials: 'NOI', accentColor: '#000000', logoPath: '/noise_N.PNG' },
-];
