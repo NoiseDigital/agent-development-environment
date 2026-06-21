@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 from scipy.stats import pearsonr, spearmanr
+from statsmodels.stats.stattools import durbin_watson
 
 _EXCEL_ERRORS = r"^#(DIV/0!|N/A|VALUE!|NAME\?|NULL!|NUM!|REF!)$"
 
@@ -323,6 +324,7 @@ def regress(
         x_mat = sm.add_constant(x_mat, has_constant="add")
 
     model = sm.OLS(y_vec, x_mat, missing="drop").fit()
+    conf = model.conf_int()  # 95% CI per coefficient (cols 0/1 = lower/upper)
     coefficients = [
         {
             "term": term,
@@ -330,6 +332,8 @@ def regress(
             "std_err": model.bse.get(term),
             "t": model.tvalues.get(term),
             "p_value": model.pvalues.get(term),
+            "ci_low": conf.loc[term, 0],
+            "ci_high": conf.loc[term, 1],
         }
         for term in model.params.index
     ]
@@ -345,6 +349,15 @@ def regress(
             "adj_r_squared": model.rsquared_adj,
             "f_pvalue": model.f_pvalue,
             "coefficients": coefficients,
+            # Residual diagnostics — Durbin-Watson (autocorrelation: ~2 is clean,
+            # <1 or >3 flags it), condition number (multicollinearity: >30 is a
+            # warning, >1000 severe), and AIC/BIC for model comparison.
+            "diagnostics": {
+                "durbin_watson": float(durbin_watson(model.resid)),
+                "condition_number": float(model.condition_number),
+                "aic": float(model.aic),
+                "bic": float(model.bic),
+            },
             "fit_points": [
                 {"actual": a, "predicted": p} for a, p in zip(actual, predicted)
             ],
@@ -412,17 +425,97 @@ def describe(df: pd.DataFrame) -> dict:
             kind = "numeric"
         else:
             kind = "categorical"
-        columns.append(
-            {
-                "name": str(c),
-                "kind": kind,
-                "missing_pct": round(float(s.isna().mean() * 100), 2),
-            }
-        )
+        col = {
+            "name": str(c),
+            "kind": kind,
+            "missing_pct": round(float(s.isna().mean() * 100), 2),
+        }
+        # For LOW-cardinality categoricals (segment columns like channel/market),
+        # expose the distinct values so the UI can offer a "segment by value"
+        # picker. Skip high-cardinality / free-text columns.
+        if kind == "categorical":
+            vc = s.dropna().astype(str).value_counts()
+            if 0 < len(vc) <= 200:
+                col["values"] = [str(v) for v in vc.index[:50].tolist()]
+        columns.append(col)
     return _clean(
         {
             "row_count": int(len(df)),
             "columns": columns,
             "numeric_columns": _numeric_columns(df),
+        }
+    )
+
+
+def profile(df: pd.DataFrame) -> dict:
+    """Robust per-numeric-column distribution stats — surfaces skew + outliers
+    that inform method (Spearman) and preprocessing (log1p/winsorize) choices."""
+    out = []
+    for c in _numeric_columns(df):
+        s = pd.to_numeric(df[c], errors="coerce")
+        nn = s.dropna()
+        if nn.empty:
+            continue
+        out.append(
+            {
+                "name": str(c),
+                "missing_pct": round(float(s.isna().mean() * 100), 2),
+                "min": float(nn.min()),
+                "p01": float(nn.quantile(0.01)),
+                "median": float(nn.median()),
+                "p99": float(nn.quantile(0.99)),
+                "max": float(nn.max()),
+                "mean": float(nn.mean()),
+                "std": float(nn.std(ddof=0)),
+                "skew": float(nn.skew()) if len(nn) > 2 else 0.0,
+            }
+        )
+    return _clean({"columns": out})
+
+
+def pairs(
+    df: pd.DataFrame,
+    a: str,
+    b: str,
+    method: str = "pearson",
+    lag: int = 0,
+    winsorize: bool = False,
+    log1p: bool = False,
+    zscore: bool = False,
+    difference: bool = False,
+    group_col: str = "",
+    group_val: str = "",
+    time_col: str = "",
+    max_points: int = 2000,
+) -> dict:
+    """The (x, y) points for ONE column pair, after the SAME preprocessing as
+    correlate — for the scatter explorer. Downsampled to max_points for render."""
+    method = "spearman" if method.lower().startswith("s") else "pearson"
+    gcol = group_col or None
+    tcol = time_col or None
+    work = preprocess(df, winsorize, log1p, zscore, difference, tcol, gcol)
+    numeric = _numeric_columns(work)
+    if a not in numeric or b not in numeric:
+        return {"a": a, "b": b, "error": "both columns must be numeric"}
+    if gcol and group_val and gcol in work.columns:
+        work = work.loc[work[gcol].astype(str) == str(group_val)]
+    if lag != 0:
+        work = _lag(work, [b], lag, tcol, gcol)
+    pair = work[[a, b]].dropna()
+    if len(pair) < 3:
+        return {"a": a, "b": b, "n": int(len(pair)), "r": None, "p": None, "points": []}
+    r, p = _corr_pair(pair[a], pair[b], method)
+    if len(pair) > max_points:
+        pair = pair.sample(max_points, random_state=0)
+    points = [{"x": float(xv), "y": float(yv)} for xv, yv in zip(pair[a], pair[b])]
+    return _clean(
+        {
+            "a": a,
+            "b": b,
+            "method": method,
+            "n": int(len(points)),
+            "r": r,
+            "p": p,
+            "points": points,
         }
     )

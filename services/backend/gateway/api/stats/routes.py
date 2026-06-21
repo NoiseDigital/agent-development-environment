@@ -32,7 +32,18 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 # Allowlisted upstream paths — the gateway never forwards an arbitrary path.
 # Mirrors the stats server's HTTP routes; if we add a new stats endpoint there
 # we add it here too.
-ALLOWED_ENDPOINTS = frozenset({"correlate", "qa", "describe"})
+ALLOWED_ENDPOINTS = frozenset(
+    {
+        "correlate",
+        "regress",
+        "pairs",
+        "qa",
+        "describe",
+        "profile",
+        "competitive",
+        "competitive_forecast",
+    }
+)
 
 
 @router.post("/{endpoint}")

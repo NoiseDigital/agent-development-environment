@@ -25,6 +25,7 @@ from starlette.routing import Mount, Route
 from google.adk.tools.function_tool import FunctionTool
 from google.adk.tools.mcp_tool.conversion_utils import adk_to_mcp_tool_type
 
+import competitive
 import engine
 from resolve import load_source
 
@@ -248,6 +249,50 @@ async def http_correlate(request):
         return JSONResponse({"error": str(e)}, status_code=400)
 
 
+async def http_regress(request):
+    try:
+        b = await request.json()
+        df = load_source(b["source"], b.get("sheet") or None)
+        result = engine.regress(
+            df,
+            b["y"],
+            b["x"],
+            b.get("add_constant", True),
+            b.get("zscore", False),
+            b.get("difference", False),
+            b.get("lag", 0),
+            b.get("group_col", ""),
+            b.get("group_val", ""),
+            b.get("time_col", ""),
+        )
+        return JSONResponse(result)
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+async def http_pairs(request):
+    try:
+        b = await request.json()
+        df = load_source(b["source"], b.get("sheet") or None)
+        result = engine.pairs(
+            df,
+            b["a"],
+            b["b"],
+            b.get("method", "pearson"),
+            b.get("lag", 0),
+            b.get("winsorize", False),
+            b.get("log1p", False),
+            b.get("zscore", False),
+            b.get("difference", False),
+            b.get("group_col", ""),
+            b.get("group_val", ""),
+            b.get("time_col", ""),
+        )
+        return JSONResponse(result)
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
 async def http_qa(request):
     try:
         b = await request.json()
@@ -257,11 +302,55 @@ async def http_qa(request):
         return JSONResponse({"error": str(e)}, status_code=400)
 
 
+async def http_profile(request):
+    try:
+        b = await request.json()
+        df = load_source(b["source"], b.get("sheet") or None)
+        return JSONResponse(engine.profile(df))
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
 async def http_describe(request):
     try:
         b = await request.json()
         df = load_source(b["source"], b.get("sheet") or None)
         return JSONResponse(engine.describe(df))
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+async def http_competitive(request):
+    try:
+        b = await request.json()
+        df = load_source(b["source"], b.get("sheet") or None)
+        return JSONResponse(
+            competitive.run(
+                df,
+                mode=b.get("mode", "basic"),
+                maturity=b.get("maturity"),
+                dimension=b.get("dimension", "auto"),
+                scope=b.get("scope", "market"),
+            ),
+        )
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+async def http_competitive_forecast(request):
+    try:
+        b = await request.json()
+        df = load_source(b["source"], b.get("sheet") or None)
+        return JSONResponse(
+            competitive.forecast(
+                df,
+                mode=b.get("mode", "advanced"),
+                maturity=b.get("maturity"),
+                scenario=b.get("scenario"),
+                dimension=b.get("dimension", "auto"),
+                scope=b.get("scope", "market"),
+            ),
+        )
     except Exception as e:  # noqa: BLE001
         return JSONResponse({"error": str(e)}, status_code=400)
 
@@ -277,8 +366,17 @@ starlette_app = Starlette(
         Mount("/messages/", app=sse.handle_post_message),
         Route("/health", endpoint=http_health),
         Route("/api/correlate", endpoint=http_correlate, methods=["POST"]),
+        Route("/api/regress", endpoint=http_regress, methods=["POST"]),
+        Route("/api/pairs", endpoint=http_pairs, methods=["POST"]),
         Route("/api/qa", endpoint=http_qa, methods=["POST"]),
         Route("/api/describe", endpoint=http_describe, methods=["POST"]),
+        Route("/api/profile", endpoint=http_profile, methods=["POST"]),
+        Route("/api/competitive", endpoint=http_competitive, methods=["POST"]),
+        Route(
+            "/api/competitive_forecast",
+            endpoint=http_competitive_forecast,
+            methods=["POST"],
+        ),
     ],
     middleware=[
         Middleware(
