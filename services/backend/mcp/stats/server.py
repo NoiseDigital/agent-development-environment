@@ -25,7 +25,7 @@ from starlette.routing import Mount, Route
 from google.adk.tools.function_tool import FunctionTool
 from google.adk.tools.mcp_tool.conversion_utils import adk_to_mcp_tool_type
 
-import competitive
+import market_radar
 import engine
 from resolve import load_source
 
@@ -320,12 +320,12 @@ async def http_describe(request):
         return JSONResponse({"error": str(e)}, status_code=400)
 
 
-async def http_competitive(request):
+async def http_market_radar(request):
     try:
         b = await request.json()
         df = load_source(b["source"], b.get("sheet") or None)
         return JSONResponse(
-            competitive.run(
+            market_radar.run(
                 df,
                 mode=b.get("mode", "basic"),
                 maturity=b.get("maturity"),
@@ -337,12 +337,12 @@ async def http_competitive(request):
         return JSONResponse({"error": str(e)}, status_code=400)
 
 
-async def http_competitive_forecast(request):
+async def http_market_radar_forecast(request):
     try:
         b = await request.json()
         df = load_source(b["source"], b.get("sheet") or None)
         return JSONResponse(
-            competitive.forecast(
+            market_radar.forecast(
                 df,
                 mode=b.get("mode", "advanced"),
                 maturity=b.get("maturity"),
@@ -371,10 +371,10 @@ starlette_app = Starlette(
         Route("/api/qa", endpoint=http_qa, methods=["POST"]),
         Route("/api/describe", endpoint=http_describe, methods=["POST"]),
         Route("/api/profile", endpoint=http_profile, methods=["POST"]),
-        Route("/api/competitive", endpoint=http_competitive, methods=["POST"]),
+        Route("/api/market_radar", endpoint=http_market_radar, methods=["POST"]),
         Route(
-            "/api/competitive_forecast",
-            endpoint=http_competitive_forecast,
+            "/api/market_radar_forecast",
+            endpoint=http_market_radar_forecast,
             methods=["POST"],
         ),
     ],

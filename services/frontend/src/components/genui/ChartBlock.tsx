@@ -11,7 +11,7 @@ import { enrichAgentSpec } from '../../lib/charts/enrich-spec';
 //
 //   • INSIDE a dashboard edit-mode context, the target tab is implied by
 //     where the user is, so we render a one-click "Save to <tab>" button.
-//   • OUTSIDE that context (normal chat, AnalyzeAssistantPanel, etc.) we
+//   • OUTSIDE that context (normal chat, AutocorrAssistantPanel, etc.) we
 //     rely on the kebab inside the chart card (ChartActions, surfaced via
 //     `saveable`) — it already handles dashboard + tab picking AND has a
 //     "Create new personal report" affordance. No second button needed.

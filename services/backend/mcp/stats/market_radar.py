@@ -3,7 +3,7 @@
 Turns competitive ad-spend exports (MediaRadar / Pathmatics) into directional
 spend estimates, share-of-voice, and model-support ("confidence") scoring. Ported
 from the Colab demo; all math is deterministic pandas/numpy. The frontend renders
-the returned tables as charts; narration comes from the competitive_insights_agent.
+the returned tables as charts; narration comes from the market_radar_insights_agent.
 
 Input schema (columns, case/space-insensitive):
   brand (req) · spend (req) · source (req) · market (opt → "Total Market") ·

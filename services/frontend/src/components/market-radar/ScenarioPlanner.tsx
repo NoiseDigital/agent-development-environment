@@ -2,12 +2,12 @@
 
 // Scenario Planner tab for /competitive — projects total competitive spend
 // forward with an OLS trend + prediction-interval fan, tunable via scenario
-// sliders. Reads a ForecastResult computed server-side (competitive.forecast).
+// sliders. Reads a ForecastResult computed server-side (market_radar.forecast).
 
 import InfoHint from '../ui/InfoHint';
 import VegaChart from '../VegaChart';
 import { forecastFanSpec } from '../../lib/charts/specs';
-import type { ForecastResult, ScenarioParams } from '../../lib/api/competitive';
+import type { ForecastResult, ScenarioParams } from '../../lib/api/market-radar';
 
 const usd = new Intl.NumberFormat('en-US', {
   style: 'currency',

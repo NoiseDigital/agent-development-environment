@@ -63,7 +63,7 @@ generate_content_config = types.GenerateContentConfig(
 
 root_agent = LlmAgent(
     model=MODEL_NAME,
-    name="competitive_insights_agent",
+    name="market_radar_insights_agent",
     description=(
         "Generates analyst-style insight bullets from a Competitive estimator "
         "result payload. Stateless; one shot per estimate."

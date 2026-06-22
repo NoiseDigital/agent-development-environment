@@ -2,16 +2,16 @@
 // Centralised here so the page produces a stable shape — the agent's prompt
 // parses these exact field names.
 
-import type { CompetitiveResult } from '../api/competitive';
+import type { MarketRadarResult } from '../api/market-radar';
 import type { SourceRef } from '../../types/source';
 import { sourceUri } from '../../types/source';
 
-export interface CompetitiveContextInput {
+export interface MarketRadarContextInput {
   source: SourceRef | null;
   mode: 'basic' | 'advanced';
   /** Detected column names — known for uploads, unknown for BigQuery until run. */
   columns: string[];
-  result: CompetitiveResult | null;
+  result: MarketRadarResult | null;
 }
 
 const usd = new Intl.NumberFormat('en-US', {
@@ -28,11 +28,11 @@ const band = (score: number) => (score >= 0.7 ? 'High' : score >= 0.4 ? 'Moderat
  *    columns so the assistant can greet + recommend mode.
  *  - RESULT (an estimate has run): adds KPIs, top markets/competitors, and SOV
  *    leaders so the assistant can interpret. Returns '' when no source. */
-export function buildCompetitiveContext(input: CompetitiveContextInput): string {
+export function buildMarketRadarContext(input: MarketRadarContextInput): string {
   const { source, mode, columns, result } = input;
   if (!source) return '';
 
-  const lines: string[] = ['[Competitive context]'];
+  const lines: string[] = ['[Market Radar context]'];
   lines.push(`source: ${sourceUri(source)}`);
   lines.push(`mode: ${mode}`);
 

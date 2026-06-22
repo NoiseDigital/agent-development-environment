@@ -21,7 +21,7 @@ export type AnalyticsEvent =
   | 'source_uploaded'
   | 'analysis_run'
   | 'regression_run'
-  | 'competitive_run'
+  | 'market_radar_run'
   | 'dashboard_created'
   | 'dashboard_viewed'
   | 'chart_pinned'

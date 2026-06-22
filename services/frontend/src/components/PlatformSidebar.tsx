@@ -29,7 +29,7 @@ const DashboardsIcon = () => (
   </svg>
 );
 
-const AnalyzeIcon = () => (
+const AutocorrIcon = () => (
   <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
       d="M9 3h6m-5 0v6.5L5.5 17A2 2 0 007.2 20h9.6a2 2 0 001.7-3L14 9.5V3M7.5 14h9" />
@@ -44,7 +44,7 @@ const AgentsIcon = () => (
 );
 
 // Concentric radar rings + a locator dot — "competitive intelligence / scan".
-const CompetitiveIcon = () => (
+const MarketRadarIcon = () => (
   <svg className="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
       d="M12 21a9 9 0 110-18 9 9 0 010 18zm0-4.5a4.5 4.5 0 110-9 4.5 4.5 0 010 9zm0-2.5a2 2 0 100-4 2 2 0 000 4z" />
@@ -55,8 +55,8 @@ const CompetitiveIcon = () => (
 const NAV_ICONS: Record<ModuleKey, ReactNode> = {
   plan: <PlanIcon />,
   dashboards: <DashboardsIcon />,
-  analyze: <AnalyzeIcon />,
-  competitive: <CompetitiveIcon />,
+  autocorr: <AutocorrIcon />,
+  "market-radar": <MarketRadarIcon />,
   agents: <AgentsIcon />,
 };
 

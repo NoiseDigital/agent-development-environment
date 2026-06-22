@@ -1,12 +1,12 @@
 'use client';
 
-// Pinned chat panel that lives on the right side of /analyze. Different
+// Pinned chat panel that lives on the right side of /autocorr. Different
 // from the FloatingAssistant: this one is ALWAYS visible (no FAB toggle)
-// and is wired to a specialised agent — `analyze_assistant_agent` — that
+// and is wired to a specialised agent — `autocorr_assistant_agent` — that
 // reads the current correlation result as a context preamble.
 //
-// The page passes in `contextPrefix` — a multi-line "[Analyze context]"
-// preamble built by `lib/agent/analyze-context.ts`. Every send prepends it, so
+// The page passes in `contextPrefix` — a multi-line "[AutoCorr context]"
+// preamble built by `lib/agent/autocorr-context.ts`. Every send prepends it, so
 // the agent always has the freshest result in view even after the user
 // re-runs the analysis.
 
@@ -15,17 +15,17 @@ import { useChat } from '../../hooks/useChat';
 import { useChatAutoScroll } from '../../hooks/useChatAutoScroll';
 import ChatMessage from '../chat/ChatMessage';
 
-const ASSISTANT_AGENT = 'analyze_assistant_agent';
+const ASSISTANT_AGENT = 'autocorr_assistant_agent';
 
 // Sent automatically the first time a data source is selected, so the assistant
-// opens with a guided greeting instead of waiting. The [Analyze context]
+// opens with a guided greeting instead of waiting. The [AutoCorr context]
 // preamble (columns + qa) rides along hidden, so this is all the user sees.
 const GREET_TRIGGER = "I just selected a data source — what should I analyze, and how?";
 
 // Sent once on mount so the panel opens with a warm welcome instead of a cold
 // empty state — even before a data source is picked.
 const INTRO_TRIGGER =
-  "No data source is selected yet. Greet me in 1-2 short sentences as the Analyze " +
+  "No data source is selected yet. Greet me in 1-2 short sentences as the AutoCorr " +
   "assistant, say in plain terms what this tool does, and ask me to pick a data " +
   "source on the left to begin. Do not invent any data or column names.";
 
@@ -36,7 +36,7 @@ interface PanelProps {
   sourceKey: string;
 }
 
-export default function AnalyzeAssistantPanel({ contextPrefix, sourceKey }: PanelProps) {
+export default function AutocorrAssistantPanel({ contextPrefix, sourceKey }: PanelProps) {
   const [input, setInput] = useState('');
   const { messages, isLoading, error, feedback, rateMessage, sendMessage, createNewSession } =
     useChat(ASSISTANT_AGENT);
@@ -94,7 +94,7 @@ export default function AnalyzeAssistantPanel({ contextPrefix, sourceKey }: Pane
           </svg>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-foreground">Analyze Assistant</p>
+          <p className="truncate text-sm font-semibold text-foreground">AutoCorr Assistant</p>
           <p className="text-[11px] text-faint">
             {ready ? 'Guiding your analysis' : 'Pick a data source to start'}
           </p>

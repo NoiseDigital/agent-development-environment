@@ -1,6 +1,6 @@
 'use client';
 
-// Output for an OLS regression run from /analyze: a fit-quality summary, the
+// Output for an OLS regression run from /autocorr: a fit-quality summary, the
 // coefficient table (with significance), and an actual-vs-predicted scatter.
 
 import type { RegressResult } from '../../lib/api/stats';

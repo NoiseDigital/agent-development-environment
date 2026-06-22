@@ -1,6 +1,6 @@
 // Client for the Competitive Media Intelligence Estimator. Like statsApi, the
 // browser never talks to mcp-stats directly — the request routes through the
-// gateway's `/api/v1/stats/competitive` proxy (allowlisted upstream path).
+// gateway's `/api/v1/stats/market_radar` proxy (allowlisted upstream path).
 
 import { postJson } from './http';
 import { gatewayBase } from '@/lib/api/gateway';
@@ -10,7 +10,7 @@ const BASE_URL = gatewayBase();
 export type MediaDimension = 'auto' | 'channel' | 'partner' | 'channel_partner';
 export type AnalysisScope = 'market' | 'total';
 
-export interface CompetitiveParams {
+export interface MarketRadarParams {
   /** Source URI — "upload:<id>" or "bigquery:<dataset>.<table>". */
   source: string;
   sheet?: string;
@@ -24,7 +24,7 @@ export interface CompetitiveParams {
   scope?: AnalysisScope;
 }
 
-export interface CompetitiveKpis {
+export interface MarketRadarKpis {
   observed_spend: number;
   estimated_base: number;
   estimated_low: number;
@@ -90,8 +90,8 @@ export interface TopCombinationRow {
   support_band: 'Low' | 'Moderate' | 'High';
 }
 
-export interface CompetitiveResult {
-  kpis: CompetitiveKpis;
+export interface MarketRadarResult {
+  kpis: MarketRadarKpis;
   mode: 'basic' | 'advanced';
   by_market: MarketRow[];
   by_brand: BrandRow[];
@@ -195,9 +195,9 @@ export interface ForecastResult {
   warnings: string[];
 }
 
-export const competitiveApi = {
-  run: (params: CompetitiveParams) =>
-    postJson<CompetitiveResult>(`${BASE_URL}/api/v1/stats/competitive`, params),
+export const marketRadarApi = {
+  run: (params: MarketRadarParams) =>
+    postJson<MarketRadarResult>(`${BASE_URL}/api/v1/stats/market_radar`, params),
   forecast: (params: ForecastParams) =>
-    postJson<ForecastResult>(`${BASE_URL}/api/v1/stats/competitive_forecast`, params),
+    postJson<ForecastResult>(`${BASE_URL}/api/v1/stats/market_radar_forecast`, params),
 };

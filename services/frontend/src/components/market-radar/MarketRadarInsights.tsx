@@ -1,6 +1,6 @@
 'use client';
 
-// Analyst insights for /competitive — calls competitive_insights_agent (a
+// Analyst insights for /competitive — calls market_radar_insights_agent (a
 // one-shot ADK agent) with a summary of the estimate, and renders structured
 // bullets. While the agent runs (or if it fails), it falls back to the
 // deterministic rule-based insights already on the result, so there's always
@@ -10,9 +10,9 @@ import { useEffect, useState } from 'react';
 
 import { adkApi } from '../../lib/agent/adk-api';
 import { getCurrentUser } from '../../lib/auth';
-import type { CompetitiveResult } from '../../lib/api/competitive';
+import type { MarketRadarResult } from '../../lib/api/market-radar';
 
-const AGENT = 'competitive_insights_agent';
+const AGENT = 'market_radar_insights_agent';
 
 interface AgentInsight {
   type: string;
@@ -26,7 +26,7 @@ const TONE: Record<string, string> = {
   neutral: 'border-line/50 bg-surface-sunken/40',
 };
 
-function sovLeaders(result: CompetitiveResult) {
+function sovLeaders(result: MarketRadarResult) {
   const seen = new Map<string, string[]>();
   for (const s of result.sov) {
     const cur = seen.get(s.market) ?? [];
@@ -38,7 +38,7 @@ function sovLeaders(result: CompetitiveResult) {
   return [...seen].slice(0, 5).map(([market, brands]) => `${market}: ${brands.join(', ')}`);
 }
 
-function buildPayload(result: CompetitiveResult) {
+function buildPayload(result: MarketRadarResult) {
   const k = result.kpis;
   return {
     mode: result.mode,
@@ -76,7 +76,7 @@ function parse(text: string): AgentInsight[] {
   }
 }
 
-export default function CompetitiveInsights({ result }: { result: CompetitiveResult }) {
+export default function MarketRadarInsights({ result }: { result: MarketRadarResult }) {
   const [insights, setInsights] = useState<AgentInsight[] | null>(null);
   const [loading, setLoading] = useState(true);
 

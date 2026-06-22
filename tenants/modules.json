@@ -24,19 +24,19 @@
       "services": ["mcp-toolbox"],
       "capabilities": ["floatingAssistant"]
     },
-    "analyze": {
-      "label": "Analyze",
-      "route": "/analyze",
-      "description": "Correlate drivers against KPIs across any data source. Upload data, run the analysis, save the visuals.",
-      "agents": ["analyze_assistant_agent"],
+    "autocorr": {
+      "label": "AutoCorr",
+      "route": "/autocorr",
+      "description": "Auto-correlate drivers against KPIs across any data source. Upload data, run the analysis, save the visuals.",
+      "agents": ["autocorr_assistant_agent"],
       "services": [],
       "capabilities": []
     },
-    "competitive": {
-      "label": "Competitive",
-      "route": "/competitive",
+    "market-radar": {
+      "label": "Market Radar",
+      "route": "/market-radar",
       "description": "Estimate competitor media spend, share-of-voice, and model support from MediaRadar / Pathmatics exports.",
-      "agents": ["competitive_assistant_agent", "competitive_insights_agent"],
+      "agents": ["market_radar_assistant_agent", "market_radar_insights_agent"],
       "services": [],
       "capabilities": []
     },

@@ -40,8 +40,8 @@ ALLOWED_ENDPOINTS = frozenset(
         "qa",
         "describe",
         "profile",
-        "competitive",
-        "competitive_forecast",
+        "market_radar",
+        "market_radar_forecast",
     }
 )
 

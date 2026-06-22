@@ -3,17 +3,17 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { sourcesApi } from '../../lib/api/sources';
 import { statsApi, type CorrelateResult, type QaResult, type ColumnProfile, type RegressResult, type PairsResult, type ColumnStat } from '../../lib/api/stats';
-import { downloadCsv, downloadJson } from '../../lib/analyze/export';
+import { downloadCsv, downloadJson } from '../../lib/autocorr/export';
 import { track } from '../../lib/analytics/track';
 import type { Upload, SourceRef, BigQueryTableRef } from '../../types/source';
 import { sourceUri, sourceLabel } from '../../types/source';
 import { heatmapSpec, scatterSpec } from '../../lib/charts/specs';
-import { buildAnalyzeContext } from '../../lib/agent/analyze-context';
+import { buildAutocorrContext } from '../../lib/agent/autocorr-context';
 import VegaChart from '../../components/VegaChart';
 import InfoHint from '../../components/ui/InfoHint';
-import AnalyzeAssistantPanel from '../../components/analyze/AnalyzeAssistantPanel';
-import RegressionResults from '../../components/analyze/RegressionResults';
-import ColumnProfileTable from '../../components/analyze/ColumnProfileTable';
+import AutocorrAssistantPanel from '../../components/autocorr/AutocorrAssistantPanel';
+import RegressionResults from '../../components/autocorr/RegressionResults';
+import ColumnProfileTable from '../../components/autocorr/ColumnProfileTable';
 
 // ── Layout primitive — a card-shaped section used in the controls rail. ────
 
@@ -146,7 +146,7 @@ const Toggle = ({ label, checked, onChange, hint }: { label: string; checked: bo
 
 type SourceKind = 'upload' | 'bigquery';
 
-export default function AnalyzePage() {
+export default function AutocorrPage() {
   // Source selection
   const [sourceKind, setSourceKind] = useState<SourceKind>('bigquery');
   const [uploads, setUploads] = useState<Upload[]>([]);
@@ -433,11 +433,11 @@ export default function AnalyzePage() {
       })
     : null;
 
-  // Context preamble for the Analyze Assistant — rebuilt on every render so
+  // Context preamble for the AutoCorr Assistant — rebuilt on every render so
   // it's always current with the latest result + controls.
   const contextPrefix = useMemo(
     () =>
-      buildAnalyzeContext({
+      buildAutocorrContext({
         source,
         columns: columnProfiles,
         setA,
@@ -456,7 +456,7 @@ export default function AnalyzePage() {
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between border-b border-line/45 px-8 py-5">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-foreground">Analyze</h1>
+          <h1 className="text-lg font-semibold tracking-tight text-foreground">AutoCorr</h1>
           <p className="mt-0.5 text-xs text-faint">
             Correlate drivers against KPIs across any data source.
           </p>
@@ -833,8 +833,8 @@ export default function AnalyzePage() {
           )}
         </main>
 
-        {/* ── Analyze Assistant (pinned right rail) ─────────────────────── */}
-        <AnalyzeAssistantPanel contextPrefix={contextPrefix} sourceKey={sourceRefUri} />
+        {/* ── AutoCorr Assistant (pinned right rail) ─────────────────────── */}
+        <AutocorrAssistantPanel contextPrefix={contextPrefix} sourceKey={sourceRefUri} />
       </div>
     </div>
   );

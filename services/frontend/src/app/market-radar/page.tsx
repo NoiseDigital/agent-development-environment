@@ -3,29 +3,29 @@
 // Competitive Media Intelligence Estimator — upload a competitive ad-spend export
 // (MediaRadar / Pathmatics), then read directional spend estimates, share-of-voice,
 // and model-support scoring across markets and brands. All math runs server-side in
-// mcp-stats (competitive.run); this page is the guided wizard + dashboards.
+// mcp-stats (market_radar.run); this page is the guided wizard + dashboards.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
-import BrandTrajectory from '../../components/competitive/BrandTrajectory';
-import CompetitiveAssistantPanel from '../../components/competitive/CompetitiveAssistantPanel';
-import CompetitiveInsights from '../../components/competitive/CompetitiveInsights';
-import ScenarioPlanner from '../../components/competitive/ScenarioPlanner';
+import BrandTrajectory from '../../components/market-radar/BrandTrajectory';
+import MarketRadarAssistantPanel from '../../components/market-radar/MarketRadarAssistantPanel';
+import MarketRadarInsights from '../../components/market-radar/MarketRadarInsights';
+import ScenarioPlanner from '../../components/market-radar/ScenarioPlanner';
 import InfoHint from '../../components/ui/InfoHint';
 import VegaChart from '../../components/VegaChart';
 import {
-  competitiveApi,
+  marketRadarApi,
   type AnalysisScope,
-  type CompetitiveResult,
+  type MarketRadarResult,
   type ForecastResult,
   type MediaDimension,
   type ScenarioParams,
   type SovRow,
-} from '../../lib/api/competitive';
+} from '../../lib/api/market-radar';
 import { sourcesApi } from '../../lib/api/sources';
-import { buildCompetitiveContext } from '../../lib/agent/competitive-context';
+import { buildMarketRadarContext } from '../../lib/agent/market-radar-context';
 import { barSpec, rangeBarSpec, scatterSpec, stackedBarSpec } from '../../lib/charts/specs';
-import { downloadCsv, downloadJson } from '../../lib/analyze/export';
+import { downloadCsv, downloadJson } from '../../lib/autocorr/export';
 import { track } from '../../lib/analytics/track';
 import {
   sourceLabel,
@@ -112,7 +112,7 @@ const BAND_CLASS: Record<string, string> = {
   Low: 'text-warning',
 };
 
-export default function CompetitivePage() {
+export default function MarketRadarPage() {
   // ── Source picker state ────────────────────────────────────────────────────
   const [sourceKind, setSourceKind] = useState<SourceKind>('upload');
   const [uploads, setUploads] = useState<Upload[]>([]);
@@ -129,7 +129,7 @@ export default function CompetitivePage() {
   const [mode, setMode] = useState<'basic' | 'advanced'>('basic');
   const [dimension, setDimension] = useState<MediaDimension>('auto');
   const [scope, setScope] = useState<AnalysisScope>('market');
-  const [result, setResult] = useState<CompetitiveResult | null>(null);
+  const [result, setResult] = useState<MarketRadarResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>('overview');
@@ -169,7 +169,7 @@ export default function CompetitivePage() {
   }, [selectedUpload, sheet]);
 
   const contextPrefix = useMemo(
-    () => buildCompetitiveContext({ source, mode, columns: detectedColumns, result }),
+    () => buildMarketRadarContext({ source, mode, columns: detectedColumns, result }),
     [source, mode, detectedColumns, result],
   );
 
@@ -237,7 +237,7 @@ export default function CompetitivePage() {
     setLoading(true);
     setError(null);
     try {
-      const r = await competitiveApi.run({
+      const r = await marketRadarApi.run({
         source: sourceRefUri,
         sheet: sheet || undefined,
         mode,
@@ -248,7 +248,7 @@ export default function CompetitivePage() {
       setResult(r);
       setForecast(null); // a fresh estimate invalidates the prior forecast
       setTab('overview');
-      track('competitive_run', { mode, source_kind: sourceKind });
+      track('market_radar_run', { mode, source_kind: sourceKind });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Estimation failed');
       setResult(null);
@@ -262,7 +262,7 @@ export default function CompetitivePage() {
     setForecastLoading(true);
     setError(null);
     try {
-      const f = await competitiveApi.forecast({
+      const f = await marketRadarApi.forecast({
         source: sourceRefUri,
         sheet: sheet || undefined,
         mode,
@@ -315,7 +315,7 @@ export default function CompetitivePage() {
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between border-b border-line/45 px-8 py-5">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Competitive</h1>
+          <h1 className="text-xl font-semibold text-foreground">Market Radar</h1>
           <p className="text-sm text-muted">
             Estimate competitor spend, share-of-voice, and model support from a media export.
           </p>
@@ -590,7 +590,7 @@ export default function CompetitivePage() {
                       sub="Estimated ÷ observed"
                     />
                   </div>
-                  <CompetitiveInsights result={result} />
+                  <MarketRadarInsights result={result} />
                   {marketRange && marketRange.length > 0 && (
                     <Card>
                       <VegaChart
@@ -794,7 +794,7 @@ export default function CompetitivePage() {
         </main>
 
         {/* ── Competitive Assistant (right rail) ───────────────────────────── */}
-        <CompetitiveAssistantPanel contextPrefix={contextPrefix} sourceKey={sourceRefUri} />
+        <MarketRadarAssistantPanel contextPrefix={contextPrefix} sourceKey={sourceRefUri} />
       </div>
     </div>
   );

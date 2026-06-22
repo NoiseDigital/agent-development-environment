@@ -8,7 +8,7 @@ import { useState } from 'react';
 
 import VegaChart from '../VegaChart';
 import { multiLineSpec } from '../../lib/charts/specs';
-import type { BrandForecast } from '../../lib/api/competitive';
+import type { BrandForecast } from '../../lib/api/market-radar';
 
 const usd = new Intl.NumberFormat('en-US', {
   style: 'currency',

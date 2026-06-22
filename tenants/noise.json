@@ -1,8 +1,8 @@
 {
-  "_comment": "Noise — the full platform tenant. enabledModules '*' means no gating: every module, every agent (ADK loads all of adk_agents/, ENABLED_AGENTS stays empty), every service. This keeps Noise byte-identical to the pre-multi-tenant platform.",
+  "_comment": "Noise — the original platform tenant: plan + dashboards + agents (the media-planning suite). 'autocorr' and 'competitive' are CSA products and are intentionally NOT enabled here. enabledModules drives nav/routes + ENABLED_AGENTS (only these modules' agents load).",
   "id": "noise",
   "projectPrefix": "nd-agentspace",
-  "enabledModules": "*",
+  "enabledModules": ["plan", "dashboards", "agents"],
   "branding": {
     "brandName": "NoiseOS",
     "logo": "/noise/noise_white.svg",

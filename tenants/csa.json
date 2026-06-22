@@ -1,9 +1,9 @@
 {
-  "_comment": "CSA tenant. enabledModules is an explicit subset — 'analyze' (correlation) + 'competitive' (media spend estimator). Both run on the same minimal backend (gateway+agents+mcp-stats+frontend, no mcp-toolbox); ENABLED_AGENTS = session_naming_agent + analyze_assistant_agent; FloatingAssistant off.",
+  "_comment": "CSA tenant. enabledModules is an explicit subset — 'autocorr' (auto-correlation) + 'market-radar' (competitor media spend estimator). Both run on the same minimal backend (gateway+agents+mcp-stats+frontend, no mcp-toolbox); ENABLED_AGENTS = session_naming_agent + autocorr_assistant_agent + the competitive agents; FloatingAssistant off.",
   "_branding": "Vivid red ramp anchored on the Converged.AI brand red (#e50914). To retune: edit accent + run `node scripts/gen-tenant-config.mjs`. onDark/onLight = the readable accent text colour per theme. (Surfaces/fonts are the shared theme; ask to extend branding to override those too.)",
   "id": "csa",
   "projectPrefix": "nd-csa",
-  "enabledModules": ["analyze", "competitive"],
+  "enabledModules": ["autocorr", "market-radar"],
   "branding": {
     "brandName": "CSA",
     "logo": "/csa/csa_white.png",

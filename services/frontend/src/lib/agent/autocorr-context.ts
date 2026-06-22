@@ -6,7 +6,7 @@ import type { ColumnProfile, CorrelateResult, QaResult } from '../api/stats';
 import type { SourceRef } from '../../types/source';
 import { sourceUri } from '../../types/source';
 
-export interface AnalyzeContextInput {
+export interface AutocorrContextInput {
   source: SourceRef | null;
   columns: ColumnProfile[];
   setA: string[];
@@ -29,11 +29,11 @@ export interface AnalyzeContextInput {
  *  - RESULT (a correlation has run): adds the method, settings, and top signals
  *    so the assistant can interpret.
  *  Returns '' only when no source is selected. */
-export function buildAnalyzeContext(input: AnalyzeContextInput): string {
+export function buildAutocorrContext(input: AutocorrContextInput): string {
   const { source, columns, setA, setB, result, qa, preprocessing, alpha, lag } = input;
   if (!source) return '';
 
-  const lines: string[] = ['[Analyze context]'];
+  const lines: string[] = ['[AutoCorr context]'];
   lines.push(`source: ${sourceUri(source)}`);
 
   // Column profile — always included; drives the guided-setup recommendations.

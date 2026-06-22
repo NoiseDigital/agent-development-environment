@@ -1,6 +1,6 @@
 'use client';
 
-// Per-column distribution stats for /analyze — surfaces skew + outliers so the
+// Per-column distribution stats for /autocorr — surfaces skew + outliers so the
 // user (and the assistant) can pick the right method/preprocessing. Collapsed by
 // default so it doesn't crowd the results.
 

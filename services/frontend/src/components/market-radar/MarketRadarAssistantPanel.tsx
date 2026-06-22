@@ -1,9 +1,9 @@
 'use client';
 
 // Pinned chat panel on the right of /competitive — the sibling of
-// AnalyzeAssistantPanel. Always visible (no FAB), wired to
-// `competitive_assistant_agent`, which reads the page's current estimator state
-// from a "[Competitive context]" preamble built by lib/agent/competitive-context.ts.
+// AutocorrAssistantPanel. Always visible (no FAB), wired to
+// `market_radar_assistant_agent`, which reads the page's current estimator state
+// from a "[Market Radar context]" preamble built by lib/agent/market-radar-context.ts.
 // Every send prepends that preamble, so the agent always sees the freshest result.
 
 import { useEffect, useRef, useState } from 'react';
@@ -11,15 +11,15 @@ import { useChat } from '../../hooks/useChat';
 import { useChatAutoScroll } from '../../hooks/useChatAutoScroll';
 import ChatMessage from '../chat/ChatMessage';
 
-const ASSISTANT_AGENT = 'competitive_assistant_agent';
+const ASSISTANT_AGENT = 'market_radar_assistant_agent';
 
 // Sent automatically the first time a source is selected, so the assistant opens
-// with a guided greeting. The [Competitive context] preamble rides along hidden.
+// with a guided greeting. The [Market Radar context] preamble rides along hidden.
 const GREET_TRIGGER = 'I just selected a data source — what should I do, and which mode fits?';
 
 // Sent once on mount so the panel opens with a warm welcome, before a source.
 const INTRO_TRIGGER =
-  "No data source is selected yet. Greet me in 1-2 short sentences as the Competitive " +
+  "No data source is selected yet. Greet me in 1-2 short sentences as the Market Radar " +
   "assistant, say in plain terms what this estimator does, and ask me to pick a data " +
   "source on the left to begin. Do not invent any data, brands, or markets.";
 
@@ -30,7 +30,7 @@ interface PanelProps {
   sourceKey: string;
 }
 
-export default function CompetitiveAssistantPanel({ contextPrefix, sourceKey }: PanelProps) {
+export default function MarketRadarAssistantPanel({ contextPrefix, sourceKey }: PanelProps) {
   const [input, setInput] = useState('');
   const { messages, isLoading, error, feedback, rateMessage, sendMessage, createNewSession } =
     useChat(ASSISTANT_AGENT);
@@ -87,7 +87,7 @@ export default function CompetitiveAssistantPanel({ contextPrefix, sourceKey }: 
           </svg>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-foreground">Competitive Assistant</p>
+          <p className="truncate text-sm font-semibold text-foreground">Market Radar Assistant</p>
           <p className="text-[11px] text-faint">
             {ready ? 'Guiding your estimate' : 'Pick a data source to start'}
           </p>

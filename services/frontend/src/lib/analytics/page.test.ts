@@ -6,7 +6,7 @@ describe('classifyPath', () => {
     expect(classifyPath('/')).toEqual({ pageType: 'home', pageTemplate: '/' });
     expect(classifyPath('/login')).toEqual({ pageType: 'login', pageTemplate: '/login' });
     expect(classifyPath('/agents')).toEqual({ pageType: 'agents', pageTemplate: '/agents' });
-    expect(classifyPath('/analyze')).toEqual({ pageType: 'analyze', pageTemplate: '/analyze' });
+    expect(classifyPath('/autocorr')).toEqual({ pageType: 'autocorr', pageTemplate: '/autocorr' });
     expect(classifyPath('/dashboards')).toEqual({ pageType: 'dashboards', pageTemplate: '/dashboards' });
   });
 

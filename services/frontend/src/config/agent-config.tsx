@@ -58,8 +58,8 @@ export const agentConfigurations: Record<string, AgentConfig> = {
     hidden: true,
     icon: React.createElement('svg', { className: 'w-8 h-8', key: 'internal-insights' }),
   },
-  'competitive_insights_agent': {
-    name: 'competitive_insights_agent',
+  'market_radar_insights_agent': {
+    name: 'market_radar_insights_agent',
     displayName: 'Competitive Insights (internal)',
     description: 'Generates analyst bullets from a competitive estimator result.',
     url: gatewayBase(),
@@ -84,8 +84,8 @@ export const agentConfigurations: Record<string, AgentConfig> = {
     hidden: true,
     icon: React.createElement('svg', { className: 'w-8 h-8', key: 'internal-editor' }),
   },
-  'analyze_assistant_agent': {
-    name: 'analyze_assistant_agent',
+  'autocorr_assistant_agent': {
+    name: 'autocorr_assistant_agent',
     displayName: 'Analyze Assistant (internal)',
     description: 'Reads the current correlation result + top signals and explains what to focus on.',
     url: gatewayBase(),

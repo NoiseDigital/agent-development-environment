@@ -24,8 +24,9 @@ export const TENANT: TenantId = resolveTenant();
 export const tenant = TENANTS[TENANT];
 export const branding = tenant.branding;
 
-/** "*" means the full platform (Noise) — every module on, no agent allowlist. */
-const ALL_MODULES = tenant.enabledModules === "*";
+/** "*" means the full platform — every module on, no agent allowlist. No tenant
+ *  uses it today (all are explicit), but the shorthand stays supported. */
+const ALL_MODULES = (tenant.enabledModules as readonly string[] | "*") === "*";
 
 export function isModuleEnabled(key: ModuleKey): boolean {
   return ALL_MODULES || (tenant.enabledModules as readonly string[]).includes(key);
