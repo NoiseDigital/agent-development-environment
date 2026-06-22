@@ -95,7 +95,8 @@ export const TENANTS = {
       "logoAlt": "CSA",
       "logoInvertOnLight": true,
       "emailDomain": "globalservs.com",
-      "favicon": "/csa/csa_favicon.ico",
+      "favicon": "/csa/csa_favicon.png",
+      "tagline": "Competitive media intelligence — estimate spend, share of voice, and correlate what moves your KPIs.",
       "accent": {
         "100": "#fde3e4",
         "300": "#f59a9e",
@@ -157,6 +158,7 @@ export const TENANTS = {
       "logoInvertOnLight": true,
       "emailDomain": "noisedigital.com",
       "favicon": "/noise/noise_favicon.ico",
+      "tagline": "Your platform for media planning, reporting, and AI-powered tools. Pick a section below to get started.",
       "accent": {
         "100": "#dbeafe",
         "300": "#93c5fd",

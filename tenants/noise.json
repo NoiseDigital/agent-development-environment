@@ -10,6 +10,7 @@
     "logoInvertOnLight": true,
     "emailDomain": "noisedigital.com",
     "favicon": "/noise/noise_favicon.ico",
+    "tagline": "Your platform for media planning, reporting, and AI-powered tools. Pick a section below to get started.",
     "accent": {
       "100": "#dbeafe",
       "300": "#93c5fd",

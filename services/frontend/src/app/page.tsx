@@ -58,8 +58,7 @@ export default function Home() {
             />
           </div>
           <p className="text-subtle text-sm leading-relaxed max-w-sm mx-auto">
-            Your platform for media planning, reporting, and AI-powered tools.
-            Pick a section below to get started.
+            {branding.tagline}
           </p>
         </div>
 

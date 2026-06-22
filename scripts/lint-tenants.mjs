@@ -71,7 +71,7 @@ for (const file of tenantFiles) {
 
   // branding
   const b = t.branding ?? {};
-  for (const field of ["brandName", "logo", "logoAlt", "accent", "emailDomain", "favicon", "defaultTheme", "font", "charts"]) {
+  for (const field of ["brandName", "logo", "logoAlt", "accent", "emailDomain", "favicon", "defaultTheme", "font", "charts", "tagline"]) {
     if (b[field] === undefined) errors.push(`${where}: branding.${field} is required`);
   }
   if (b.accent) {
