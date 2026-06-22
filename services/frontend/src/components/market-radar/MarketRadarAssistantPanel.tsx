@@ -10,6 +10,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useChat } from '../../hooks/useChat';
 import { useChatAutoScroll } from '../../hooks/useChatAutoScroll';
 import ChatMessage from '../chat/ChatMessage';
+import SessionHistoryMenu, { toMs, type SessionRow } from '../chat/SessionHistoryMenu';
+import CollapsiblePanel from '../ui/CollapsiblePanel';
+import { useSidebarCollapsed } from '../../contexts/SidebarContext';
 
 const ASSISTANT_AGENT = 'market_radar_assistant_agent';
 
@@ -32,21 +35,28 @@ interface PanelProps {
 
 export default function MarketRadarAssistantPanel({ contextPrefix, sourceKey }: PanelProps) {
   const [input, setInput] = useState('');
-  const { messages, isLoading, error, feedback, rateMessage, sendMessage, createNewSession } =
-    useChat(ASSISTANT_AGENT);
+  const {
+    messages, isLoading, error, feedback, rateMessage, sendMessage,
+    createNewSession, sessions, sessionNames, selectSession,
+  } = useChat(ASSISTANT_AGENT);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastMsgRef = useRef<HTMLDivElement>(null);
+  const histBtn = useRef<HTMLButtonElement>(null);
   const initRef = useRef(false);
   const greetedKey = useRef<string | null>(null);
+  const [histOpen, setHistOpen] = useState(false);
+  const [histPos, setHistPos] = useState<{ x: number; y: number } | null>(null);
+  const [collapsed, setCollapsed] = useSidebarCollapsed('assistant');
 
   // One session per panel mount + an opening greeting so the panel feels alive.
   useEffect(() => {
     if (initRef.current) return;
     initRef.current = true;
-    createNewSession(ASSISTANT_AGENT);
-    sendMessage(INTRO_TRIGGER, '');
+    // Await the fresh session before greeting — sending synchronously races
+    // ahead of session creation and the intro message never lands.
+    createNewSession(ASSISTANT_AGENT).then(() => sendMessage(INTRO_TRIGGER, ''));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ready = contextPrefix.length > 0;
@@ -74,18 +84,55 @@ export default function MarketRadarAssistantPanel({ contextPrefix, sourceKey }: 
     sendMessage(text, contextPrefix);
   };
 
+  const handleNewChat = () => {
+    setHistOpen(false);
+    createNewSession(ASSISTANT_AGENT).then(() => sendMessage(INTRO_TRIGGER, ''));
+  };
+
+  const toggleHistory = () => {
+    if (histOpen) {
+      setHistOpen(false);
+      return;
+    }
+    const r = histBtn.current?.getBoundingClientRect();
+    if (r) setHistPos({ x: r.right, y: r.bottom + 4 });
+    setHistOpen(true);
+  };
+
+  const historyRows: SessionRow[] = sessions
+    .map((s) => ({ id: s.id, name: sessionNames[s.id] ?? 'Untitled chat', ts: toMs(s.lastUpdateTime) }))
+    .sort((a, b) => b.ts - a.ts)
+    .slice(0, 10);
+
   return (
-    <aside className="flex h-full w-[380px] shrink-0 flex-col border-l border-line/45 bg-surface-sunken">
-      {/* Header */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-line/45 px-4 py-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-accent-500">
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6}
-              d="M12 4l1.6 4.4L18 10l-4.4 1.6L12 16l-1.6-4.4L6 10l4.4-1.6L12 4z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6}
-              d="M18.5 14.5l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7 .7-2z" />
-          </svg>
-        </div>
+    <CollapsiblePanel
+      collapsed={collapsed}
+      resize={{ initial: 380, min: 320, max: 520 }}
+      side="left"
+      className="bg-surface-sunken border-line/45"
+      rail={
+        <>
+          <button
+            type="button"
+            onClick={() => setCollapsed(false)}
+            title="Expand assistant"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-faint transition-colors hover:bg-surface-raised hover:text-foreground"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg text-accent-500" title="Market Radar Assistant">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6}
+                d="M12 4l1.6 4.4L18 10l-4.4 1.6L12 16l-1.6-4.4L6 10l4.4-1.6L12 4z" />
+            </svg>
+          </div>
+        </>
+      }
+    >
+      {/* Header — no avatar; title + new-chat / history actions (Claude-Code style) */}
+      <div className="flex shrink-0 items-center gap-1 border-b border-line/45 px-4 py-3">
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-foreground">Market Radar Assistant</p>
           <p className="text-[11px] text-faint">
@@ -94,16 +141,49 @@ export default function MarketRadarAssistantPanel({ contextPrefix, sourceKey }: 
         </div>
         <button
           type="button"
-          onClick={() => createNewSession(ASSISTANT_AGENT)}
+          onClick={handleNewChat}
           title="New chat"
           className="rounded-md p-1.5 text-faint transition-colors hover:bg-surface-raised hover:text-foreground"
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+        <button
+          ref={histBtn}
+          type="button"
+          onClick={toggleHistory}
+          title="Chat history"
+          className={`rounded-md p-1.5 transition-colors hover:bg-surface-raised hover:text-foreground ${histOpen ? 'text-foreground' : 'text-faint'}`}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              d="M12 8v4l3 2M3 12a9 9 0 1018 0 9 9 0 00-18 0z" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          onClick={() => setCollapsed(true)}
+          title="Collapse assistant"
+          className="rounded-md p-1.5 text-faint transition-colors hover:bg-surface-raised hover:text-foreground"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>
       </div>
+
+      <SessionHistoryMenu
+        open={histOpen}
+        anchor={histPos}
+        title="Recent chats"
+        rows={historyRows}
+        onSelect={(id) => {
+          selectSession(id);
+          setHistOpen(false);
+        }}
+        onClose={() => setHistOpen(false)}
+      />
 
       {/* Transcript */}
       <div ref={containerRef} className="flex-1 space-y-3 overflow-y-auto px-3 py-3">
@@ -156,7 +236,7 @@ export default function MarketRadarAssistantPanel({ contextPrefix, sourceKey }: 
           </button>
         </div>
       </div>
-    </aside>
+    </CollapsiblePanel>
   );
 }
 

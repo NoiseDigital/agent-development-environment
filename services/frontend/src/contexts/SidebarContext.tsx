@@ -6,7 +6,9 @@ import { createContext, useContext, useState, type ReactNode } from 'react';
 // survives page navigations (e.g. starting a new chat) instead of resetting
 // when the page subtree re-renders.
 
-type Panel = 'platform' | 'chat' | 'sources';
+// 'assistant' is shared by the embedded AutoCorr / Market Radar rails — only one
+// is ever mounted at a time, so a single key keeps their collapse state in sync.
+type Panel = 'platform' | 'chat' | 'sources' | 'assistant';
 
 interface SidebarState {
   collapsed: Record<Panel, boolean>;
@@ -20,6 +22,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     platform: false,
     chat: false,
     sources: false,
+    assistant: false,
   });
   const setCollapsed = (panel: Panel, value: boolean) =>
     setCollapsedState((prev) => ({ ...prev, [panel]: value }));
