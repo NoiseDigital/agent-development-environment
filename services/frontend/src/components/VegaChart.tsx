@@ -15,6 +15,7 @@ import { vegaTheme } from '../lib/charts/theme';
 import { useTheme } from '../contexts/ThemeContext';
 import { checkVegaSpec } from '../lib/charts/guard';
 import { compactNum } from '../lib/format/compact-num';
+import { canPinToDashboard } from '../config/tenant';
 import ChartActions from './ChartActions';
 
 const VegaEmbed = dynamic(
@@ -117,11 +118,12 @@ export default function VegaChart({ spec, fill = false, saveable = false, onDele
       )}
       {saveable && !error && (
         <div className="absolute right-1 top-1 z-10">
-          {/* Dashboard tiles (fill) show export-only — they're already on a dashboard. */}
+          {/* Export-only when the chart is already on a dashboard (fill) OR the
+              tenant has no dashboards module to pin into (capability absent). */}
           <ChartActions
             chart={spec}
             captureRef={containerRef}
-            exportsOnly={fill}
+            exportsOnly={fill || !canPinToDashboard}
             onDelete={onDelete}
           />
         </div>

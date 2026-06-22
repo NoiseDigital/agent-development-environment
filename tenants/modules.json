@@ -22,7 +22,7 @@
       "description": "Access your reports and shared dashboards. Monitor performance across campaigns, clients, and channels.",
       "agents": ["dashboard_insights_agent", "dashboard_editor_agent"],
       "services": ["mcp-toolbox"],
-      "capabilities": ["floatingAssistant"]
+      "capabilities": ["floatingAssistant", "pinToDashboard"]
     },
     "autocorr": {
       "label": "AutoCorr",

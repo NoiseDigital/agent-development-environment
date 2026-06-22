@@ -38,7 +38,8 @@ export const MODULE_CATALOG = {
         "mcp-toolbox"
       ],
       "capabilities": [
-        "floatingAssistant"
+        "floatingAssistant",
+        "pinToDashboard"
       ]
     },
     "autocorr": {
@@ -90,9 +91,9 @@ export const TENANTS = {
       "market-radar"
     ],
     "branding": {
-      "brandName": "CSA",
+      "brandName": "CSAos",
       "logo": "/csa/csa_white.png",
-      "logoAlt": "CSA",
+      "logoAlt": "CSAos",
       "logoInvertOnLight": true,
       "emailDomain": "globalservs.com",
       "favicon": "/csa/csa_favicon.png",

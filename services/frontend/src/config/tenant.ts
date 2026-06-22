@@ -56,16 +56,28 @@ export const disabledRoutes: string[] = (
   .filter((key) => !isModuleEnabled(key))
   .map((key) => MODULE_CATALOG.modules[key].route);
 
+/** True when any enabled module *provides* the given platform capability.
+ *  This is how modules declare loose dependencies: a module needs a capability
+ *  (e.g. AutoCorr's "save to dashboard"), another module provides it (dashboards),
+ *  and the UI adapts when it's absent instead of breaking. */
+export function hasCapability(cap: string): boolean {
+  return (
+    ALL_MODULES ||
+    (Object.keys(MODULE_CATALOG.modules) as ModuleKey[]).some(
+      (key) =>
+        isModuleEnabled(key) &&
+        (MODULE_CATALOG.modules[key].capabilities as readonly string[]).includes(cap),
+    )
+  );
+}
+
 /** The global FloatingAssistant belongs to any module that declares the
  *  `floatingAssistant` capability (agents / dashboards). Off for analyze-only
  *  tenants — it would otherwise spawn a media_performance_agent session that
  *  isn't in their stack. */
-export const showFloatingAssistant: boolean =
-  ALL_MODULES ||
-  (Object.keys(MODULE_CATALOG.modules) as ModuleKey[]).some(
-    (key) =>
-      isModuleEnabled(key) &&
-      (MODULE_CATALOG.modules[key].capabilities as readonly string[]).includes(
-        "floatingAssistant",
-      ),
-  );
+export const showFloatingAssistant: boolean = hasCapability("floatingAssistant");
+
+/** Charts can be pinned to a dashboard only when an enabled module provides it
+ *  (the dashboards module). Without it, the chart menu degrades to export-only
+ *  (PNG / SVG / data) — so AutoCorr/Market Radar work standalone on CSA. */
+export const canPinToDashboard: boolean = hasCapability("pinToDashboard");
