@@ -64,7 +64,7 @@ type TabKey = (typeof TABS)[number]['key'];
 // ── Small presentational primitives ──────────────────────────────────────────
 function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
-    <section className="space-y-2 rounded-xl border border-line/80 bg-surface-sunken/40 p-3">
+    <section className="space-y-2 rounded-xl border border-line/50 bg-surface-sunken/40 p-3">
       <h2 className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-subtle">
         {title}
         {hint && <InfoHint text={hint} />}
@@ -76,7 +76,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 
 function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-xl border border-line/80 bg-surface-sunken/40 p-4">
+    <div className="rounded-xl border border-line/50 bg-surface-sunken/40 p-4">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-subtle">{label}</div>
       <div className="mt-1 text-xl font-semibold tabular-nums text-foreground">{value}</div>
       {sub && <div className="mt-0.5 text-[11px] text-faint">{sub}</div>}
@@ -85,7 +85,7 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub?: string
 }
 
 function Card({ children }: { children: ReactNode }) {
-  return <div className="rounded-xl border border-line/80 bg-surface-sunken/40 p-3">{children}</div>;
+  return <div className="rounded-xl border border-line/50 bg-surface-sunken/40 p-3">{children}</div>;
 }
 
 // Top-N brands as stacked SOV series; everything else collapses into "Other" so
@@ -313,7 +313,7 @@ export default function CompetitivePage() {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex shrink-0 items-center justify-between border-b border-line/60 px-8 py-5">
+      <div className="flex shrink-0 items-center justify-between border-b border-line/45 px-8 py-5">
         <div>
           <h1 className="text-xl font-semibold text-foreground">Competitive</h1>
           <p className="text-sm text-muted">
@@ -325,7 +325,7 @@ export default function CompetitivePage() {
 
       <div className="flex min-h-0 flex-1">
         {/* ── Controls rail ────────────────────────────────────────────────── */}
-        <aside className="flex w-[300px] shrink-0 flex-col border-r border-line/60">
+        <aside className="flex w-[300px] shrink-0 flex-col border-r border-line/45">
           <div className="flex-1 space-y-3 overflow-y-auto p-3">
             <Section
               title="Data source"
@@ -501,7 +501,7 @@ export default function CompetitivePage() {
             )}
           </div>
 
-          <div className="shrink-0 border-t border-line/60 p-3">
+          <div className="shrink-0 border-t border-line/45 p-3">
             <button
               type="button"
               onClick={runEstimate}
@@ -542,7 +542,7 @@ export default function CompetitivePage() {
           ) : (
             <div className="space-y-5">
               {/* Tab bar */}
-              <div className="flex gap-1 border-b border-line/60">
+              <div className="flex gap-1 border-b border-line/45">
                 {TABS.map((t) => (
                   <button
                     key={t.key}

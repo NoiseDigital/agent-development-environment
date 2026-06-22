@@ -62,7 +62,7 @@ function Slider({
 
 function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-xl border border-line/80 bg-surface-sunken/40 p-4">
+    <div className="rounded-xl border border-line/50 bg-surface-sunken/40 p-4">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-subtle">{label}</div>
       <div className="mt-1 text-xl font-semibold tabular-nums text-foreground">{value}</div>
       {sub && <div className="mt-0.5 text-[11px] text-faint">{sub}</div>}
@@ -108,7 +108,7 @@ export default function ScenarioPlanner({ params, onChange, onRun, loading, fore
   return (
     <div className="space-y-5">
       {/* Controls */}
-      <div className="rounded-xl border border-line/80 bg-surface-sunken/40 p-4">
+      <div className="rounded-xl border border-line/50 bg-surface-sunken/40 p-4">
         <div className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-3">
           <Slider label="Market multiplier" value={p.market_mult} min={0.5} max={2} step={0.05}
             onChange={(v) => set({ market_mult: v })} fmt={(v) => `${v.toFixed(2)}×`}
@@ -178,7 +178,7 @@ export default function ScenarioPlanner({ params, onChange, onRun, loading, fore
             <Kpi label="R²" value={fmtNum(stats?.r_squared)} />
           </div>
 
-          <div className="rounded-xl border border-line/80 bg-surface-sunken/40 p-3">
+          <div className="rounded-xl border border-line/50 bg-surface-sunken/40 p-3">
             <VegaChart
               spec={forecastFanSpec({
                 title: 'Total competitive spend — forecast',
@@ -190,11 +190,11 @@ export default function ScenarioPlanner({ params, onChange, onRun, loading, fore
             />
           </div>
 
-          <details className="rounded-xl border border-line/80 bg-surface-sunken/40">
+          <details className="rounded-xl border border-line/50 bg-surface-sunken/40">
             <summary className="cursor-pointer select-none px-4 py-2.5 text-sm font-medium text-foreground">
               Forecast QA table
             </summary>
-            <div className="overflow-x-auto border-t border-line/60">
+            <div className="overflow-x-auto border-t border-line/45">
               <table className="w-full text-xs">
                 <thead className="text-faint">
                   <tr className="text-right">

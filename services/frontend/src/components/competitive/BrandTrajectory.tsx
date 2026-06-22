@@ -66,7 +66,7 @@ export default function BrandTrajectory({ brands }: { brands: BrandForecast[] })
         ))}
       </div>
 
-      <div className="rounded-xl border border-line/80 bg-surface-sunken/40 p-3">
+      <div className="rounded-xl border border-line/50 bg-surface-sunken/40 p-3">
         <VegaChart
           spec={multiLineSpec({
             title: `Brand ${metric === 'sov' ? 'share of voice' : metric} — trajectory`,
@@ -78,7 +78,7 @@ export default function BrandTrajectory({ brands }: { brands: BrandForecast[] })
         />
       </div>
 
-      <div className="rounded-xl border border-line/80 bg-surface-sunken/40 p-3">
+      <div className="rounded-xl border border-line/50 bg-surface-sunken/40 p-3">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead className="text-faint">

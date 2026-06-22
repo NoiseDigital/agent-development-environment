@@ -27,7 +27,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-line/80 bg-surface-sunken/40 p-3 space-y-2">
+    <section className="rounded-xl border border-line/50 bg-surface-sunken/40 p-3 space-y-2">
       <header className="flex items-center justify-between">
         <h2 className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-subtle">
           {title}
@@ -454,7 +454,7 @@ export default function AnalyzePage() {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex shrink-0 items-center justify-between border-b border-line/60 px-8 py-5">
+      <div className="flex shrink-0 items-center justify-between border-b border-line/45 px-8 py-5">
         <div>
           <h1 className="text-lg font-semibold tracking-tight text-foreground">Analyze</h1>
           <p className="mt-0.5 text-xs text-faint">
@@ -477,7 +477,7 @@ export default function AnalyzePage() {
 
       <div className="flex min-h-0 flex-1">
         {/* ── Controls rail ────────────────────────────────────────────── */}
-        <aside className="flex w-[300px] shrink-0 flex-col border-r border-line/60">
+        <aside className="flex w-[300px] shrink-0 flex-col border-r border-line/45">
           <div className="flex-1 space-y-3 overflow-y-auto p-3">
             {/* Source */}
             <Section title="Data source">
@@ -501,7 +501,7 @@ export default function AnalyzePage() {
                   <select
                     value={bqDataset}
                     onChange={(e) => pickDataset(e.target.value)}
-                    className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground focus:border-line-strong focus:outline-none"
+                    className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground focus:border-accent-500 focus:outline-none"
                   >
                     <option value="">Select dataset…</option>
                     {bqDatasets.map((d) => (
@@ -512,7 +512,7 @@ export default function AnalyzePage() {
                     <select
                       value={bqTable}
                       onChange={(e) => setBqTable(e.target.value)}
-                      className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground focus:border-line-strong focus:outline-none"
+                      className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground focus:border-accent-500 focus:outline-none"
                     >
                       <option value="">Select table…</option>
                       {bqTables.map((t) => (
@@ -530,7 +530,7 @@ export default function AnalyzePage() {
                       const u = uploads.find((x) => x.id === e.target.value);
                       setSheet(u?.metadata.sheet_names?.[0] ?? '');
                     }}
-                    className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground focus:border-line-strong focus:outline-none"
+                    className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground focus:border-accent-500 focus:outline-none"
                   >
                     <option value="">Select an upload…</option>
                     {uploads.map((u) => (
@@ -541,7 +541,7 @@ export default function AnalyzePage() {
                     <select
                       value={sheet}
                       onChange={(e) => setSheet(e.target.value)}
-                      className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground focus:border-line-strong focus:outline-none"
+                      className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground focus:border-accent-500 focus:outline-none"
                     >
                       {sheetNames.map((s) => (
                         <option key={s} value={s}>Sheet: {s}</option>
@@ -593,7 +593,7 @@ export default function AnalyzePage() {
                 value={groupCol}
                 onChange={(e) => { setGroupCol(e.target.value); setGroupVal(''); }}
                 disabled={describing}
-                className="mb-2 w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground outline-none transition-colors focus:border-line-strong disabled:opacity-50"
+                className="mb-2 w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground outline-none transition-colors focus:border-accent-500 disabled:opacity-50"
               >
                 <option value="">(whole dataset)</option>
                 {segmentColumns.map((n) => <option key={n} value={n}>{n}</option>)}
@@ -604,7 +604,7 @@ export default function AnalyzePage() {
                   <select
                     value={groupVal}
                     onChange={(e) => setGroupVal(e.target.value)}
-                    className="mb-2 w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground outline-none transition-colors focus:border-line-strong"
+                    className="mb-2 w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground outline-none transition-colors focus:border-accent-500"
                   >
                     <option value="">(all values)</option>
                     {groupValues.map((v) => <option key={v} value={v}>{v}</option>)}
@@ -616,7 +616,7 @@ export default function AnalyzePage() {
                 value={timeCol}
                 onChange={(e) => setTimeCol(e.target.value)}
                 disabled={describing}
-                className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground outline-none transition-colors focus:border-line-strong disabled:opacity-50"
+                className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground outline-none transition-colors focus:border-accent-500 disabled:opacity-50"
               >
                 <option value="">(none)</option>
                 {datetimeColumns.map((n) => <option key={n} value={n}>{n}</option>)}
@@ -677,7 +677,7 @@ export default function AnalyzePage() {
                 value={regY}
                 onChange={(e) => setRegY(e.target.value)}
                 disabled={describing}
-                className="mb-3 w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground outline-none transition-colors focus:border-line-strong disabled:opacity-50"
+                className="mb-3 w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground outline-none transition-colors focus:border-accent-500 disabled:opacity-50"
               >
                 <option value="">{describing ? 'Profiling…' : 'Select outcome…'}</option>
                 {numericColumns.map((n) => (
@@ -711,7 +711,7 @@ export default function AnalyzePage() {
           </div>
 
           {/* Run button — pinned to the bottom of the rail so it's always reachable. */}
-          <div className="shrink-0 border-t border-line/60 p-3">
+          <div className="shrink-0 border-t border-line/45 p-3">
             <button
               type="button"
               onClick={mode === 'regress' ? runRegress : run}
@@ -789,7 +789,7 @@ export default function AnalyzePage() {
 
               {/* Heatmap */}
               {heatmapChart && (
-                <div className="rounded-xl border border-line/80 bg-surface-sunken/40 p-3">
+                <div className="rounded-xl border border-line/50 bg-surface-sunken/40 p-3">
                   <VegaChart spec={heatmapChart} saveable />
                 </div>
               )}
@@ -803,7 +803,7 @@ export default function AnalyzePage() {
 
               {/* Scatter explorer */}
               {(scatter || scatterLoading) && (
-                <div className="rounded-xl border border-line/80 bg-surface-sunken/40 p-3">
+                <div className="rounded-xl border border-line/50 bg-surface-sunken/40 p-3">
                   {scatterLoading ? (
                     <p className="px-2 py-10 text-center text-xs text-faint">Loading scatter…</p>
                   ) : scatter && scatter.points.length > 0 ? (
@@ -848,7 +848,7 @@ function EmptyResults({ source, running }: { source: SourceRef | null; running: 
       <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-line bg-surface">
         <svg className="h-5 w-5 text-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-            d="M9 19V6l-3 1.5M15 5v13l3-1.5M9 6l6 -1M9 19l6 -1" />
+            d="M4 4v16h16M8 15l3-4 3 2 4-6" />
         </svg>
       </div>
       <p className="text-sm font-semibold text-foreground">
@@ -887,7 +887,7 @@ function TopSignalsTable({
 
   if (signals.length === 0) {
     return (
-      <div className="rounded-xl border border-line/80 bg-surface-sunken/40 p-4">
+      <div className="rounded-xl border border-line/50 bg-surface-sunken/40 p-4">
         <h3 className="text-sm font-medium text-foreground">Top signals</h3>
         <p className="mt-2 text-xs text-faint">No signals returned.</p>
       </div>
@@ -895,8 +895,8 @@ function TopSignalsTable({
   }
 
   return (
-    <div className="rounded-xl border border-line/80 bg-surface-sunken/40">
-      <div className="flex items-center justify-between border-b border-line/60 px-4 py-2.5">
+    <div className="rounded-xl border border-line/50 bg-surface-sunken/40">
+      <div className="flex items-center justify-between border-b border-line/45 px-4 py-2.5">
         <h3 className="text-sm font-medium text-foreground">Top signals</h3>
         <div className="flex gap-1 rounded-md border border-line bg-surface p-0.5">
           {(['r', 'p'] as const).map((k) => (
@@ -916,7 +916,7 @@ function TopSignalsTable({
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-line/60 text-left text-faint">
+            <tr className="border-b border-line/45 text-left text-faint">
               <Th>A</Th>
               <Th>B</Th>
               <Th align="right">r</Th>
@@ -936,7 +936,7 @@ function TopSignalsTable({
                   key={i}
                   onClick={() => onRowClick?.(s.a, s.b)}
                   title="Plot this pair"
-                  className="cursor-pointer border-b border-line/60 transition-colors last:border-0 hover:bg-surface/30"
+                  className="cursor-pointer border-b border-line/45 transition-colors last:border-0 hover:bg-surface/30"
                 >
                   <Td><span className="text-muted">{s.a}</span></Td>
                   <Td><span className="text-muted">{s.b}</span></Td>

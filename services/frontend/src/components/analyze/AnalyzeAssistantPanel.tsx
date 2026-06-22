@@ -22,6 +22,13 @@ const ASSISTANT_AGENT = 'analyze_assistant_agent';
 // preamble (columns + qa) rides along hidden, so this is all the user sees.
 const GREET_TRIGGER = "I just selected a data source — what should I analyze, and how?";
 
+// Sent once on mount so the panel opens with a warm welcome instead of a cold
+// empty state — even before a data source is picked.
+const INTRO_TRIGGER =
+  "No data source is selected yet. Greet me in 1-2 short sentences as the Analyze " +
+  "assistant, say in plain terms what this tool does, and ask me to pick a data " +
+  "source on the left to begin. Do not invent any data or column names.";
+
 interface PanelProps {
   /** The current analysis preamble — empty string means "no source selected". */
   contextPrefix: string;
@@ -40,11 +47,13 @@ export default function AnalyzeAssistantPanel({ contextPrefix, sourceKey }: Pane
   const initRef = useRef(false);
   const greetedKey = useRef<string | null>(null);
 
-  // Create one session per panel mount so the user gets a clean transcript.
+  // Create one session per panel mount + open with a greeting so the assistant
+  // feels alive immediately (no cold "empty" panel).
   useEffect(() => {
     if (initRef.current) return;
     initRef.current = true;
     createNewSession(ASSISTANT_AGENT);
+    sendMessage(INTRO_TRIGGER, '');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ready = contextPrefix.length > 0;
@@ -61,25 +70,27 @@ export default function AnalyzeAssistantPanel({ contextPrefix, sourceKey }: Pane
 
   const handleSend = () => {
     const text = input.trim();
-    if (!text || isLoading || !ready) return;
+    if (!text || isLoading) return;
     setInput('');
     sendMessage(text, contextPrefix);
   };
 
   const askSuggestion = (text: string) => {
-    if (isLoading || !ready) return;
+    if (isLoading) return;
     setInput('');
     sendMessage(text, contextPrefix);
   };
 
   return (
-    <aside className="flex h-full w-[380px] shrink-0 flex-col border-l border-line/60 bg-surface-sunken">
+    <aside className="flex h-full w-[380px] shrink-0 flex-col border-l border-line/45 bg-surface-sunken">
       {/* Header */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-line/60 px-4 py-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-foreground">
+      <div className="flex shrink-0 items-center gap-3 border-b border-line/45 px-4 py-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-accent-500">
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M3 12h2m14 0h2M5.6 5.6l1.4 1.4m9.9 9.9l1.4 1.4M12 3v2m0 14v2M5.6 18.4l1.4-1.4m9.9-9.9l1.4-1.4M9 12a3 3 0 116 0 3 3 0 01-6 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6}
+              d="M12 4l1.6 4.4L18 10l-4.4 1.6L12 16l-1.6-4.4L6 10l4.4-1.6L12 4z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6}
+              d="M18.5 14.5l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7 .7-2z" />
           </svg>
         </div>
         <div className="min-w-0 flex-1">
@@ -124,7 +135,7 @@ export default function AnalyzeAssistantPanel({ contextPrefix, sourceKey }: Pane
       </div>
 
       {/* Input */}
-      <div className="shrink-0 border-t border-line/60 p-3">
+      <div className="shrink-0 border-t border-line/45 p-3">
         <div className="flex items-end gap-2 rounded-xl border border-line bg-surface px-3 py-2 focus-within:border-line-strong">
           <textarea
             value={input}
@@ -135,15 +146,14 @@ export default function AnalyzeAssistantPanel({ contextPrefix, sourceKey }: Pane
                 handleSend();
               }
             }}
-            placeholder={ready ? 'Ask about your data or this analysis…' : 'Pick a data source first…'}
+            placeholder="Ask about your data or this analysis…"
             rows={2}
-            disabled={!ready}
-            className="flex-1 resize-none bg-transparent text-[13px] text-foreground placeholder-disabled outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex-1 resize-none bg-transparent text-[13px] text-foreground placeholder-disabled outline-none"
           />
           <button
             type="button"
             onClick={handleSend}
-            disabled={!input.trim() || isLoading || !ready}
+            disabled={!input.trim() || isLoading}
             aria-label="Send message"
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-inverse text-inverse-foreground transition-colors hover:bg-inverse/90 disabled:cursor-not-allowed disabled:opacity-30"
           >
@@ -163,10 +173,12 @@ function EmptyState({ ready, onAsk }: { ready: boolean; onAsk: (q: string) => vo
   if (!ready) {
     return (
       <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-        <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-line bg-surface">
-          <svg className="h-5 w-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M9 17v-2a4 4 0 014-4h0M5 12V7a4 4 0 014-4h0m6 18v-2a4 4 0 00-4-4H7m12 6v-2a4 4 0 00-4-4h-1" />
+        <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-line bg-surface text-accent-500">
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6}
+              d="M12 4l1.6 4.4L18 10l-4.4 1.6L12 16l-1.6-4.4L6 10l4.4-1.6L12 4z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6}
+              d="M18.5 14.5l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7 .7-2z" />
           </svg>
         </div>
         <p className="text-sm font-semibold text-foreground">Pick a data source</p>

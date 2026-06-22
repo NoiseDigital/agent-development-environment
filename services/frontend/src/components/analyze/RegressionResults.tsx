@@ -64,7 +64,7 @@ export default function RegressionResults({
       {/* Fit summary */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {stats.map((s) => (
-          <div key={s.label} className="rounded-xl border border-line/80 bg-surface-sunken/40 px-4 py-3">
+          <div key={s.label} className="rounded-xl border border-line/50 bg-surface-sunken/40 px-4 py-3">
             <p className="text-[11px] uppercase tracking-wide text-faint">{s.label}</p>
             <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{s.value}</p>
           </div>
@@ -94,7 +94,7 @@ export default function RegressionResults({
       </div>
 
       {/* Coefficient table */}
-      <div className="overflow-hidden rounded-xl border border-line/80">
+      <div className="overflow-hidden rounded-xl border border-line/50">
         <table className="w-full text-xs">
           <thead className="bg-surface-sunken/60 text-faint">
             <tr>
@@ -129,14 +129,14 @@ export default function RegressionResults({
             })}
           </tbody>
         </table>
-        <p className="border-t border-line/60 bg-surface-sunken/40 px-3 py-1.5 text-[11px] text-faint">
+        <p className="border-t border-line/45 bg-surface-sunken/40 px-3 py-1.5 text-[11px] text-faint">
           <span className="text-accent">●</span> significant at α = {alpha}. A small p-value means the
           predictor&apos;s effect is unlikely to be noise — it doesn&apos;t prove causation.
         </p>
       </div>
 
       {/* Actual vs predicted */}
-      <div className="rounded-xl border border-line/80 bg-surface-sunken/40 p-3">
+      <div className="rounded-xl border border-line/50 bg-surface-sunken/40 p-3">
         <VegaChart spec={scatter} saveable />
       </div>
     </div>

@@ -23,7 +23,7 @@ interface AgentInsight {
 const TONE: Record<string, string> = {
   positive: 'border-positive/30 bg-positive/10',
   negative: 'border-danger/30 bg-danger/10',
-  neutral: 'border-line/80 bg-surface-sunken/40',
+  neutral: 'border-line/50 bg-surface-sunken/40',
 };
 
 function sovLeaders(result: CompetitiveResult) {

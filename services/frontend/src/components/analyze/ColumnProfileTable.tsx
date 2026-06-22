@@ -17,14 +17,14 @@ export default function ColumnProfileTable({ columns }: { columns: ColumnStat[] 
   const skewed = columns.filter((c) => Math.abs(c.skew) >= 2).length;
 
   return (
-    <details className="rounded-xl border border-line/80 bg-surface-sunken/40">
+    <details className="rounded-xl border border-line/50 bg-surface-sunken/40">
       <summary className="cursor-pointer select-none px-4 py-2.5 text-sm font-medium text-foreground">
         Column distribution
         <span className="ml-2 text-[11px] font-normal text-faint">
           {columns.length} numeric{skewed > 0 ? ` · ${skewed} highly skewed` : ''}
         </span>
       </summary>
-      <div className="overflow-x-auto border-t border-line/60">
+      <div className="overflow-x-auto border-t border-line/45">
         <table className="w-full text-xs">
           <thead className="text-faint">
             <tr className="text-right">
@@ -60,7 +60,7 @@ export default function ColumnProfileTable({ columns }: { columns: ColumnStat[] 
             })}
           </tbody>
         </table>
-        <p className="border-t border-line/60 px-3 py-1.5 text-[11px] text-faint">
+        <p className="border-t border-line/45 px-3 py-1.5 text-[11px] text-faint">
           High |skew| (≥ 2) means heavy tails — consider <b>Spearman</b> or <b>Log1p</b>.
         </p>
       </div>
