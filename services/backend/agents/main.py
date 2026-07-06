@@ -16,13 +16,14 @@ from google.adk.cli.utils.agent_loader import AgentLoader
 
 
 class _MuteLivenessAccessLog(logging.Filter):
-    """Drop the exact liveness-probe access line (`GET /healthz`, any status) —
-    zero-signal orchestrator noise; a real liveness failure shows via the
-    unhealthy container + app error log. Narrow on purpose: `/list-apps`, every
-    other route, and their failures stay visible."""
+    """Drop zero-signal poll access lines: the orchestrator's `GET /healthz`
+    liveness probe and the frontend's `GET /list-apps` agent-liveness poll —
+    both high-frequency, no signal; a real failure shows via the unhealthy
+    container + app error log. Narrow: every other route + their failures stay."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        return '"GET /healthz HTTP' not in record.getMessage()
+        msg = record.getMessage()
+        return '"GET /healthz HTTP' not in msg and '"GET /list-apps HTTP' not in msg
 
 
 logging.getLogger("uvicorn.access").addFilter(_MuteLivenessAccessLog())

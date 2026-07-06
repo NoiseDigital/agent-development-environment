@@ -43,14 +43,15 @@ from api.users.routes import router as users_router
 
 
 class _MuteLivenessAccessLog(logging.Filter):
-    """Drop the exact liveness-probe access line (`GET /healthz`, any status),
-    which the orchestrator hits every few seconds with zero signal — a liveness
-    failure surfaces via the orchestrator marking the container unhealthy + the
-    app-level error log, not this access line. Deliberately narrow: `/list-apps`,
-    every other route, and their failures all stay visible."""
+    """Drop zero-signal poll access lines: the orchestrator's `GET /healthz`
+    liveness probe and the frontend's `GET /list-apps` agent-liveness poll (the
+    AppsProvider hits it on a 15s timer). Both are high-frequency and carry no
+    signal — a real failure surfaces via the unhealthy container + app error
+    log. Narrow on purpose: every other route and their failures stay visible."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        return '"GET /healthz HTTP' not in record.getMessage()
+        msg = record.getMessage()
+        return '"GET /healthz HTTP' not in msg and '"GET /list-apps HTTP' not in msg
 
 
 logging.getLogger("uvicorn.access").addFilter(_MuteLivenessAccessLog())
