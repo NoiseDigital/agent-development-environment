@@ -55,11 +55,9 @@ export interface Session {
 // list-apps is a near-static list. The cache + in-flight dedupe live at MODULE
 // scope (not on the instance) so they're shared no matter how many ADKApiClient
 // instances the bundler/HMR creates — a static list should never hit the
-// network more than once per TTL. `_appsNetCount` lets us see real network hits
-// in the console vs. the request log.
+// network more than once per TTL.
 let _appsCache: { apps: string[]; at: number } | null = null;
 let _appsInflight: Promise<string[]> | null = null;
-let _appsNetCount = 0;
 const APPS_TTL_MS = 10_000;
 
 // API functions
@@ -112,8 +110,6 @@ export class ADKApiClient {
   }
 
   private async fetchApps(): Promise<string[]> {
-    _appsNetCount += 1;
-    console.debug(`[adkApi] list-apps NETWORK hit #${_appsNetCount}`);
     // Query all configured endpoints to discover available apps
     const allApps = new Set<string>();
     const endpoints = Object.values(this.endpoints);

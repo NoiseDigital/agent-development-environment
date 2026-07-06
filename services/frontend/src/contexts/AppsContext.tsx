@@ -51,7 +51,7 @@ export function AppsProvider({ children }: { children: ReactNode }) {
 
   // Fetch once on mount, then poll for liveness (which agents are up).
   useEffect(() => {
-    console.debug('[AppsProvider] mount/effect run');
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
     const id = window.setInterval(refresh, 15_000);
     return () => window.clearInterval(id);
