@@ -319,10 +319,11 @@ services:
       - FIREBASE_AUTH_EMULATOR_HOST=${FIREBASE_AUTH_EMULATOR_HOST:-firebase-emulator:9099}
       # Access control lives in the gateway's access_rules allowlist (DB/UI);
       # local dev is permissive (GATEWAY_DEV_AUTH on the gateway → admin).
-      # Google Analytics (gtag.js). Empty = analytics no-ops. Set the measurement
-      # id to test tagging locally; point the server URL at the `sgtm` service
-      # (run `docker compose --profile tagging up` to route through it).
-      - NEXT_PUBLIC_GA_MEASUREMENT_ID=${NEXT_PUBLIC_GA_MEASUREMENT_ID:-}
+      # Google Analytics (gtag.js). The measurement id is baked per-tenant
+      # (tenants/<id>.json → analytics.measurementId, via NEXT_PUBLIC_TENANT) —
+      # NOT set here, so no tenant can inherit another's property. Only the sGTM
+      # relay URL is env-driven; point it at the `sgtm` service (run
+      # `docker compose --profile tagging up`) to route through it locally.
       - NEXT_PUBLIC_GA_SERVER_CONTAINER_URL=${NEXT_PUBLIC_GA_SERVER_CONTAINER_URL:-}
     depends_on:
       gateway:
@@ -371,3 +372,16 @@ volumes:
   postgres_data:
   frontend_node_modules:
   uploads:
+
+# The project network is `external` so Compose never creates, recreates, or
+# removes it. An implicit network gets
+# recreated when its config drifts (e.g. another compose file — the devcontainer
+# — also attaches to it), and a recreate mid-`up` orphans any long-lived
+# container that isn't being recreated (notably postgres, which survives tenant
+# switches), leaving `migrate` unable to resolve the `postgres` host. External
+# also stops a stray `compose down` from deleting the network the devcontainer
+# shares. start_services.sh creates it (idempotent) before the first `up`.
+networks:
+  default:
+    name: agent-platform_default
+    external: true

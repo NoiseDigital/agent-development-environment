@@ -231,6 +231,15 @@ docker volume create agent-platform_gcloud_config >/dev/null 2>&1 || true
 # COMPOSE_IGNORE_ORPHANS suppresses the workspace container orphan warning — the
 # workspace service is intentionally absent from this up invocation.
 #
+# Ensure the shared network exists before `up`. docker-compose.yml declares it
+# `external`, so Compose never creates/recreates/removes it — which prevents the
+# orphaning bug: a network recreate mid-`up` would drop any long-lived container
+# that ISN'T being recreated this run (notably postgres, which survives across
+# tenant switches) off the network, so `migrate` couldn't resolve the `postgres`
+# host. Keeping it external also means a stray `compose down` can't delete the
+# network the devcontainer shares. Idempotent — a no-op once it exists.
+docker network create agent-platform_default >/dev/null 2>&1 || true
+
 docker compose \
     --project-directory "$PROJECT_ROOT" \
     -f "$PROJECT_ROOT/docker-compose.yml" \
