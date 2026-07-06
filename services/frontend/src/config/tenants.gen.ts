@@ -90,6 +90,9 @@ export const TENANTS = {
       "autocorr",
       "market-radar"
     ],
+    "analytics": {
+      "measurementId": ""
+    },
     "branding": {
       "brandName": "CSAos",
       "logo": "/csa/csa_white.png",
@@ -156,6 +159,9 @@ export const TENANTS = {
       "dashboards",
       "agents"
     ],
+    "analytics": {
+      "measurementId": "G-PSTSB8D377"
+    },
     "branding": {
       "brandName": "NoiseOS",
       "logo": "/noise/noise_white.svg",

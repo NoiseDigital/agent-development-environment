@@ -41,6 +41,10 @@ cat > "tenants/$ID.json" <<EOF
   "id": "$ID",
   "projectPrefix": "$PREFIX",
   "enabledModules": $MODS_JSON,
+  "_analytics": "This tenant's OWN GA4 destination — no shared default, so it can never hit another tenant's property. Empty = analytics off. Set to this tenant's GA4 web-stream id (G-XXXX) once the property exists.",
+  "analytics": {
+    "measurementId": ""
+  },
   "branding": {
     "brandName": "$BRAND",
     "logo": "/${ID}/${ID}_white.svg",

@@ -11,10 +11,16 @@ across the repo.
 | File | What it is |
 |------|-----------|
 | `modules.json` | The **module catalog** — the structural definition of every module: its frontend `route`/`label`, the ADK `agents` it needs, the extra backend `services` it requires, and any `capabilities` (e.g. `floatingAssistant`). Plus a `core` set deployed for every tenant. Same across all tenants. |
-| `<id>.json` | A **tenant manifest** — the only per-tenant authored file: `id`, `projectPrefix`, `enabledModules`, and `branding` (brand name, logo, accent ramp). |
+| `<id>.json` | A **tenant manifest** — the only per-tenant authored file: `id`, `projectPrefix`, `enabledModules`, `analytics`, and `branding` (brand name, logo, accent ramp). |
 
 `enabledModules` is either `"*"` (the full platform — every module, no agent
 allowlist; this is Noise) or an explicit array like `["analyze"]` (a subset).
+
+`analytics.measurementId` is this tenant's **own** GA4 web-stream id (gtag.js).
+It's required and per-tenant with **no shared default** — so a tenant can never
+emit into another tenant's property. Empty (`""`) = analytics is a no-op (zero
+measurement traffic). The sGTM *relay* URL is environment-specific and stays an
+env var (`NEXT_PUBLIC_GA_SERVER_CONTAINER_URL`), never in the manifest.
 
 ## Who consumes it
 

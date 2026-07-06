@@ -3,6 +3,10 @@
   "id": "noise",
   "projectPrefix": "nd-agentspace",
   "enabledModules": ["plan", "dashboards", "agents"],
+  "_analytics": "GA4 destination for THIS tenant only. measurementId decides which property gtag hits, so it is per-tenant with no shared fallback — a tenant with an empty id ships zero measurement traffic. The sGTM relay URL is environment-specific (NEXT_PUBLIC_GA_SERVER_CONTAINER_URL), not here.",
+  "analytics": {
+    "measurementId": "G-PSTSB8D377"
+  },
   "branding": {
     "brandName": "NoiseOS",
     "logo": "/noise/noise_white.svg",

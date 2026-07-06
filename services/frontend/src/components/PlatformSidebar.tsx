@@ -124,7 +124,7 @@ export default function PlatformSidebar() {
       collapsed={collapsed}
       resize={{ initial: 224, min: 180, max: 340 }}
       side="right"
-      className="bg-surface-sunken border-line"
+      className="bg-surface-sunken border-transparent"
       rail={
         <>
           <button
@@ -155,7 +155,7 @@ export default function PlatformSidebar() {
       }
     >
       {/* Brand */}
-      <div className="flex items-center justify-between pl-4 pr-2 h-14 shrink-0 border-b border-line">
+      <div className="flex items-center justify-between pl-4 pr-2 h-14 shrink-0">
         <div className="flex items-end gap-1.5 min-w-0 cursor-pointer" onClick={() => router.push('/')}>
           {/* Logo + readable accent flip come from the active tenant manifest. */}
           <Image

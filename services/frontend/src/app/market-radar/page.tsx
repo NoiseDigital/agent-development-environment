@@ -5,7 +5,7 @@
 // and model-support scoring across markets and brands. All math runs server-side in
 // mcp-stats (market_radar.run); this page is the guided wizard + dashboards.
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import BrandTrajectory from '../../components/market-radar/BrandTrajectory';
 import MarketRadarAssistantPanel from '../../components/market-radar/MarketRadarAssistantPanel';
@@ -22,20 +22,13 @@ import {
   type ScenarioParams,
   type SovRow,
 } from '../../lib/api/market-radar';
-import { sourcesApi } from '../../lib/api/sources';
 import { buildMarketRadarContext } from '../../lib/agent/market-radar-context';
 import { barSpec, rangeBarSpec, scatterSpec, stackedBarSpec } from '../../lib/charts/specs';
 import { downloadCsv, downloadJson } from '../../lib/autocorr/export';
 import { track } from '../../lib/analytics/track';
-import {
-  sourceLabel,
-  sourceUri,
-  type BigQueryTableRef,
-  type SourceRef,
-  type Upload,
-} from '../../types/source';
-
-type SourceKind = 'bigquery' | 'upload';
+import SourcePicker, { type SourceSelection } from '../../components/sources/SourcePicker';
+import ControlsPanel from '../../components/sources/ControlsPanel';
+import { sourceLabel } from '../../types/source';
 
 const SELECT_CLASS =
   'w-full rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs text-foreground focus:border-accent-500 focus:outline-none';
@@ -64,8 +57,8 @@ type TabKey = (typeof TABS)[number]['key'];
 // ── Small presentational primitives ──────────────────────────────────────────
 function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
-    <section className="space-y-2 rounded-xl border border-line/50 bg-surface-sunken/40 p-3">
-      <h2 className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-subtle">
+    <section className="space-y-2">
+      <h2 className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">
         {title}
         {hint && <InfoHint text={hint} />}
       </h2>
@@ -113,17 +106,9 @@ const BAND_CLASS: Record<string, string> = {
 };
 
 export default function MarketRadarPage() {
-  // ── Source picker state ────────────────────────────────────────────────────
-  const [sourceKind, setSourceKind] = useState<SourceKind>('upload');
-  const [uploads, setUploads] = useState<Upload[]>([]);
-  const [uploadId, setUploadId] = useState('');
-  const [sheet, setSheet] = useState('');
-  const [bqDatasets, setBqDatasets] = useState<string[]>([]);
-  const [bqDataset, setBqDataset] = useState('');
-  const [bqTables, setBqTables] = useState<BigQueryTableRef[]>([]);
-  const [bqTable, setBqTable] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
+  // ── Source selection (one shared SourcePicker owns the catalog state) ──────
+  const [sel, setSel] = useState<SourceSelection>({ source: null, uri: '', sheet: '', columns: [] });
+  const { source, uri: sourceRefUri, sheet, columns: detectedColumns } = sel;
 
   // ── Run config + result ────────────────────────────────────────────────────
   const [mode, setMode] = useState<'basic' | 'advanced'>('basic');
@@ -140,81 +125,13 @@ export default function MarketRadarPage() {
   const [scenario, setScenario] = useState<ScenarioParams>({});
   const [forecast, setForecast] = useState<ForecastResult | null>(null);
   const [forecastLoading, setForecastLoading] = useState(false);
-
-  const selectedUpload = uploads.find((u) => u.id === uploadId) ?? null;
-  const sheetNames = selectedUpload?.metadata.sheet_names ?? [];
-
-  const source: SourceRef | null = useMemo(
-    () =>
-      sourceKind === 'upload'
-        ? selectedUpload
-          ? { kind: 'upload', id: selectedUpload.id, name: selectedUpload.name }
-          : null
-        : bqDataset && bqTable
-          ? { kind: 'bigquery', dataset: bqDataset, table: bqTable }
-          : null,
-    // eslint-disable-next-line react-hooks/preserve-manual-memoization
-    [sourceKind, selectedUpload, bqDataset, bqTable],
-  );
-  const sourceRefUri = source ? sourceUri(source) : '';
-
-  // Column names the assistant uses to recommend mode (uploads expose them in
-  // metadata; BigQuery tables don't until the estimate runs).
-  const detectedColumns = useMemo(() => {
-    const meta = selectedUpload?.metadata;
-    if (!meta) return [];
-    if (sheet && meta.sheets?.[sheet]) return meta.sheets[sheet];
-    return meta.columns ?? [];
-    // eslint-disable-next-line react-hooks/preserve-manual-memoization
-  }, [selectedUpload, sheet]);
+  // Bumped on a MANUAL run only (not live-update reruns) → the assistant narrates.
+  const [runSignal, setRunSignal] = useState(0);
 
   const contextPrefix = useMemo(
     () => buildMarketRadarContext({ source, mode, columns: detectedColumns, result }),
     [source, mode, detectedColumns, result],
   );
-
-  const loadUploads = async () => {
-    try {
-      setUploads(await sourcesApi.listUploads());
-    } catch {
-      /* listing failures are non-fatal — BigQuery still works */
-    }
-  };
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadUploads();
-    sourcesApi.bigQueryDatasets().then(setBqDatasets).catch(() => setBqDatasets([]));
-  }, []);
-
-  useEffect(() => {
-    if (!bqDataset) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setBqTables([]);
-      return;
-    }
-    sourcesApi.bigQueryTables(bqDataset).then(setBqTables).catch(() => setBqTables([]));
-  }, [bqDataset]);
-
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    setError(null);
-    try {
-      const created = await sourcesApi.upload(file);
-      await loadUploads();
-      setSourceKind('upload');
-      setSheet(created.metadata.sheet_names?.[0] ?? '');
-      setUploadId(created.id);
-      track('source_uploaded', { file_type: file.name.split('.').pop()?.toLowerCase() ?? 'unknown' });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setUploading(false);
-      if (fileInput.current) fileInput.current.value = '';
-    }
-  };
 
   // A starter CSV showing the expected schema (required + optional columns).
   const downloadTemplate = () => {
@@ -232,7 +149,7 @@ export default function MarketRadarPage() {
     ]);
   };
 
-  const runEstimate = async () => {
+  const runEstimate = async ({ keepTab = false, narrate = false } = {}) => {
     if (!sourceRefUri) return;
     setLoading(true);
     setError(null);
@@ -247,8 +164,9 @@ export default function MarketRadarPage() {
       });
       setResult(r);
       setForecast(null); // a fresh estimate invalidates the prior forecast
-      setTab('overview');
-      track('market_radar_run', { mode, source_kind: sourceKind });
+      if (!keepTab) setTab('overview'); // live re-runs stay on the current tab
+      if (narrate) setRunSignal((s) => s + 1);
+      track('market_radar_run', { mode, source_kind: source?.kind ?? 'none' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Estimation failed');
       setResult(null);
@@ -256,6 +174,15 @@ export default function MarketRadarPage() {
       setLoading(false);
     }
   };
+
+  // Live updates: once an estimate exists, re-run on lever changes (debounced),
+  // staying on the current tab. Source/sheet changes still require a manual Run.
+  useEffect(() => {
+    if (!result) return;
+    const t = setTimeout(() => runEstimate({ keepTab: true }), 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, dimension, scope, maturity]);
 
   const runForecast = async () => {
     if (!sourceRefUri) return;
@@ -311,9 +238,10 @@ export default function MarketRadarPage() {
   }));
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full">
+      <div className="flex min-w-0 flex-1 flex-col">
       {/* Header */}
-      <div className="flex shrink-0 items-center justify-between border-b border-line/45 px-8 py-5">
+      <div className="flex shrink-0 items-center justify-between px-8 py-5">
         <div>
           <h1 className="text-xl font-semibold text-foreground">Market Radar</h1>
           <p className="text-sm text-muted">
@@ -324,94 +252,31 @@ export default function MarketRadarPage() {
       </div>
 
       <div className="flex min-h-0 flex-1">
-        {/* ── Controls rail ────────────────────────────────────────────────── */}
-        <aside className="flex w-[300px] shrink-0 flex-col border-r border-line/45">
-          <div className="flex-1 space-y-3 overflow-y-auto p-3">
+        {/* ── Controls rail (collapsible) ──────────────────────────────────── */}
+        <ControlsPanel
+          title="Market Radar controls"
+          icon={
+            <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+                d="M12 21a9 9 0 110-18 9 9 0 010 18zm0-4.5a4.5 4.5 0 110-9 4.5 4.5 0 010 9zm0-2.5a2 2 0 100-4 2 2 0 000 4z" />
+            </svg>
+          }
+          footer={
+            <button
+              type="button"
+              onClick={() => runEstimate({ narrate: true })}
+              disabled={!sourceRefUri || loading}
+              className="w-full rounded-lg bg-inverse px-3 py-2.5 text-xs font-semibold text-inverse-foreground transition-colors hover:bg-inverse/90 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {loading ? 'Estimating…' : 'Run estimate'}
+            </button>
+          }
+        >
             <Section
               title="Data source"
               hint="Upload a MediaRadar / Pathmatics export (brand, spend, source required; market, channel, impressions optional) or pick a BigQuery table."
             >
-              <div className="flex gap-1 rounded-lg border border-line bg-surface p-1">
-                {(['upload', 'bigquery'] as const).map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => setSourceKind(k)}
-                    className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
-                      sourceKind === k ? 'bg-surface-raised text-foreground' : 'text-faint hover:text-muted'
-                    }`}
-                  >
-                    {k === 'upload' ? 'Upload' : 'BigQuery'}
-                  </button>
-                ))}
-              </div>
-
-              {sourceKind === 'bigquery' ? (
-                <div className="space-y-2">
-                  <select
-                    className={SELECT_CLASS}
-                    value={bqDataset}
-                    onChange={(e) => {
-                      setBqDataset(e.target.value);
-                      setBqTable('');
-                    }}
-                  >
-                    <option value="">Select dataset…</option>
-                    {bqDatasets.map((d) => (
-                      <option key={d} value={d}>
-                        {d}
-                      </option>
-                    ))}
-                  </select>
-                  {bqDataset && (
-                    <select className={SELECT_CLASS} value={bqTable} onChange={(e) => setBqTable(e.target.value)}>
-                      <option value="">Select table…</option>
-                      {bqTables.map((t) => (
-                        <option key={t.table} value={t.table}>
-                          {t.table}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <select
-                    className={SELECT_CLASS}
-                    value={uploadId}
-                    onChange={(e) => {
-                      setUploadId(e.target.value);
-                      const u = uploads.find((x) => x.id === e.target.value);
-                      setSheet(u?.metadata.sheet_names?.[0] ?? '');
-                    }}
-                  >
-                    <option value="">Select upload…</option>
-                    {uploads.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </select>
-                  {sheetNames.length > 1 && (
-                    <select className={SELECT_CLASS} value={sheet} onChange={(e) => setSheet(e.target.value)}>
-                      {sheetNames.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  <input ref={fileInput} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleUpload} />
-                  <button
-                    type="button"
-                    onClick={() => fileInput.current?.click()}
-                    disabled={uploading}
-                    className="w-full rounded-lg border border-dashed border-line px-2.5 py-1.5 text-xs text-muted transition-colors hover:border-accent-500 hover:text-foreground disabled:opacity-50"
-                  >
-                    {uploading ? 'Uploading…' : '＋ Upload a file'}
-                  </button>
-                </div>
-              )}
+              <SourcePicker onChange={setSel} onError={setError} />
             </Section>
 
             <Section
@@ -499,19 +364,7 @@ export default function MarketRadarPage() {
                 </div>
               </Section>
             )}
-          </div>
-
-          <div className="shrink-0 border-t border-line/45 p-3">
-            <button
-              type="button"
-              onClick={runEstimate}
-              disabled={!sourceRefUri || loading}
-              className="w-full rounded-lg bg-inverse px-3 py-2.5 text-xs font-semibold text-inverse-foreground transition-colors hover:bg-inverse/90 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {loading ? 'Estimating…' : 'Run estimate'}
-            </button>
-          </div>
-        </aside>
+        </ControlsPanel>
 
         {/* ── Results ──────────────────────────────────────────────────────── */}
         <main className="flex-1 overflow-y-auto p-6">
@@ -792,10 +645,11 @@ export default function MarketRadarPage() {
             </div>
           )}
         </main>
-
-        {/* ── Competitive Assistant (right rail) ───────────────────────────── */}
-        <MarketRadarAssistantPanel contextPrefix={contextPrefix} sourceKey={sourceRefUri} />
       </div>
+      </div>
+
+      {/* ── Market Radar Assistant — full-height right rail ──────────────── */}
+      <MarketRadarAssistantPanel contextPrefix={contextPrefix} sourceKey={sourceRefUri} runSignal={runSignal} />
     </div>
   );
 }

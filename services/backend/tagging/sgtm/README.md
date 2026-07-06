@@ -6,8 +6,8 @@ instead of straight to Google; the tags/triggers you author in the GTM UI then
 shape it and route it onward to GA4 (and anywhere else you configure).
 
 ```
-frontend (gtag.js, NEXT_PUBLIC_GA_MEASUREMENT_ID)
-   │  server_container_url
+frontend (gtag.js, measurement id baked per-tenant in tenants/<id>.json)
+   │  server_container_url  (NEXT_PUBLIC_GA_SERVER_CONTAINER_URL)
    ▼
 sGTM  ──►  GA4  (+ other destinations)
  local:  docker compose --profile tagging  (port 8090)
@@ -42,9 +42,14 @@ deploy setup → **[DEPLOY.md §6](../../../../DEPLOY.md)**.
 The compose service is **profile-gated** (`tagging`) so it stays off until you
 have a config — an empty `CONTAINER_CONFIG` would crash-loop a normal `up`.
 
+The GA4 measurement id is baked **per-tenant** (`tenants/<id>.json` →
+`analytics.measurementId`), not set via env — so to exercise tagging locally,
+make sure the tenant you build has a non-empty id (noise's sbx stream is
+`G-PSTSB8D377`) and re-run `node scripts/gen-tenant-config.mjs`. Only the relay
+URL is env-driven:
+
 ```bash
 # .env
-NEXT_PUBLIC_GA_MEASUREMENT_ID=G-PSTSB8D377
 NEXT_PUBLIC_GA_SERVER_CONTAINER_URL=http://localhost:8090
 SGTM_CONTAINER_CONFIG='<paste the Container Config string>'
 

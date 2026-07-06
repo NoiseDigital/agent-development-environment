@@ -1,54 +1,57 @@
 name: Migrate DB & Deploy Services
 
-# Backend deploy: build images, run DB migrations, roll Cloud Run. The frontend
-# (frontend) is a standalone Cloud Run service built + rolled out here too.
+# Build images, run DB migrations, roll Cloud Run — fanned out over EVERY deploy
+# target (a tenant × stage, e.g. `noise-sbx`). Auth is keyless via Workload
+# Identity Federation (no JSON keys).
 #
-# Auth is keyless via Workload Identity Federation (no JSON keys).
+# WHERE CONFIG LIVES
+#   - Which targets exist:  .github/deploy-targets.json  (tenant, stage, trigger)
+#   - Per-target values:    GitHub Environment `<tenant>-<stage>` (Settings →
+#     Environments) — DEPLOY_PROJECT, ARTIFACT_REGISTRY, GCP_REGION,
+#     GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_CI_SERVICE_ACCOUNT,
+#     NEXT_PUBLIC_FIREBASE_APP_ID, NEXT_PUBLIC_GA_SERVER_CONTAINER_URL.
+#   This workflow reads NO tenant/stage-specific value itself, so adding a target
+#   = add a row to deploy-targets.json + create its Environment. No workflow edit.
+#   (The tenant's branding + enabled modules come from tenants/<id>.json, baked
+#   into the frontend image via NEXT_PUBLIC_TENANT; the GA4 measurement id is
+#   baked there too — never a deploy var, so tenants can't cross-contaminate.)
 #
-# Single-tenant model: each client gets a dedicated GCP project, and each
-# tenant-stack is a GitHub *Environment* (e.g. `noise-sbx`) holding that
-# stack's deploy vars. Selecting the environment makes vars.* resolve to that
-# tenant's values, so adding a client = one new environment, no workflow edit.
-# Per environment, from that tenant's infra/bootstrap outputs:
-#   vars.GCP_WORKLOAD_IDENTITY_PROVIDER  vars.GCP_CI_SERVICE_ACCOUNT
-#   vars.GCP_REGION  vars.DEPLOY_PROJECT  vars.ARTIFACT_REGISTRY
+# TRIGGERS
+#   push to main       → every target with "trigger": "push" (today: all *-sbx).
+#   workflow_dispatch  → the chosen `environment`, or ALL push-targets if blank.
+#   Gating: give a prod/uat GitHub Environment required reviewers and the run
+#   pauses for approval — orthogonal to the trigger.
 
 on:
   push:
-    branches: [main] # main → noise-sbx (default environment)
+    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
-        description: Tenant-stack to deploy (GitHub Environment, e.g. noise-sbx)
-        default: noise-sbx
+        description: One target to deploy (e.g. csa-sbx). Blank = all push targets.
+        default: ""
 
 permissions:
   contents: read
   id-token: write # required for WIF
 
-env:
-  REGION: ${{ vars.GCP_REGION }}
-  PROJECT: ${{ vars.DEPLOY_PROJECT }}
-  AR: ${{ vars.ARTIFACT_REGISTRY }} # e.g. us-central1-docker.pkg.dev/<proj>/platform
-  # Which tenant build this environment deploys (branding + enabled modules,
-  # baked into the frontend image). Defaults to noise so existing envs need no
-  # change. The frontend image is tagged per-tenant (the brand is baked in);
-  # backend images are tenant-agnostic (config comes from Cloud Run env).
-  FE_TENANT: ${{ vars.NEXT_PUBLIC_TENANT || 'noise' }}
-
 jobs:
-  deploy:
+  # ── Discover targets + changed services (once, shared by every matrix leg) ───
+  discover:
+    name: Discover deploy targets
     runs-on: ubuntu-latest
-    # Scopes vars.* to this tenant-stack's environment (push → noise-sbx).
-    environment: ${{ github.event.inputs.environment || 'noise-sbx' }}
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+      count: ${{ steps.pick.outputs.count }}
+      changes: ${{ steps.filter.outputs.changes }}
     steps:
       - uses: actions/checkout@v7
 
-      # Only build/deploy services whose source changed since the previous commit
-      # (a manual workflow_dispatch forces a full deploy — see the `force` exprs).
-      # The migrate job runs when the gateway changed (Alembic migrations live there).
+      # Which services' source changed since the previous commit. Computed ONCE
+      # here so all matrix legs share one verdict (a manual dispatch forces a
+      # full deploy via the `github.event_name` checks on each step below).
       - uses: dorny/paths-filter@v4
-        id: changed
+        id: filter
         with:
           filters: |
             gateway: ['services/backend/gateway/**']
@@ -56,7 +59,53 @@ jobs:
             mcp_stats: ['services/backend/mcp/stats/**']
             mcp_toolbox: ['services/backend/mcp/images/toolbox/**']
             sgtm: ['services/backend/tagging/sgtm/**']
-            frontend: ['services/frontend/**']
+            frontend: ['services/frontend/**', 'tenants/**']
+
+      - id: pick
+        env:
+          DISPATCH_ENV: ${{ github.event.inputs.environment }}
+        run: |
+          set -euo pipefail
+          # Every declared target → {tenant, stage, environment}.
+          all=$(jq -c '[.targets[] | . + {environment: (.tenant + "-" + .stage)}]' .github/deploy-targets.json)
+          if [ -n "${DISPATCH_ENV:-}" ]; then
+            # Manual single-environment deploy — must be a known target.
+            sel=$(printf '%s' "$all" | jq -c --arg e "$DISPATCH_ENV" '[.[] | select(.environment == $e)]')
+            if [ "$(printf '%s' "$sel" | jq 'length')" = "0" ]; then
+              echo "::error::unknown environment '$DISPATCH_ENV' — not in .github/deploy-targets.json"
+              exit 1
+            fi
+          else
+            # push (or a blank dispatch) → every auto-deploy target.
+            sel=$(printf '%s' "$all" | jq -c '[.[] | select(.trigger == "push")]')
+          fi
+          echo "matrix={\"include\":$sel}" >> "$GITHUB_OUTPUT"
+          echo "count=$(printf '%s' "$sel" | jq 'length')" >> "$GITHUB_OUTPUT"
+          echo "Deploy targets:"; printf '%s' "$sel" | jq -r '.[].environment'
+
+  deploy:
+    name: Deploy ${{ matrix.environment }}
+    needs: discover
+    if: ${{ needs.discover.outputs.count != '0' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # one tenant's failure must not cancel the others
+      matrix: ${{ fromJSON(needs.discover.outputs.matrix) }}
+    # Scopes vars.* to THIS target's environment. Gated environments (required
+    # reviewers) pause the run here until approved.
+    environment: ${{ matrix.environment }}
+    env:
+      REGION: ${{ vars.GCP_REGION }}
+      PROJECT: ${{ vars.DEPLOY_PROJECT }}
+      AR: ${{ vars.ARTIFACT_REGISTRY }} # e.g. us-central1-docker.pkg.dev/<proj>/platform
+      TENANT_ID: ${{ matrix.tenant }} # branding + enabled modules, baked into the FE image
+      # Frontend image is per-ENVIRONMENT: it bakes this stack's Firebase app id
+      # (+ tenant brand), which differ per stage — so the tag is <tenant>-<stage>.
+      # Backend images are tenant/stage-agnostic (config comes from Cloud Run env),
+      # tagged by SHA only and shared across every target.
+      IMAGE_ENV: ${{ matrix.environment }}
+    steps:
+      - uses: actions/checkout@v7
 
       - id: auth
         uses: google-github-actions/auth@v3
@@ -72,56 +121,59 @@ jobs:
           echo "SHA=${GITHUB_SHA::12}" >> "$GITHUB_ENV"
 
       # ── Build + push (only changed services; gateway/agent use the prod stage) ─
+      # Backend images are identical across targets. They're built per-leg for
+      # correctness (each target may push to its own AR); the push is idempotent
+      # on the shared-AR setup. Hoist to a shared job if all targets share one AR.
       - name: Build & push gateway
-        if: ${{ steps.changed.outputs.gateway == 'true' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'gateway') || github.event_name == 'workflow_dispatch' }}
         run: |
           docker build --target prod -t "$AR/gateway:$SHA" services/backend/gateway
           docker push "$AR/gateway:$SHA"
       - name: Build & push agents
-        if: ${{ steps.changed.outputs.agents == 'true' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'agents') || github.event_name == 'workflow_dispatch' }}
         run: |
           docker build --target prod -t "$AR/agents:$SHA" services/backend/agents
           docker push "$AR/agents:$SHA"
       - name: Build & push mcp-stats
-        if: ${{ steps.changed.outputs.mcp_stats == 'true' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'mcp_stats') || github.event_name == 'workflow_dispatch' }}
         run: |
           docker build -t "$AR/mcp-stats:$SHA" services/backend/mcp/stats
           docker push "$AR/mcp-stats:$SHA"
       - name: Build & push mcp-toolbox
-        if: ${{ steps.changed.outputs.mcp_toolbox == 'true' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'mcp_toolbox') || github.event_name == 'workflow_dispatch' }}
         run: |
           docker build -t "$AR/mcp-toolbox:$SHA" services/backend/mcp/images/toolbox
           docker push "$AR/mcp-toolbox:$SHA"
       - name: Build & push sgtm
-        if: ${{ steps.changed.outputs.sgtm == 'true' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'sgtm') || github.event_name == 'workflow_dispatch' }}
         run: |
           # Google's gtm-cloud-image, snapshotted into our AR. Pushed regardless;
           # the deploy step below only rolls it if the service is provisioned.
           docker build -t "$AR/sgtm:$SHA" services/backend/tagging/sgtm
           docker push "$AR/sgtm:$SHA"
       - name: Build & push frontend
-        if: ${{ steps.changed.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'frontend') || github.event_name == 'workflow_dispatch' }}
         run: |
           # NEXT_PUBLIC_* are inlined at build time. Public config from vars; the
           # API key from Secret Manager (ci-deployer has project secretAccessor).
           API_KEY="$(gcloud secrets versions access latest --secret=firebase-web-api-key --project="$PROJECT")"
-          # Analytics is optional: both default empty (vars unset → gtag no-ops).
-          # Set vars.NEXT_PUBLIC_GA_MEASUREMENT_ID + vars.NEXT_PUBLIC_GA_SERVER_CONTAINER_URL
-          # (the sgtm_url TF output) to light it up.
+          # The GA4 measurement id is baked per-tenant from tenants/<id>.json (via
+          # NEXT_PUBLIC_TENANT) — NOT passed here, so a tenant can't emit into
+          # another's property. Only the sGTM relay URL is env-driven (optional;
+          # vars.NEXT_PUBLIC_GA_SERVER_CONTAINER_URL = the sgtm_url TF output).
           docker build --target runner \
-            --build-arg NEXT_PUBLIC_TENANT="$FE_TENANT" \
+            --build-arg NEXT_PUBLIC_TENANT="$TENANT_ID" \
             --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID="$PROJECT" \
             --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="$PROJECT.firebaseapp.com" \
             --build-arg NEXT_PUBLIC_FIREBASE_APP_ID="${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}" \
             --build-arg NEXT_PUBLIC_FIREBASE_API_KEY="$API_KEY" \
-            --build-arg NEXT_PUBLIC_GA_MEASUREMENT_ID="${{ vars.NEXT_PUBLIC_GA_MEASUREMENT_ID }}" \
             --build-arg NEXT_PUBLIC_GA_SERVER_CONTAINER_URL="${{ vars.NEXT_PUBLIC_GA_SERVER_CONTAINER_URL }}" \
-            -t "$AR/frontend:$FE_TENANT-$SHA" services/frontend
-          docker push "$AR/frontend:$FE_TENANT-$SHA"
+            -t "$AR/frontend:$IMAGE_ENV-$SHA" services/frontend
+          docker push "$AR/frontend:$IMAGE_ENV-$SHA"
 
       # ── Migrate FIRST (only when the gateway/migrations changed) ─────────────
       - name: Run DB migrations
-        if: ${{ steps.changed.outputs.gateway == 'true' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'gateway') || github.event_name == 'workflow_dispatch' }}
         run: |
           set -euo pipefail
           gcloud run jobs update "migrate" \
@@ -133,7 +185,7 @@ jobs:
       # mcp-toolbox is module-gated in Terraform (tenants whose modules don't need
       # it — e.g. csa/analyze-only — have no such service), so guard like sgtm.
       - name: Deploy mcp-toolbox
-        if: ${{ steps.changed.outputs.mcp_toolbox == 'true' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'mcp_toolbox') || github.event_name == 'workflow_dispatch' }}
         run: |
           set -euo pipefail
           if gcloud run services describe "mcp-toolbox" --region "$REGION" --project "$PROJECT" >/dev/null 2>&1; then
@@ -142,14 +194,14 @@ jobs:
             echo "mcp-toolbox not provisioned for this tenant (no enabling module) — skipping deploy"
           fi
       - name: Deploy agents
-        if: ${{ steps.changed.outputs.agents == 'true' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'agents') || github.event_name == 'workflow_dispatch' }}
         run: gcloud run deploy "agents" --image "$AR/agents:$SHA" --region "$REGION" --project "$PROJECT"
       - name: Deploy mcp-stats
-        if: ${{ steps.changed.outputs.mcp_stats == 'true' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'mcp_stats') || github.event_name == 'workflow_dispatch' }}
         run: gcloud run deploy "mcp-stats" --image "$AR/mcp-stats:$SHA" --region "$REGION" --project "$PROJECT"
       # sgtm is toggle-gated in Terraform (no service unless enable_sgtm = true)
       - name: Deploy sgtm
-        if: ${{ steps.changed.outputs.sgtm == 'true' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'sgtm') || github.event_name == 'workflow_dispatch' }}
         run: |
           set -euo pipefail
           if gcloud run services describe "sgtm" --region "$REGION" --project "$PROJECT" >/dev/null 2>&1; then
@@ -158,20 +210,20 @@ jobs:
             echo "sgtm not provisioned (no CONTAINER_CONFIG / terraform apply) — skipping deploy"
           fi
       - name: Deploy gateway
-        if: ${{ steps.changed.outputs.gateway == 'true' || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'gateway') || github.event_name == 'workflow_dispatch' }}
         run: gcloud run deploy "gateway" --image "$AR/gateway:$SHA" --region "$REGION" --project "$PROJECT"
       - name: Deploy frontend
-        if: ${{ steps.changed.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' }}
-        run: gcloud run deploy "frontend" --image "$AR/frontend:$FE_TENANT-$SHA" --region "$REGION" --project "$PROJECT"
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'frontend') || github.event_name == 'workflow_dispatch' }}
+        run: gcloud run deploy "frontend" --image "$AR/frontend:$IMAGE_ENV-$SHA" --region "$REGION" --project "$PROJECT"
 
       # ── Post-deploy smoke test ───────────────────────────────────────────────
       # Hits the public frontend on the request path — verifies the live state
-      # even on a push that didn't roll a given service).
+      # even on a push that didn't roll a given service.
       - name: Post-deploy smoke test
         run: |
           set -euo pipefail
           FE="$(gcloud run services describe frontend --region "$REGION" --project "$PROJECT" --format='value(status.url)')"
-          echo "Frontend: $FE"
+          echo "Frontend ($IMAGE_ENV): $FE"
 
           echo "→ app reachable (production build + middleware)"
           # Tenant-agnostic: every tenant serves / and the login route. (No

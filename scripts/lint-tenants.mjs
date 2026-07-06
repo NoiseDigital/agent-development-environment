@@ -69,6 +69,13 @@ for (const file of tenantFiles) {
     else for (const m of mods) if (!moduleKeys.includes(m)) errors.push(`${where}: unknown module "${m}"`);
   }
 
+  // analytics — every tenant must declare its OWN GA4 destination (may be empty
+  // = no analytics). Required + explicit so a new tenant can't silently inherit
+  // another tenant's property: there is no shared fallback anywhere.
+  if (t.analytics === undefined || typeof t.analytics.measurementId !== "string") {
+    errors.push(`${where}: analytics.measurementId is required (string; "" = analytics off)`);
+  }
+
   // branding
   const b = t.branding ?? {};
   for (const field of ["brandName", "logo", "logoAlt", "accent", "emailDomain", "favicon", "defaultTheme", "font", "charts", "tagline"]) {
@@ -84,6 +91,35 @@ for (const file of tenantFiles) {
   for (const asset of ["logo", "favicon"]) {
     if (typeof b[asset] === "string" && !existsSync(join(PUBLIC_DIR, b[asset].replace(/^\//, "")))) {
       warnings.push(`${where}: ${asset} ${b[asset]} not found in services/frontend/public/ (add it before deploy)`);
+    }
+  }
+}
+
+// Deploy targets (.github/deploy-targets.json) must reference a real tenant AND
+// a provisioned stage (infra/tenants/<tenant>/env/<stage>.tfvars) — so the
+// deploy matrix can never fan out to a tenant/stage that doesn't exist.
+const DEPLOY_TARGETS = join(ROOT, ".github/deploy-targets.json");
+const tenantIds = new Set(
+  tenantFiles.map((f) => readJson(join(TENANTS, f)).id),
+);
+if (existsSync(DEPLOY_TARGETS)) {
+  const dt = readJson(DEPLOY_TARGETS);
+  const where = ".github/deploy-targets.json";
+  if (!Array.isArray(dt.targets)) {
+    errors.push(`${where}: "targets" must be an array`);
+  } else {
+    const seen = new Set();
+    for (const t of dt.targets) {
+      const env = `${t.tenant}-${t.stage}`;
+      if (!t.tenant || !t.stage) errors.push(`${where}: each target needs "tenant" and "stage" (got ${JSON.stringify(t)})`);
+      if (t.trigger !== "push" && t.trigger !== "manual") errors.push(`${where}: ${env} trigger must be "push" or "manual"`);
+      if (seen.has(env)) errors.push(`${where}: duplicate target ${env}`);
+      seen.add(env);
+      if (t.tenant && !tenantIds.has(t.tenant)) errors.push(`${where}: ${env} references unknown tenant "${t.tenant}" (no tenants/${t.tenant}.json)`);
+      const tfvars = join(ROOT, `infra/tenants/${t.tenant}/env/${t.stage}.tfvars`);
+      if (t.tenant && t.stage && !existsSync(tfvars)) {
+        errors.push(`${where}: ${env} has no infra/tenants/${t.tenant}/env/${t.stage}.tfvars (provision the stage first)`);
+      }
     }
   }
 }

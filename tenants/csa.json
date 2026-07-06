@@ -4,6 +4,10 @@
   "id": "csa",
   "projectPrefix": "nd-csa",
   "enabledModules": ["autocorr", "market-radar"],
+  "_analytics": "GA4 destination for THIS tenant only. Empty measurementId = analytics is a no-op — CSA ships ZERO measurement traffic and CANNOT reach Noise's property (no shared fallback). Set this to CSA's own GA4 web-stream id once the property exists.",
+  "analytics": {
+    "measurementId": ""
+  },
   "branding": {
     "brandName": "CSAos",
     "logo": "/csa/csa_white.png",

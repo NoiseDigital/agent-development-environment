@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { DashboardTab, DashboardTile } from '../../data/dashboards';
 import {
   buildDashboardContext,
-  stripDashboardContext,
+  stripContextPreamble,
   tileManifestLine,
   tileManifestList,
 } from './context';
@@ -137,24 +137,33 @@ describe('tileManifestList', () => {
   });
 });
 
-describe('stripDashboardContext', () => {
+describe('stripContextPreamble', () => {
   it('removes a multi-line dashboard preamble + the blank separator', () => {
     const text =
       '[Dashboard context: id=NOI, tab=overall, name=NOI Performance, mode=view]\n' +
       'Active tab: Overall\n' +
       'Tiles on this tab:\n- KPI: Spend\n\n' +
       'What was our top publisher?';
-    expect(stripDashboardContext(text)).toBe('What was our top publisher?');
+    expect(stripContextPreamble(text)).toBe('What was our top publisher?');
+  });
+
+  it('removes the AutoCorr / Market Radar preambles too', () => {
+    expect(
+      stripContextPreamble('[AutoCorr context]\nsource: upload:abc\nstatus: result\n\nTell me about it'),
+    ).toBe('Tell me about it');
+    expect(
+      stripContextPreamble('[Market Radar context]\nmode: advanced\n\ni ran the analysis'),
+    ).toBe('i ran the analysis');
   });
 
   it('passes through messages that have no preamble', () => {
-    expect(stripDashboardContext('Plot weekly spend in 2024.')).toBe(
+    expect(stripContextPreamble('Plot weekly spend in 2024.')).toBe(
       'Plot weekly spend in 2024.',
     );
   });
 
   it('is idempotent — already-stripped text round-trips unchanged', () => {
     const clean = 'Show CTR by creative format.';
-    expect(stripDashboardContext(stripDashboardContext(clean))).toBe(clean);
+    expect(stripContextPreamble(stripContextPreamble(clean))).toBe(clean);
   });
 });

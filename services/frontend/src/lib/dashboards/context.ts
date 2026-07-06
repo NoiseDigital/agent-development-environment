@@ -126,11 +126,13 @@ export function tileManifestList(tiles: DashboardTile[]): string[] {
   return tiles.map(tileManifestLine);
 }
 
-/** Strip the dashboard-context preamble from a stored user message so the
- *  rendered bubble shows just what the user actually typed. Idempotent —
- *  messages without the preamble pass through unchanged. */
-export function stripDashboardContext(text: string): string {
-  if (!text.startsWith('[Dashboard context:')) return text;
+/** Strip a leading agent-context preamble from a stored user message so the
+ *  rendered bubble shows just what the user actually typed. Covers every module
+ *  that prepends context — "[Dashboard context: …]", "[AutoCorr context]",
+ *  "[Market Radar context]" — since the preamble is sent to the agent but should
+ *  never be user-facing. Idempotent — messages without a preamble pass through. */
+export function stripContextPreamble(text: string): string {
+  if (!/^\[[^\]\n]*context[:\]]/i.test(text)) return text;
   const split = text.indexOf('\n\n');
   if (split === -1) return text;
   return text.slice(split + 2);

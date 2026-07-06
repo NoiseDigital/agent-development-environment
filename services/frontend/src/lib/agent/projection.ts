@@ -6,6 +6,7 @@ import type { Session } from './adk-api';
 import type { UIBlock } from '../../types/genui';
 import { eventsToMessages, type ChatMessage, type ToolCall } from './events';
 import { streamingDisplayText } from './response';
+import { isSilentMessage } from './silent';
 
 /** Snapshot of the agent's final reply once the SSE has ended. Lives on
  *  the in-flight stream so the bubble is guaranteed to show even if the
@@ -78,7 +79,9 @@ export function deriveMessages(
   );
 
   const out = [...committed];
-  if (!userAlreadyIn) {
+  // Silent turns (page-sent greetings / action notifications) drive an agent
+  // reply but never render a user bubble — live or persisted.
+  if (!userAlreadyIn && !isSilentMessage(stream.userContent)) {
     out.push({
       id: stream.userMessageId,
       content: stream.userContent,

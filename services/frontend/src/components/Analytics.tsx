@@ -4,11 +4,15 @@ import Script from "next/script";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
 import { classifyPath } from "../lib/analytics/page";
+import { analytics } from "../config/tenant";
 
-// Both are NEXT_PUBLIC_ → inlined into the client bundle at build time (prod) or
-// read from the dev server env (compose). Empty = analytics is a no-op, so local
-// dev and any tenant without tagging configured ship zero measurement traffic.
-const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+// The GA4 destination is baked PER-TENANT (tenants/<id>.json → analytics.
+// measurementId, inlined via tenants.gen.ts). There is no env fallback, so one
+// tenant can never emit into another's property; empty = analytics no-ops.
+const GA_ID = analytics.measurementId;
+// The sGTM relay endpoint is environment-specific (localhost in dev, each
+// deploy's own sGTM URL), so it stays a NEXT_PUBLIC_ env var. It's a relay, not
+// a property id — it can't change WHICH property the data lands in.
 const SERVER_CONTAINER_URL = process.env.NEXT_PUBLIC_GA_SERVER_CONTAINER_URL;
 
 declare global {
@@ -60,7 +64,7 @@ function RouteChangePageViews() {
 /**
  * Google Analytics via gtag.js, routed through our server-side GTM container.
  *
- * No-op unless NEXT_PUBLIC_GA_MEASUREMENT_ID is set. When
+ * No-op unless the tenant declares an analytics.measurementId. When
  * NEXT_PUBLIC_GA_SERVER_CONTAINER_URL is also set, gtag posts measurement data
  * to our sGTM endpoint (first-party flow) instead of straight to Google — the
  * sGTM container's tags/triggers (authored in the GTM UI) then shape + route it.

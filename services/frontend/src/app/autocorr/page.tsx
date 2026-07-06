@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { sourcesApi } from '../../lib/api/sources';
+import { useState, useEffect, useMemo } from 'react';
 import { statsApi, type CorrelateResult, type QaResult, type ColumnProfile, type RegressResult, type PairsResult, type ColumnStat } from '../../lib/api/stats';
 import { downloadCsv, downloadJson } from '../../lib/autocorr/export';
 import { track } from '../../lib/analytics/track';
-import type { Upload, SourceRef, BigQueryTableRef } from '../../types/source';
-import { sourceUri, sourceLabel } from '../../types/source';
+import { sourceLabel, type SourceRef } from '../../types/source';
+import SourcePicker, { type SourceSelection } from '../../components/sources/SourcePicker';
+import ControlsPanel from '../../components/sources/ControlsPanel';
 import { heatmapSpec, scatterSpec } from '../../lib/charts/specs';
 import { buildAutocorrContext } from '../../lib/agent/autocorr-context';
 import VegaChart from '../../components/VegaChart';
@@ -27,13 +27,11 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-line/50 bg-surface-sunken/40 p-3 space-y-2">
-      <header className="flex items-center justify-between">
-        <h2 className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-subtle">
-          {title}
-          {hint && <InfoHint text={hint} />}
-        </h2>
-      </header>
+    <section className="space-y-2">
+      <h2 className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-faint">
+        {title}
+        {hint && <InfoHint text={hint} />}
+      </h2>
       {children}
     </section>
   );
@@ -144,23 +142,14 @@ const Toggle = ({ label, checked, onChange, hint }: { label: string; checked: bo
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-type SourceKind = 'upload' | 'bigquery';
 
 export default function AutocorrPage() {
-  // Source selection
-  const [sourceKind, setSourceKind] = useState<SourceKind>('bigquery');
-  const [uploads, setUploads] = useState<Upload[]>([]);
-  const [uploadId, setUploadId] = useState('');
-  const [sheet, setSheet] = useState('');
-  const [bqDatasets, setBqDatasets] = useState<string[]>([]);
-  const [bqDataset, setBqDataset] = useState('');
-  const [bqTables, setBqTables] = useState<BigQueryTableRef[]>([]);
-  const [bqTable, setBqTable] = useState('');
+  // Source selection — one shared SourcePicker owns the catalog state.
+  const [sel, setSel] = useState<SourceSelection>({ source: null, uri: '', sheet: '', columns: [] });
+  const { source, uri: sourceRefUri, sheet } = sel;
   const [columnProfiles, setColumnProfiles] = useState<ColumnProfile[]>([]);
   const [columnStats, setColumnStats] = useState<ColumnStat[]>([]);
   const [describing, setDescribing] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
 
   // Analysis mode
   const [mode, setMode] = useState<'correlate' | 'regress'>('correlate');
@@ -201,40 +190,6 @@ export default function AutocorrPage() {
   const [scatter, setScatter] = useState<PairsResult | null>(null);
   const [scatterLoading, setScatterLoading] = useState(false);
 
-  // ── Derived source + columns ────────────────────────────────────────────
-  const selectedUpload = uploads.find((u) => u.id === uploadId) || null;
-  const sheetNames = selectedUpload?.metadata.sheet_names ?? [];
-  // Memoised so downstream hooks (the assistant context preamble) can list
-  // it as a dep without re-running on every render.
-  const source: SourceRef | null = useMemo(
-    () =>
-      sourceKind === 'upload'
-        ? selectedUpload
-          ? { kind: 'upload', id: selectedUpload.id, name: selectedUpload.name }
-          : null
-        : bqDataset && bqTable
-          ? { kind: 'bigquery', dataset: bqDataset, table: bqTable }
-          : null,
-    // eslint-disable-next-line react-hooks/preserve-manual-memoization
-    [sourceKind, selectedUpload, bqDataset, bqTable],
-  );
-  const sourceRefUri = source ? sourceUri(source) : '';
-
-  // ── Catalog loading ─────────────────────────────────────────────────────
-  const loadUploads = useCallback(async () => {
-    try {
-      setUploads(await sourcesApi.listUploads());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load uploads');
-    }
-  }, []);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadUploads();
-    sourcesApi.bigQueryDatasets().then(setBqDatasets).catch(() => setBqDatasets([]));
-  }, [loadUploads]);
-
   // Reset analysis, then profile the columns + run QA whenever the resolved
   // source (or sheet) changes. `describe` drives the dtype-aware column picker.
   useEffect(() => {
@@ -269,41 +224,10 @@ export default function AutocorrPage() {
       .finally(() => setDescribing(false));
   }, [sourceRefUri, sheet]);
 
-  const pickDataset = async (dataset: string) => {
-    setBqDataset(dataset);
-    setBqTable('');
-    setBqTables([]);
-    if (dataset) {
-      try {
-        setBqTables(await sourcesApi.bigQueryTables(dataset));
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to list tables');
-      }
-    }
-  };
+  // Bumped on a MANUAL run only (not live-update reruns) → the assistant narrates.
+  const [runSignal, setRunSignal] = useState(0);
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    setError(null);
-    try {
-      const created = await sourcesApi.upload(file);
-      await loadUploads();
-      setSourceKind('upload');
-      setSheet(created.metadata.sheet_names?.[0] ?? '');
-      setUploadId(created.id);
-      // Extension only — never the filename (can carry client/PII).
-      track('source_uploaded', { file_type: file.name.split('.').pop()?.toLowerCase() ?? 'unknown' });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setUploading(false);
-      if (fileInput.current) fileInput.current.value = '';
-    }
-  };
-
-  const run = async () => {
+  const run = async ({ narrate = false } = {}) => {
     if (!source) return;
     setRunning(true);
     setError(null);
@@ -311,7 +235,7 @@ export default function AutocorrPage() {
     try {
       setResult(
         await statsApi.correlate({
-          source: sourceUri(source),
+          source: sourceRefUri,
           sheet: sheet || undefined,
           set_a: setA,
           set_b: setB,
@@ -328,7 +252,8 @@ export default function AutocorrPage() {
           time_col: timeCol,
         }),
       );
-      track('analysis_run', { method, source_kind: sourceUri(source).split(':')[0] });
+      track('analysis_run', { method, source_kind: source?.kind ?? 'none' });
+      if (narrate) setRunSignal((s) => s + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Analysis failed');
       setResult(null);
@@ -337,14 +262,14 @@ export default function AutocorrPage() {
     }
   };
 
-  const runRegress = async () => {
+  const runRegress = async ({ narrate = false } = {}) => {
     if (!source || !regY || regX.length === 0) return;
     setRunning(true);
     setError(null);
     try {
       setRegResult(
         await statsApi.regress({
-          source: sourceUri(source),
+          source: sourceRefUri,
           sheet: sheet || undefined,
           y: regY,
           x: regX,
@@ -357,7 +282,8 @@ export default function AutocorrPage() {
           time_col: timeCol,
         }),
       );
-      track('regression_run', { source_kind: sourceUri(source).split(':')[0] });
+      track('regression_run', { source_kind: source?.kind ?? 'none' });
+      if (narrate) setRunSignal((s) => s + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Regression failed');
       setRegResult(null);
@@ -382,7 +308,7 @@ export default function AutocorrPage() {
     try {
       setScatter(
         await statsApi.pairs({
-          source: sourceUri(source),
+          source: sourceRefUri,
           sheet: sheet || undefined,
           a,
           b,
@@ -422,6 +348,23 @@ export default function AutocorrPage() {
     });
   };
 
+  // Live updates: once a result exists, re-run on lever changes (debounced) so
+  // tuning the controls refreshes the visuals without re-clicking Run. Source/
+  // sheet changes still reset + require an explicit Run (handled above).
+  useEffect(() => {
+    if (mode !== 'correlate' || !result) return;
+    const t = setTimeout(() => run(), 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [method, alpha, lag, topN, winsorize, log1p, zscore, difference, groupCol, groupVal, timeCol, setA, setB]);
+
+  useEffect(() => {
+    if (mode !== 'regress' || !regResult || !regY || regX.length === 0) return;
+    const t = setTimeout(() => runRegress(), 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regConst, regZscore, regDiff, regLag, groupCol, groupVal, timeCol, regY, regX]);
+
   const heatmapChart = result
     ? heatmapSpec({
         title: `Correlation — ${result.method === 'spearman' ? 'Spearman' : 'Pearson'}`,
@@ -452,9 +395,10 @@ export default function AutocorrPage() {
   );
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full">
+      <div className="flex min-w-0 flex-1 flex-col">
       {/* Header */}
-      <div className="flex shrink-0 items-center justify-between border-b border-line/45 px-8 py-5">
+      <div className="flex shrink-0 items-center justify-between px-8 py-5">
         <div>
           <h1 className="text-lg font-semibold tracking-tight text-foreground">AutoCorr</h1>
           <p className="mt-0.5 text-xs text-faint">
@@ -476,95 +420,29 @@ export default function AutocorrPage() {
       </div>
 
       <div className="flex min-h-0 flex-1">
-        {/* ── Controls rail ────────────────────────────────────────────── */}
-        <aside className="flex w-[300px] shrink-0 flex-col border-r border-line/45">
-          <div className="flex-1 space-y-3 overflow-y-auto p-3">
+        {/* ── Controls rail (collapsible) ──────────────────────────────── */}
+        <ControlsPanel
+          title="AutoCorr controls"
+          icon={
+            <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+                d="M9 3h6m-5 0v6.5L5.5 17A2 2 0 007.2 20h9.6a2 2 0 001.7-3L14 9.5V3M7.5 14h9" />
+            </svg>
+          }
+          footer={
+            <button
+              type="button"
+              onClick={() => (mode === 'regress' ? runRegress : run)({ narrate: true })}
+              disabled={!source || running || (mode === 'regress' && (!regY || regX.length === 0))}
+              className="w-full rounded-lg bg-inverse px-3 py-2.5 text-xs font-semibold text-inverse-foreground transition-colors hover:bg-inverse/90 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {running ? 'Running…' : mode === 'regress' ? 'Run regression' : 'Run analysis'}
+            </button>
+          }
+        >
             {/* Source */}
             <Section title="Data source">
-              <div className="flex gap-1 rounded-lg border border-line bg-surface p-1">
-                {(['bigquery', 'upload'] as const).map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => setSourceKind(k)}
-                    className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
-                      sourceKind === k ? 'bg-surface-raised text-foreground' : 'text-faint hover:text-muted'
-                    }`}
-                  >
-                    {k === 'bigquery' ? 'BigQuery' : 'Upload'}
-                  </button>
-                ))}
-              </div>
-
-              {sourceKind === 'bigquery' ? (
-                <>
-                  <select
-                    value={bqDataset}
-                    onChange={(e) => pickDataset(e.target.value)}
-                    className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground focus:border-accent-500 focus:outline-none"
-                  >
-                    <option value="">Select dataset…</option>
-                    {bqDatasets.map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                  {bqDataset && (
-                    <select
-                      value={bqTable}
-                      onChange={(e) => setBqTable(e.target.value)}
-                      className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground focus:border-accent-500 focus:outline-none"
-                    >
-                      <option value="">Select table…</option>
-                      {bqTables.map((t) => (
-                        <option key={t.table} value={t.table}>{t.table}</option>
-                      ))}
-                    </select>
-                  )}
-                </>
-              ) : (
-                <>
-                  <select
-                    value={uploadId}
-                    onChange={(e) => {
-                      setUploadId(e.target.value);
-                      const u = uploads.find((x) => x.id === e.target.value);
-                      setSheet(u?.metadata.sheet_names?.[0] ?? '');
-                    }}
-                    className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground focus:border-accent-500 focus:outline-none"
-                  >
-                    <option value="">Select an upload…</option>
-                    {uploads.map((u) => (
-                      <option key={u.id} value={u.id}>{u.name}</option>
-                    ))}
-                  </select>
-                  {sheetNames.length > 0 && (
-                    <select
-                      value={sheet}
-                      onChange={(e) => setSheet(e.target.value)}
-                      className="w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-xs text-foreground focus:border-accent-500 focus:outline-none"
-                    >
-                      {sheetNames.map((s) => (
-                        <option key={s} value={s}>Sheet: {s}</option>
-                      ))}
-                    </select>
-                  )}
-                  <input
-                    ref={fileInput}
-                    type="file"
-                    accept=".csv,.txt,.xlsx,.xls,.xlsb"
-                    onChange={handleUpload}
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileInput.current?.click()}
-                    disabled={uploading}
-                    className="w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-medium text-muted transition-colors hover:border-line-strong hover:text-foreground disabled:opacity-50"
-                  >
-                    {uploading ? 'Uploading…' : 'Upload a file'}
-                  </button>
-                </>
-              )}
+              <SourcePicker onChange={setSel} onError={setError} />
             </Section>
 
             {/* Analysis mode */}
@@ -708,20 +586,7 @@ export default function AutocorrPage() {
             </Section>
             </>
             )}
-          </div>
-
-          {/* Run button — pinned to the bottom of the rail so it's always reachable. */}
-          <div className="shrink-0 border-t border-line/45 p-3">
-            <button
-              type="button"
-              onClick={mode === 'regress' ? runRegress : run}
-              disabled={!source || running || (mode === 'regress' && (!regY || regX.length === 0))}
-              className="w-full rounded-lg bg-inverse px-3 py-2.5 text-xs font-semibold text-inverse-foreground transition-colors hover:bg-inverse/90 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {running ? 'Running…' : mode === 'regress' ? 'Run regression' : 'Run analysis'}
-            </button>
-          </div>
-        </aside>
+        </ControlsPanel>
 
         {/* ── Results ───────────────────────────────────────────────────── */}
         <main className="flex-1 overflow-y-auto p-6">
@@ -832,10 +697,11 @@ export default function AutocorrPage() {
             <EmptyResults source={source} running={running} />
           )}
         </main>
-
-        {/* ── AutoCorr Assistant (pinned right rail) ─────────────────────── */}
-        <AutocorrAssistantPanel contextPrefix={contextPrefix} sourceKey={sourceRefUri} />
       </div>
+      </div>
+
+      {/* ── AutoCorr Assistant — full-height right rail ─────────────────── */}
+      <AutocorrAssistantPanel contextPrefix={contextPrefix} sourceKey={sourceRefUri} runSignal={runSignal} />
     </div>
   );
 }
@@ -844,7 +710,7 @@ export default function AutocorrPage() {
 
 function EmptyResults({ source, running }: { source: SourceRef | null; running: boolean }) {
   return (
-    <div className="flex h-72 flex-col items-center justify-center rounded-xl border border-dashed border-line bg-surface-sunken/40 text-center">
+    <div className="flex h-72 flex-col items-center justify-center text-center">
       <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-line bg-surface">
         <svg className="h-5 w-5 text-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}

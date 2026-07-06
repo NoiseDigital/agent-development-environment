@@ -161,6 +161,14 @@ publish in the GTM UI.
   image-based service like the toolbox), the frontend `gtag` wiring, and the
   env/secrets. **GTM owns** the tag/trigger/variable logic — authored in the
   GTM UI and published; the container fetches its published config at runtime.
+- **Per-tenant destination — no shared default:** the GA4 measurement id that
+  decides *which property* gtag hits is baked **per-tenant** in
+  `tenants/<id>.json` → `analytics.measurementId` (inlined via `tenants.gen.ts`,
+  keyed off `NEXT_PUBLIC_TENANT`). There is deliberately no env/default fallback,
+  so a tenant can never emit into another tenant's property; an empty id ships
+  zero measurement traffic. Only the sGTM *relay* URL
+  (`NEXT_PUBLIC_GA_SERVER_CONTAINER_URL`) stays an env var — it's environment-
+  specific and can't change which property the data lands in.
 - **Profile-gated** (`tagging`): needs `SGTM_CONTAINER_CONFIG` from a GTM Server
   container, so it stays off until configured — `docker compose --profile tagging up`.
 - **Prod:** gated on a committed `enable_sgtm` toggle; the CONTAINER_CONFIG value

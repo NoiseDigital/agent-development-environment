@@ -71,11 +71,15 @@ terraform output    # state_buckets, artifact_registry, ci_deployer_sa_email, wo
 ### CI deploy auth — one GitHub Environment per tenant-stack
 
 Each client = its own GCP project, modelled as a GitHub **Environment** named
-`<tenant>-<stage>` (e.g. `noise-sbx`). `deploy.yml` selects it (defaults to
-`noise-sbx` on push to `main`; otherwise the `workflow_dispatch` input), scoping
-`vars.*` to that environment. Set these as **Environment variables** (Settings →
-Environments → `<tenant>-<stage>`), *not* repo-level — they're identifiers, not
-secrets (keyless WIF is the trust):
+`<tenant>-<stage>` (e.g. `noise-sbx`). `deploy.yml` **fans out over every target
+listed in [`.github/deploy-targets.json`](.github/deploy-targets.json)** — a
+matrix leg per `<tenant>-<stage>`, each scoping `vars.*` to its Environment. On
+push to `main` every target with `"trigger": "push"` deploys; `workflow_dispatch`
+with an `environment` input deploys just that one (blank = all push targets).
+Adding a target is a data change (a registry row + `env/<stage>.tfvars` + the
+Environment) — **no workflow edit**. Set these as **Environment variables**
+(Settings → Environments → `<tenant>-<stage>`), *not* repo-level — they're
+identifiers, not secrets (keyless WIF is the trust):
 
 | Variable | Value (from `terraform output`) |
 | --- | --- |
@@ -111,12 +115,16 @@ turn features on.
 | `ARTIFACT_REGISTRY` | where images are pushed/pulled | §1 — required |
 | `GCP_REGION` | region for services/jobs | §1 — required |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | frontend auth (Firebase web app) | §4 — required for the app to work |
-| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | gtag sends to this GA4 stream | §6 — only with sGTM/GA |
 | `NEXT_PUBLIC_GA_SERVER_CONTAINER_URL` | routes gtag through your sGTM | §6 — only with sGTM/GA |
 
+The GA4 **measurement id is NOT a deploy var** — it's baked per-tenant in
+`tenants/<id>.json` (`analytics.measurementId`, keyed off `NEXT_PUBLIC_TENANT`),
+so a tenant can never emit into another tenant's property. Set a tenant's own id
+there (empty = analytics off); see §6.
+
 The `NEXT_PUBLIC_*` are inlined at **build** time, so a change needs a new
-frontend build (re-run deploy) to take effect. Unset analytics vars simply make
-`gtag` a no-op — the app is unaffected.
+frontend build (re-run deploy) to take effect. An unset sGTM URL / empty
+measurement id simply makes `gtag` a no-op — the app is unaffected.
 
 ## 2. Provision the tenant stack
 
@@ -192,9 +200,14 @@ Firebase-related is committed.
 git push origin main
 ```
 
-`deploy.yml`: WIF auth → build only the changed services (path-filtered) → push to
-Artifact Registry → run the `migrate` job (when the gateway changed) → roll the
-Cloud Run services (replacing placeholder images).
+`deploy.yml`: a `discover` job reads the target registry + the changed-service
+set (path-filtered, once), then a `deploy` matrix fans out — one leg per
+`<tenant>-<stage>` — each doing WIF auth → build only the changed services → push
+to Artifact Registry → run the `migrate` job (when the gateway changed) → roll
+the Cloud Run services (replacing placeholder images). Backend images are shared
+(tagged by SHA); the frontend is per-environment (`frontend:<tenant>-<stage>-<sha>`,
+since it bakes that stack's brand + Firebase app id). Legs run independently
+(`fail-fast: false`), so one tenant's failure won't block another's.
 
 Verify:
 - `terraform output frontend_url` loads → sign in (Google Workspace, or a
@@ -230,10 +243,14 @@ Setup:
 5. **Configure the GTM container** (external) — add a **Google Analytics: GA4**
    tag + an **All Events** trigger (the GA4 client is built in), then **Publish**.
    Without a published tag the server receives hits but forwards nothing.
-6. **Point the frontend at it** — set these GitHub Environment vars (the next
-   frontend build bakes them in):
-   - `NEXT_PUBLIC_GA_MEASUREMENT_ID` — your GA4 web-stream id (e.g. `G-PSTSB8D377`)
-   - `NEXT_PUBLIC_GA_SERVER_CONTAINER_URL` — the `sgtm_url` Terraform output
+6. **Point the frontend at it** (the next frontend build bakes these in):
+   - **Measurement id — per tenant, not a deploy var.** Set this tenant's own
+     GA4 web-stream id in `tenants/<id>.json` → `analytics.measurementId` (e.g.
+     `G-PSTSB8D377`), then run `node scripts/gen-tenant-config.mjs` and commit.
+     Each tenant declares its own; there is no shared default, so one tenant can
+     never send to another's property (empty id = analytics off).
+   - `NEXT_PUBLIC_GA_SERVER_CONTAINER_URL` — the `sgtm_url` Terraform output —
+     stays a GitHub Environment var (environment-specific relay).
 7. **(GA4, optional)** Register the product-event params (`agent`, `method`,
    `status`, …) as **Custom Dimensions** in GA4 to report on them; verify events
    in GA4 → **Realtime**.
@@ -281,9 +298,18 @@ the Datastream console shows the stream healthy.
 `project_prefix` locals in its `main.tf`, and keep one `env/`+`backend/` pair per
 stage. (`prod`/`uat` auto-get deletion protection, regional SQL HA, and PITR.)
 
-Either way, repeat §1's *CI deploy auth*: a new GitHub Environment `<tenant>-<stage>`
-with that stack's variables (see the §1 checklist) — the one manual, per-stack
-step. Deploy it via the `workflow_dispatch` `environment` input.
+Either way, wire the new stack into CI/CD (all data, no workflow edits):
+1. Add a row to [`.github/deploy-targets.json`](.github/deploy-targets.json):
+   `{ "tenant": "<tenant>", "stage": "<stage>", "trigger": "push" | "manual" }`.
+   Use `manual` for stages you don't want auto-deploying on merge.
+2. Create the GitHub Environment `<tenant>-<stage>` with that stack's variables
+   (§1 checklist). For prod/uat, add **required reviewers** on the Environment so
+   the run pauses for approval — gating is orthogonal to `trigger`.
+3. `node scripts/lint-tenants.mjs` validates the row (real tenant + a matching
+   `env/<stage>.tfvars`) — it also runs in CI, so a typo fails the PR, not a deploy.
+
+Push to `main` then deploys every `push` target; run one on demand via the
+`workflow_dispatch` `environment` input.
 
 ## Hardening follow-ups (not blocking)
 

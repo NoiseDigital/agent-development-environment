@@ -11,6 +11,7 @@ import { useChat } from '../../hooks/useChat';
 import { useChatAutoScroll } from '../../hooks/useChatAutoScroll';
 import ChatMessage from '../chat/ChatMessage';
 import SessionHistoryMenu, { toMs, type SessionRow } from '../chat/SessionHistoryMenu';
+import { AGENT_SILENT_PREFIX } from '../../lib/agent/silent';
 import CollapsiblePanel from '../ui/CollapsiblePanel';
 import { useSidebarCollapsed } from '../../contexts/SidebarContext';
 
@@ -31,9 +32,11 @@ interface PanelProps {
   contextPrefix: string;
   /** Stable id of the selected source; a change re-greets for the new dataset. */
   sourceKey: string;
+  /** Bumped by the page on a manual Run — the assistant narrates the estimate. */
+  runSignal?: number;
 }
 
-export default function MarketRadarAssistantPanel({ contextPrefix, sourceKey }: PanelProps) {
+export default function MarketRadarAssistantPanel({ contextPrefix, sourceKey, runSignal }: PanelProps) {
   const [input, setInput] = useState('');
   const {
     messages, isLoading, error, feedback, rateMessage, sendMessage,
@@ -46,6 +49,7 @@ export default function MarketRadarAssistantPanel({ contextPrefix, sourceKey }: 
   const histBtn = useRef<HTMLButtonElement>(null);
   const initRef = useRef(false);
   const greetedKey = useRef<string | null>(null);
+  const narratedRun = useRef(0);
   const [histOpen, setHistOpen] = useState(false);
   const [histPos, setHistPos] = useState<{ x: number; y: number } | null>(null);
   const [collapsed, setCollapsed] = useSidebarCollapsed('assistant');
@@ -56,7 +60,7 @@ export default function MarketRadarAssistantPanel({ contextPrefix, sourceKey }: 
     initRef.current = true;
     // Await the fresh session before greeting — sending synchronously races
     // ahead of session creation and the intro message never lands.
-    createNewSession(ASSISTANT_AGENT).then(() => sendMessage(INTRO_TRIGGER, ''));
+    createNewSession(ASSISTANT_AGENT).then(() => sendMessage(AGENT_SILENT_PREFIX + INTRO_TRIGGER, ''));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ready = contextPrefix.length > 0;
@@ -66,8 +70,20 @@ export default function MarketRadarAssistantPanel({ contextPrefix, sourceKey }: 
   useEffect(() => {
     if (!ready || !sourceKey || greetedKey.current === sourceKey) return;
     greetedKey.current = sourceKey;
-    sendMessage(GREET_TRIGGER, contextPrefix);
+    sendMessage(AGENT_SILENT_PREFIX + GREET_TRIGGER, contextPrefix);
   }, [ready, sourceKey, contextPrefix]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Narrate the estimate after a manual Run (silent prompt → visible reply).
+  useEffect(() => {
+    if (!runSignal || narratedRun.current === runSignal || !contextPrefix) return;
+    narratedRun.current = runSignal;
+    sendMessage(
+      AGENT_SILENT_PREFIX +
+        'The estimate just ran. In 2-4 short lines, tell me what stands out — the ' +
+        'leaders, any share shifts, and anything worth a closer look.',
+      contextPrefix,
+    );
+  }, [runSignal, contextPrefix]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useChatAutoScroll({ containerRef, endRef: messagesEndRef, lastMsgRef, messages });
 
@@ -86,7 +102,7 @@ export default function MarketRadarAssistantPanel({ contextPrefix, sourceKey }: 
 
   const handleNewChat = () => {
     setHistOpen(false);
-    createNewSession(ASSISTANT_AGENT).then(() => sendMessage(INTRO_TRIGGER, ''));
+    createNewSession(ASSISTANT_AGENT).then(() => sendMessage(AGENT_SILENT_PREFIX + INTRO_TRIGGER, ''));
   };
 
   const toggleHistory = () => {
@@ -109,7 +125,7 @@ export default function MarketRadarAssistantPanel({ contextPrefix, sourceKey }: 
       collapsed={collapsed}
       resize={{ initial: 380, min: 320, max: 520 }}
       side="left"
-      className="bg-surface-sunken border-line/45"
+      className="bg-surface-sunken border-transparent"
       rail={
         <>
           <button

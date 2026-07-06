@@ -24,6 +24,13 @@ export const TENANT: TenantId = resolveTenant();
 export const tenant = TENANTS[TENANT];
 export const branding = tenant.branding;
 
+/** This tenant's analytics destination — baked per-tenant in tenants/<id>.json.
+ *  `measurementId` decides which GA4 property gtag hits; empty = analytics is a
+ *  no-op. There is deliberately NO env/default fallback, so a tenant can never
+ *  emit into another tenant's property. The sGTM relay URL is environment-
+ *  specific and stays an env var (NEXT_PUBLIC_GA_SERVER_CONTAINER_URL). */
+export const analytics = tenant.analytics;
+
 /** "*" means the full platform — every module on, no agent allowlist. No tenant
  *  uses it today (all are explicit), but the shorthand stays supported. */
 const ALL_MODULES = (tenant.enabledModules as readonly string[] | "*") === "*";
