@@ -27,8 +27,14 @@ import { barSpec, rangeBarSpec, scatterSpec, stackedBarSpec } from '../../lib/ch
 import { downloadCsv, downloadJson } from '../../lib/autocorr/export';
 import { track } from '../../lib/analytics/track';
 import SourcePicker, { type SourceSelection } from '../../components/sources/SourcePicker';
+import { MARKET_RADAR_SAMPLE } from '../../lib/samples';
 import ControlsPanel from '../../components/sources/ControlsPanel';
 import { sourceLabel } from '../../types/source';
+import { branding } from '../../config/tenant';
+import { downloadMarketRadarWorkbook, openMarketRadarReport } from '../../lib/market-radar/deliverables';
+
+const reportDate = () =>
+  new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 
 const SELECT_CLASS =
   'w-full rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs text-foreground focus:border-accent-500 focus:outline-none';
@@ -129,8 +135,8 @@ export default function MarketRadarPage() {
   const [runSignal, setRunSignal] = useState(0);
 
   const contextPrefix = useMemo(
-    () => buildMarketRadarContext({ source, mode, columns: detectedColumns, result }),
-    [source, mode, detectedColumns, result],
+    () => buildMarketRadarContext({ source, mode, columns: detectedColumns, result, forecast, activeTab: tab }),
+    [source, mode, detectedColumns, result, forecast, tab],
   );
 
   // A starter CSV showing the expected schema (required + optional columns).
@@ -276,7 +282,7 @@ export default function MarketRadarPage() {
               title="Data source"
               hint="Upload a MediaRadar / Pathmatics export (brand, spend, source required; market, channel, impressions optional) or pick a BigQuery table."
             >
-              <SourcePicker onChange={setSel} onError={setError} />
+              <SourcePicker onChange={setSel} onError={setError} sample={MARKET_RADAR_SAMPLE} />
             </Section>
 
             <Section
@@ -609,6 +615,29 @@ export default function MarketRadarPage() {
                 <div className="max-w-md space-y-3">
                   <p className="text-sm text-muted">Download the estimator output for reporting or a deeper dive.</p>
                   <div className="grid gap-2">
+                    <button
+                      type="button"
+                      onClick={() => downloadMarketRadarWorkbook(result)}
+                      title="Multi-sheet workbook: summary, estimates, SOV, observed vs estimated, insights"
+                      className="rounded-lg border border-accent-500/40 bg-accent-500/5 px-3 py-2 text-left text-xs font-semibold text-foreground transition-colors hover:border-accent-500 hover:bg-accent-500/10"
+                    >
+                      ⤓ Full workbook (Excel)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openMarketRadarReport(result, {
+                          brandName: branding.brandName,
+                          accent: branding.accent.onLight ?? branding.accent['600'],
+                          sourceLabel: source ? sourceLabel(source) : 'uploaded data',
+                          generatedAt: reportDate(),
+                        })
+                      }
+                      title="Branded, client-ready report — opens a print-to-PDF view"
+                      className="rounded-lg border border-accent-500/40 bg-accent-500/5 px-3 py-2 text-left text-xs font-semibold text-foreground transition-colors hover:border-accent-500 hover:bg-accent-500/10"
+                    >
+                      🖨 Client report (PDF)
+                    </button>
                     <button
                       type="button"
                       onClick={() => downloadCsv('competitive-by-market.csv', result.by_market)}

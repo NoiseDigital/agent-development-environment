@@ -21,6 +21,10 @@ export default defineConfig({
     },
   },
   test: {
+    // Tests run against the noise tenant fixture — set EXPLICITLY here (the app
+    // has no default tenant; tenant.ts throws on an unset NEXT_PUBLIC_TENANT).
+    // Keep in sync with the @tenant-content alias above.
+    env: { NEXT_PUBLIC_TENANT: 'noise' },
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     environment: 'node',
     setupFiles: ['./vitest.setup.ts'],

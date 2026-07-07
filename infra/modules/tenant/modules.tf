@@ -29,9 +29,10 @@ locals {
   ))
   deploy_toolbox = contains(local.enabled_services, "mcp-toolbox")
 
-  # Agent allowlist for the agents runtime. Empty ("") = load every agent (the
-  # full-platform tenant); otherwise core agents + the union of module agents.
-  enabled_agents = local._all_modules ? "" : join(",", sort(distinct(concat(
+  # Agent allowlist for the agents runtime. "*" = full platform (an explicit
+  # sentinel — never empty, so the runtime fails loud on a missing value instead
+  # of silently loading everything); otherwise core agents + module agents.
+  enabled_agents = local._all_modules ? "*" : join(",", sort(distinct(concat(
     local._catalog.core.agents,
     flatten([for m in local._module_keys : local._catalog.modules[m].agents]),
   ))))

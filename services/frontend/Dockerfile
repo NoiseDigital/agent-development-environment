@@ -25,9 +25,10 @@ ENV NODE_ENV=production
 # NEXT_PUBLIC_* are inlined into the client bundle at build time, so they're
 # build args. CI passes the public Firebase config (project/authDomain/appId)
 # and reads the API key from Secret Manager — nothing committed to the repo.
-# Tenant (branding + enabled modules) — defaults to noise so a plain build is the
-# full platform; CI passes the environment's tenant.
-ARG NEXT_PUBLIC_TENANT=noise
+# Tenant (branding + enabled modules) — REQUIRED, no default: noise is one tenant
+# of many. A build must name its tenant (CI passes the environment's); an unset
+# value fails the build via next.config.ts / src/config/tenant.ts.
+ARG NEXT_PUBLIC_TENANT
 ARG NEXT_PUBLIC_FIREBASE_PROJECT_ID
 ARG NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
 ARG NEXT_PUBLIC_FIREBASE_APP_ID
@@ -54,8 +55,9 @@ COPY --from=builder /app/public ./public
 # Per-tenant asset isolation: keep ONLY this tenant's public/<tenant>/ dir, drop
 # every other tenant's — so a deployed tenant can't serve another's brand assets
 # by direct URL. Shared root files (file.svg, …) are files, untouched.
-ARG NEXT_PUBLIC_TENANT=noise
-RUN find public -mindepth 1 -maxdepth 1 -type d ! -name "$NEXT_PUBLIC_TENANT" -exec rm -rf {} +
+ARG NEXT_PUBLIC_TENANT
+RUN : "${NEXT_PUBLIC_TENANT:?NEXT_PUBLIC_TENANT build-arg is required (no default tenant)}" \
+    && find public -mindepth 1 -maxdepth 1 -type d ! -name "$NEXT_PUBLIC_TENANT" -exec rm -rf {} +
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 EXPOSE 8080

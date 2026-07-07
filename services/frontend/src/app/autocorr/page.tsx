@@ -6,6 +6,7 @@ import { downloadCsv, downloadJson } from '../../lib/autocorr/export';
 import { track } from '../../lib/analytics/track';
 import { sourceLabel, type SourceRef } from '../../types/source';
 import SourcePicker, { type SourceSelection } from '../../components/sources/SourcePicker';
+import { AUTOCORR_SAMPLE } from '../../lib/samples';
 import ControlsPanel from '../../components/sources/ControlsPanel';
 import { heatmapSpec, scatterSpec } from '../../lib/charts/specs';
 import { buildAutocorrContext } from '../../lib/agent/autocorr-context';
@@ -13,6 +14,7 @@ import VegaChart from '../../components/VegaChart';
 import InfoHint from '../../components/ui/InfoHint';
 import AutocorrAssistantPanel from '../../components/autocorr/AutocorrAssistantPanel';
 import RegressionResults from '../../components/autocorr/RegressionResults';
+import AutocorrInsights from '../../components/autocorr/AutocorrInsights';
 import ColumnProfileTable from '../../components/autocorr/ColumnProfileTable';
 
 // ── Layout primitive — a card-shaped section used in the controls rail. ────
@@ -382,16 +384,21 @@ export default function AutocorrPage() {
     () =>
       buildAutocorrContext({
         source,
+        mode,
         columns: columnProfiles,
+        columnStats,
         setA,
         setB,
         result,
+        regResult,
+        regY,
+        regX,
         qa,
         preprocessing: { winsorize, log1p, zscore, difference },
         alpha,
         lag,
       }),
-    [source, columnProfiles, setA, setB, result, qa, winsorize, log1p, zscore, difference, alpha, lag],
+    [source, mode, columnProfiles, columnStats, setA, setB, result, regResult, regY, regX, qa, winsorize, log1p, zscore, difference, alpha, lag],
   );
 
   return (
@@ -442,7 +449,7 @@ export default function AutocorrPage() {
         >
             {/* Source */}
             <Section title="Data source">
-              <SourcePicker onChange={setSel} onError={setError} />
+              <SourcePicker onChange={setSel} onError={setError} sample={AUTOCORR_SAMPLE} />
             </Section>
 
             {/* Analysis mode */}
@@ -658,6 +665,9 @@ export default function AutocorrPage() {
                   <VegaChart spec={heatmapChart} saveable />
                 </div>
               )}
+
+              {/* Analyst insights — agent-backed, rule-based fallback */}
+              <AutocorrInsights result={result} alpha={alpha} />
 
               {/* Top signals — click a row to plot the pair below */}
               <TopSignalsTable

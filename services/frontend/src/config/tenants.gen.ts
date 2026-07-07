@@ -47,7 +47,8 @@ export const MODULE_CATALOG = {
       "route": "/autocorr",
       "description": "Auto-correlate drivers against KPIs across any data source. Upload data, run the analysis, save the visuals.",
       "agents": [
-        "autocorr_assistant_agent"
+        "autocorr_assistant_agent",
+        "autocorr_insights_agent"
       ],
       "services": [],
       "capabilities": []

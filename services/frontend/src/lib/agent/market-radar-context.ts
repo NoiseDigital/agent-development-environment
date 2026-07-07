@@ -2,7 +2,7 @@
 // Centralised here so the page produces a stable shape — the agent's prompt
 // parses these exact field names.
 
-import type { MarketRadarResult } from '../api/market-radar';
+import type { ForecastResult, MarketRadarResult } from '../api/market-radar';
 import type { SourceRef } from '../../types/source';
 import { sourceUri } from '../../types/source';
 
@@ -12,6 +12,11 @@ export interface MarketRadarContextInput {
   /** Detected column names — known for uploads, unknown for BigQuery until run. */
   columns: string[];
   result: MarketRadarResult | null;
+  /** Scenario/Brand-Trajectory forecast, when computed — so the assistant is
+   *  grounded on the forecast tabs, not just the estimate. */
+  forecast?: ForecastResult | null;
+  /** Which tab the user is looking at — lets the assistant answer in context. */
+  activeTab?: string;
 }
 
 const usd = new Intl.NumberFormat('en-US', {
@@ -29,12 +34,13 @@ const band = (score: number) => (score >= 0.7 ? 'High' : score >= 0.4 ? 'Moderat
  *  - RESULT (an estimate has run): adds KPIs, top markets/competitors, and SOV
  *    leaders so the assistant can interpret. Returns '' when no source. */
 export function buildMarketRadarContext(input: MarketRadarContextInput): string {
-  const { source, mode, columns, result } = input;
+  const { source, mode, columns, result, forecast, activeTab } = input;
   if (!source) return '';
 
   const lines: string[] = ['[Market Radar context]'];
   lines.push(`source: ${sourceUri(source)}`);
   lines.push(`mode: ${mode}`);
+  if (activeTab) lines.push(`active_tab: ${activeTab}`);
 
   // PRE-RUN — guide setup.
   if (!result) {
@@ -85,6 +91,37 @@ export function buildMarketRadarContext(input: MarketRadarContextInput): string 
     lines.push('sov_leaders:');
     for (const [market, brands] of [...leaders].slice(0, 5)) {
       lines.push(`  - ${market}: ${brands.join(', ')}`);
+    }
+  }
+
+  // Forecast (Scenario Planner / Brand Trajectory) — only when computed.
+  if (forecast) {
+    lines.push('forecast:');
+    if (!forecast.has_dates) {
+      lines.push('  status: unavailable (no usable date column — trajectories need time series)');
+    } else {
+      if (forecast.reliability) {
+        lines.push(`  reliability: ${pct(forecast.reliability.score)} (${forecast.reliability.label})`);
+      }
+      const tf = forecast.total_forecast ?? [];
+      if (tf.length > 0) {
+        const end = tf[tf.length - 1];
+        lines.push(`  horizon: ${tf.length} periods (through ${end.month})`);
+        lines.push(
+          `  total_spend_end: ${usd.format(end.central_forecast)} (95% CI ${usd.format(end.ci_low_95)} – ${usd.format(end.ci_high_95)})`,
+        );
+      }
+      if (forecast.model_stats) {
+        lines.push(`  method: ${forecast.model_stats.forecast_method} (${forecast.model_stats.n_months} months of history)`);
+      }
+      const brands = forecast.brands ?? [];
+      if (brands.length > 0) {
+        lines.push('  brand_trajectories (brand · metric · quality · change):');
+        for (const b of brands.slice(0, 5)) {
+          const chg = `${b.change_pct >= 0 ? '+' : ''}${b.change_pct.toFixed(0)}%`;
+          lines.push(`    - ${b.brand} · ${b.metric} · ${b.quality} · ${chg}`);
+        }
+      }
     }
   }
 

@@ -34,12 +34,12 @@ AGENTS_DIR = str(Path(__file__).resolve().parent / "adk_agents")
 class _AllowlistAgentLoader(AgentLoader):
     """Restrict the ADK runtime to a tenant's enabled agents.
 
-    A tenant that enables only a subset of modules (e.g. CSA = analyze) sets
-    ENABLED_AGENTS to that subset's agents. `list_agents()` gates discovery
-    (/list-apps and the dev UI, which derives its list from it); `load_agent()`
-    enforces it so a disabled agent can't be reached by name either. When
-    ENABLED_AGENTS is empty (the full-platform tenant, Noise) the default
-    AgentLoader is used and every agent in adk_agents/ loads."""
+    A tenant sets ENABLED_AGENTS to its enabled modules' agents (a comma list),
+    or to "*" for the full platform. `list_agents()` gates discovery (/list-apps
+    and the dev UI, which derives its list from it); `load_agent()` enforces it
+    so a disabled agent can't be reached by name either. There is no default
+    tenant: ENABLED_AGENTS must be set — an unset value is a config error, not a
+    silent "load everything"."""
 
     def __init__(self, agents_dir: str, allowed: set[str]) -> None:
         super().__init__(agents_dir)
@@ -54,15 +54,21 @@ class _AllowlistAgentLoader(AgentLoader):
         return super().load_agent(agent_name)
 
 
-# A tenant deploying a module subset constrains the runtime to those modules'
-# agents via ENABLED_AGENTS (comma-separated, set by Terraform / start_services
-# from the module catalog). Empty → load everything (Noise).
-_enabled_agents = {
-    a.strip() for a in os.environ.get("ENABLED_AGENTS", "").split(",") if a.strip()
-}
-_agent_loader = (
-    _AllowlistAgentLoader(AGENTS_DIR, _enabled_agents) if _enabled_agents else None
-)
+# Every tenant declares its agent allowlist via ENABLED_AGENTS (set by Terraform
+# / start_services from the module catalog): "*" = full platform, a comma list =
+# that subset. No default tenant — an unset/empty value is a configuration error
+# we fail on, never a silent "load everything".
+_raw_enabled = os.environ.get("ENABLED_AGENTS", "").strip()
+if not _raw_enabled:
+    raise RuntimeError(
+        "ENABLED_AGENTS is not set. Every tenant must declare its agent allowlist "
+        '("*" for the full platform, or a comma-separated subset). No tenant is the default.'
+    )
+if _raw_enabled == "*":
+    _agent_loader = None  # full platform — the default AgentLoader loads every agent
+else:
+    _enabled_agents = {a.strip() for a in _raw_enabled.split(",") if a.strip()}
+    _agent_loader = _AllowlistAgentLoader(AGENTS_DIR, _enabled_agents)
 
 # ADK's artifact service handles CONTEXTUAL files within a chat — files a user
 # attaches to a message, and files an agent generates during a turn (read/written

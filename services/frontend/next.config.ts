@@ -3,8 +3,15 @@ import type { NextConfig } from "next";
 
 // Tenant chosen at build (mirrors src/config/tenant.ts). The @tenant-content
 // alias below resolves to ONLY this tenant's content dir, so a build never
-// bundles another tenant's dashboards/plans/clients.
-const TENANT = process.env.NEXT_PUBLIC_TENANT || "noise";
+// bundles another tenant's dashboards/plans/clients. No default — noise is one
+// tenant of many; an unset value fails the build loudly rather than silently
+// bundling a privileged tenant's content.
+const TENANT = process.env.NEXT_PUBLIC_TENANT;
+if (!TENANT) {
+  throw new Error(
+    "NEXT_PUBLIC_TENANT is not set — name a tenant to build (e.g. NEXT_PUBLIC_TENANT=noise). No tenant is the default.",
+  );
+}
 
 // Bundle analyzer is OFF unless ANALYZE=true. We `require()` it lazily so
 // type-checking + dev builds on machines that haven't `npm install`d yet

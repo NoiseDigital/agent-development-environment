@@ -66,24 +66,33 @@ echo "Resolved compose host root:  $HOST_PROJECT_ROOT"
 cd "$PROJECT_ROOT"
 
 # ── Tenant selection ──────────────────────────────────────────────────────────
-# Which tenant's stack to run locally. Defaults to `noise` (the full platform),
-# so existing dev flow is unchanged. The enabled modules in tenants/<tenant>.json
-# derive the agent allowlist (ENABLED_AGENTS) and whether mcp-toolbox starts —
-# the SAME module catalog (tenants/modules.json) that Terraform uses for deploys,
-# so local and cloud agree on what a tenant gets. Override with: TENANT=csa.
-TENANT="${TENANT:-noise}"
-if [ ! -f "$PROJECT_ROOT/tenants/${TENANT}.json" ]; then
-    echo "✘ Unknown tenant '$TENANT' — no tenants/${TENANT}.json. Available:"
+# Which tenant's stack to run locally. REQUIRED — no default: noise is one tenant
+# of many, so you name the one you want (TENANT=noise or TENANT=csa …). The
+# enabled modules in tenants/<tenant>.json derive the agent allowlist
+# (ENABLED_AGENTS) and whether mcp-toolbox starts — the SAME module catalog
+# (tenants/modules.json) that Terraform uses for deploys, so local and cloud
+# agree on what a tenant gets.
+list_tenants() {
     for f in "$PROJECT_ROOT"/tenants/*.json; do
         b="$(basename "$f" .json)"
         [ "$b" != "modules" ] && echo "    $b"
     done
+}
+if [ -z "${TENANT:-}" ]; then
+    echo "✘ TENANT is not set — name the tenant stack to run (no default). Available:"
+    list_tenants
+    echo "  e.g.  TENANT=noise ./scripts/start_services.sh"
+    exit 1
+fi
+if [ ! -f "$PROJECT_ROOT/tenants/${TENANT}.json" ]; then
+    echo "✘ Unknown tenant '$TENANT' — no tenants/${TENANT}.json. Available:"
+    list_tenants
     exit 1
 fi
 echo "Tenant: $TENANT"
 
-# Derive, from the module catalog: the agent allowlist (empty = load every
-# agent), whether mcp-toolbox is needed, and STOP_SERVICES — module services
+# Derive, from the module catalog: the agent allowlist ("*" = full platform, a
+# comma list = subset), whether mcp-toolbox is needed, and STOP_SERVICES — module services
 # this tenant does NOT use but another tenant might (so we tear them down when
 # switching tenants, since the stack shares one compose project + host ports).
 eval "$(python3 - "$TENANT" <<'PY'
@@ -97,7 +106,7 @@ for m in cat["modules"].values():
     all_mod_svcs |= set(m.get("services", []))
 if mods == "*":
     this_svcs = set(cat["core"].get("services", [])) | all_mod_svcs
-    print("ENABLED_AGENTS=")
+    print("ENABLED_AGENTS=*")  # explicit full-platform sentinel (no empty=all)
     print("WANT_TOOLBOX=1")
 else:
     agents = set(cat["core"].get("agents", []))

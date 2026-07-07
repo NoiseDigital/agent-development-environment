@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { sourcesApi } from '../../lib/api/sources';
 import { track } from '../../lib/analytics/track';
+import type { SampleDataset } from '../../lib/samples';
 import {
   sourceUri,
   type BigQueryTableRef,
@@ -36,9 +37,12 @@ interface Props {
   onChange: (selection: SourceSelection) => void;
   /** Surfaced inline; a parent can also show it in its own error banner. */
   onError?: (message: string) => void;
+  /** When provided, a one-click "Load sample dataset" button uploads a bundled
+   *  demo file via the same path as a user upload — removes data-prep friction. */
+  sample?: SampleDataset;
 }
 
-export default function SourcePicker({ onChange, onError }: Props) {
+export default function SourcePicker({ onChange, onError, sample }: Props) {
   const [sourceKind, setSourceKind] = useState<SourceKind>('bigquery');
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [uploadId, setUploadId] = useState('');
@@ -102,9 +106,8 @@ export default function SourcePicker({ onChange, onError }: Props) {
     sourcesApi.bigQueryTables(bqDataset).then(setBqTables).catch(() => setBqTables([]));
   }, [bqDataset]);
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Upload a file + select it. Shared by the file picker and the sample loader.
+  const ingest = async (file: File, fileType: string) => {
     setUploading(true);
     try {
       const created = await sourcesApi.upload(file);
@@ -112,14 +115,26 @@ export default function SourcePicker({ onChange, onError }: Props) {
       setSourceKind('upload');
       setSheet(created.metadata.sheet_names?.[0] ?? '');
       setUploadId(created.id);
-      // Extension only — never the filename (can carry client/PII).
-      track('source_uploaded', { file_type: file.name.split('.').pop()?.toLowerCase() ?? 'unknown' });
+      track('source_uploaded', { file_type: fileType });
     } catch (err) {
       onError?.(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setUploading(false);
       if (fileInput.current) fileInput.current.value = '';
     }
+  };
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Extension only — never the filename (can carry client/PII).
+    await ingest(file, file.name.split('.').pop()?.toLowerCase() ?? 'unknown');
+  };
+
+  const loadSample = async () => {
+    if (!sample) return;
+    const file = new File([sample.build()], sample.filename, { type: 'text/csv' });
+    await ingest(file, 'sample-csv');
   };
 
   return (
@@ -202,6 +217,19 @@ export default function SourcePicker({ onChange, onError }: Props) {
             {uploading ? 'Uploading…' : 'Upload a file'}
           </button>
         </>
+      )}
+
+      {/* One-click sample — no data prep needed to see the module work. */}
+      {sample && (
+        <button
+          type="button"
+          onClick={loadSample}
+          disabled={uploading}
+          title="Load a bundled sample dataset and select it"
+          className="w-full rounded-lg border border-dashed border-line px-3 py-1.5 text-[11px] font-medium text-faint transition-colors hover:border-accent-500 hover:text-accent-500 disabled:opacity-50"
+        >
+          {uploading ? 'Loading…' : '✨ Load a sample dataset'}
+        </button>
       )}
     </div>
   );

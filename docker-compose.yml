@@ -302,7 +302,10 @@ services:
       # Which tenant build to run (branding + enabled modules). Set by
       # start_services.sh; the dev server reads it live (NEXT_PUBLIC_* is baked
       # at build for the deployed image — see services/frontend/Dockerfile).
-      - NEXT_PUBLIC_TENANT=${NEXT_PUBLIC_TENANT:-noise}
+      # No default: unset passes through empty and the app fails loud (tenant.ts)
+      # rather than silently privileging one tenant. Run via start_services.sh
+      # with TENANT=<id>, or export NEXT_PUBLIC_TENANT before a bare compose up.
+      - NEXT_PUBLIC_TENANT=${NEXT_PUBLIC_TENANT:-}
       # Firebase Auth (client SDK, runs in the browser). Dev values pair with the
       # local emulator; the emulator host is the *browser-reachable* address
       # (published port on localhost), not the docker-network name. Per-tenant

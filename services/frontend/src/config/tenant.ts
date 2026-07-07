@@ -13,11 +13,24 @@ import { MODULE_CATALOG, TENANTS } from "./tenants.gen";
 export type TenantId = keyof typeof TENANTS;
 export type ModuleKey = keyof typeof MODULE_CATALOG.modules;
 
-const DEFAULT_TENANT: TenantId = "noise";
-
+// No default tenant — every tenant (noise included) is one of many, chosen
+// explicitly. An unset or unknown NEXT_PUBLIC_TENANT is a configuration error we
+// fail loudly on, rather than silently resolving to a privileged tenant (which
+// would ship the wrong brand, modules, and analytics property).
 function resolveTenant(): TenantId {
   const id = process.env.NEXT_PUBLIC_TENANT;
-  return id && id in TENANTS ? (id as TenantId) : DEFAULT_TENANT;
+  const known = Object.keys(TENANTS);
+  if (!id) {
+    throw new Error(
+      `NEXT_PUBLIC_TENANT is not set. Every build/run must name a tenant (one of: ${known.join(", ")}). No tenant is the default.`,
+    );
+  }
+  if (!(id in TENANTS)) {
+    throw new Error(
+      `Unknown NEXT_PUBLIC_TENANT "${id}". Available tenants: ${known.join(", ")}.`,
+    );
+  }
+  return id as TenantId;
 }
 
 export const TENANT: TenantId = resolveTenant();
