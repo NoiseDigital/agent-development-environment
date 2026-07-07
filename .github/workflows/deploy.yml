@@ -16,15 +16,24 @@ name: Migrate DB & Deploy Services
 #   into the frontend image via NEXT_PUBLIC_TENANT; the GA4 measurement id is
 #   baked there too — never a deploy var, so tenants can't cross-contaminate.)
 #
-# TRIGGERS
-#   push to main       → every target with "trigger": "push" (today: all *-sbx).
-#   workflow_dispatch  → the chosen `environment`, or ALL push-targets if blank.
-#   Gating: give a prod/uat GitHub Environment required reviewers and the run
-#   pauses for approval — orthogonal to the trigger.
+# TRIGGERS — trunk-based promotion (industry standard: one trunk, tags promote up)
+#   push to a branch   → every "trigger": "push" target whose "branch" matches
+#                        (default branch "main"). This is the low/integration
+#                        stage — typically all *-sbx.
+#   push a tag         → promote a single env: tag `deploy/<tenant>/<stage>/<ver>`
+#                        (e.g. deploy/noise/prod/v1.4.0) deploys exactly that
+#                        registered target. Higher stages should also set REQUIRED
+#                        REVIEWERS on their GitHub Environment so the run pauses
+#                        for approval — gating is orthogonal to the trigger.
+#   workflow_dispatch  → the chosen `environment` (escape hatch / redeploy), or
+#                        ALL push targets on the selected branch if blank.
+#   Tag + dispatch runs force a FULL deploy (all services); branch pushes only
+#   roll services whose source changed.
 
 on:
   push:
-    branches: [main]
+    branches: [main] # add a branch here if a target sets "branch" to it
+    tags: ["deploy/**"] # deploy/<tenant>/<stage>/<version> → promote that env
   workflow_dispatch:
     inputs:
       environment:
@@ -44,12 +53,15 @@ jobs:
       matrix: ${{ steps.pick.outputs.matrix }}
       count: ${{ steps.pick.outputs.count }}
       changes: ${{ steps.filter.outputs.changes }}
+      # "true" on tag-promotion and manual runs → deploy ALL services regardless
+      # of the change filter (a promotion ships the whole tagged commit).
+      full: ${{ steps.pick.outputs.full }}
     steps:
       - uses: actions/checkout@v7
 
       # Which services' source changed since the previous commit. Computed ONCE
-      # here so all matrix legs share one verdict (a manual dispatch forces a
-      # full deploy via the `github.event_name` checks on each step below).
+      # here so all matrix legs share one verdict. Tag promotions + manual runs
+      # ignore it (discover sets full=true → every step deploys regardless).
       - uses: dorny/paths-filter@v4
         id: filter
         with:
@@ -63,25 +75,45 @@ jobs:
 
       - id: pick
         env:
+          EVENT: ${{ github.event_name }}
           DISPATCH_ENV: ${{ github.event.inputs.environment }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          # Every declared target → {tenant, stage, environment}.
-          all=$(jq -c '[.targets[] | . + {environment: (.tenant + "-" + .stage)}]' .github/deploy-targets.json)
+          # Every declared target → {tenant, stage, environment, branch}.
+          all=$(jq -c '[.targets[] | . + {environment: (.tenant + "-" + .stage), branch: (.branch // "main")}]' \
+            .github/deploy-targets.json)
+          fail_empty() { # $1 = jq array, $2 = error message
+            [ "$(printf '%s' "$1" | jq 'length')" != "0" ] || { echo "::error::$2"; exit 1; }
+          }
+
           if [ -n "${DISPATCH_ENV:-}" ]; then
             # Manual single-environment deploy — must be a known target.
             sel=$(printf '%s' "$all" | jq -c --arg e "$DISPATCH_ENV" '[.[] | select(.environment == $e)]')
-            if [ "$(printf '%s' "$sel" | jq 'length')" = "0" ]; then
-              echo "::error::unknown environment '$DISPATCH_ENV' — not in .github/deploy-targets.json"
-              exit 1
-            fi
+            fail_empty "$sel" "unknown environment '$DISPATCH_ENV' — not in .github/deploy-targets.json"
+          elif [ "$REF_TYPE" = "tag" ]; then
+            # Promotion tag deploy/<tenant>/<stage>[/<version>] → exactly that target.
+            t=$(printf '%s' "$REF_NAME" | cut -d/ -f2)
+            s=$(printf '%s' "$REF_NAME" | cut -d/ -f3)
+            sel=$(printf '%s' "$all" | jq -c --arg t "$t" --arg s "$s" '[.[] | select(.tenant == $t and .stage == $s)]')
+            fail_empty "$sel" "tag '$REF_NAME' → no target $t-$s (expected deploy/<tenant>/<stage>/<version>)"
           else
-            # push (or a blank dispatch) → every auto-deploy target.
-            sel=$(printf '%s' "$all" | jq -c '[.[] | select(.trigger == "push")]')
+            # Branch push (or blank dispatch) → every trigger:push target on THIS branch.
+            sel=$(printf '%s' "$all" | jq -c --arg b "$REF_NAME" '[.[] | select(.trigger == "push" and .branch == $b)]')
           fi
-          echo "matrix={\"include\":$sel}" >> "$GITHUB_OUTPUT"
-          echo "count=$(printf '%s' "$sel" | jq 'length')" >> "$GITHUB_OUTPUT"
-          echo "Deploy targets:"; printf '%s' "$sel" | jq -r '.[].environment'
+
+          # Tag promotions and manual runs deploy every service; branch pushes
+          # honour the change filter.
+          full=false
+          if [ "$EVENT" = "workflow_dispatch" ] || [ "$REF_TYPE" = "tag" ]; then full=true; fi
+
+          {
+            echo "matrix={\"include\":$sel}"
+            echo "count=$(printf '%s' "$sel" | jq 'length')"
+            echo "full=$full"
+          } >> "$GITHUB_OUTPUT"
+          echo "Deploy targets (full=$full):"; printf '%s' "$sel" | jq -r '.[].environment' || true
 
   deploy:
     name: Deploy ${{ matrix.environment }}
@@ -125,34 +157,34 @@ jobs:
       # correctness (each target may push to its own AR); the push is idempotent
       # on the shared-AR setup. Hoist to a shared job if all targets share one AR.
       - name: Build & push gateway
-        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'gateway') || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'gateway') || needs.discover.outputs.full == 'true' }}
         run: |
           docker build --target prod -t "$AR/gateway:$SHA" services/backend/gateway
           docker push "$AR/gateway:$SHA"
       - name: Build & push agents
-        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'agents') || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'agents') || needs.discover.outputs.full == 'true' }}
         run: |
           docker build --target prod -t "$AR/agents:$SHA" services/backend/agents
           docker push "$AR/agents:$SHA"
       - name: Build & push mcp-stats
-        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'mcp_stats') || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'mcp_stats') || needs.discover.outputs.full == 'true' }}
         run: |
           docker build -t "$AR/mcp-stats:$SHA" services/backend/mcp/stats
           docker push "$AR/mcp-stats:$SHA"
       - name: Build & push mcp-toolbox
-        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'mcp_toolbox') || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'mcp_toolbox') || needs.discover.outputs.full == 'true' }}
         run: |
           docker build -t "$AR/mcp-toolbox:$SHA" services/backend/mcp/images/toolbox
           docker push "$AR/mcp-toolbox:$SHA"
       - name: Build & push sgtm
-        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'sgtm') || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'sgtm') || needs.discover.outputs.full == 'true' }}
         run: |
           # Google's gtm-cloud-image, snapshotted into our AR. Pushed regardless;
           # the deploy step below only rolls it if the service is provisioned.
           docker build -t "$AR/sgtm:$SHA" services/backend/tagging/sgtm
           docker push "$AR/sgtm:$SHA"
       - name: Build & push frontend
-        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'frontend') || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'frontend') || needs.discover.outputs.full == 'true' }}
         run: |
           # NEXT_PUBLIC_* are inlined at build time. Public config from vars; the
           # API key from Secret Manager (ci-deployer has project secretAccessor).
@@ -173,7 +205,7 @@ jobs:
 
       # ── Migrate FIRST (only when the gateway/migrations changed) ─────────────
       - name: Run DB migrations
-        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'gateway') || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'gateway') || needs.discover.outputs.full == 'true' }}
         run: |
           set -euo pipefail
           gcloud run jobs update "migrate" \
@@ -185,7 +217,7 @@ jobs:
       # mcp-toolbox is module-gated in Terraform (tenants whose modules don't need
       # it — e.g. csa/analyze-only — have no such service), so guard like sgtm.
       - name: Deploy mcp-toolbox
-        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'mcp_toolbox') || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'mcp_toolbox') || needs.discover.outputs.full == 'true' }}
         run: |
           set -euo pipefail
           if gcloud run services describe "mcp-toolbox" --region "$REGION" --project "$PROJECT" >/dev/null 2>&1; then
@@ -194,14 +226,14 @@ jobs:
             echo "mcp-toolbox not provisioned for this tenant (no enabling module) — skipping deploy"
           fi
       - name: Deploy agents
-        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'agents') || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'agents') || needs.discover.outputs.full == 'true' }}
         run: gcloud run deploy "agents" --image "$AR/agents:$SHA" --region "$REGION" --project "$PROJECT"
       - name: Deploy mcp-stats
-        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'mcp_stats') || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'mcp_stats') || needs.discover.outputs.full == 'true' }}
         run: gcloud run deploy "mcp-stats" --image "$AR/mcp-stats:$SHA" --region "$REGION" --project "$PROJECT"
       # sgtm is toggle-gated in Terraform (no service unless enable_sgtm = true)
       - name: Deploy sgtm
-        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'sgtm') || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'sgtm') || needs.discover.outputs.full == 'true' }}
         run: |
           set -euo pipefail
           if gcloud run services describe "sgtm" --region "$REGION" --project "$PROJECT" >/dev/null 2>&1; then
@@ -210,10 +242,10 @@ jobs:
             echo "sgtm not provisioned (no CONTAINER_CONFIG / terraform apply) — skipping deploy"
           fi
       - name: Deploy gateway
-        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'gateway') || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'gateway') || needs.discover.outputs.full == 'true' }}
         run: gcloud run deploy "gateway" --image "$AR/gateway:$SHA" --region "$REGION" --project "$PROJECT"
       - name: Deploy frontend
-        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'frontend') || github.event_name == 'workflow_dispatch' }}
+        if: ${{ contains(fromJSON(needs.discover.outputs.changes), 'frontend') || needs.discover.outputs.full == 'true' }}
         run: gcloud run deploy "frontend" --image "$AR/frontend:$IMAGE_ENV-$SHA" --region "$REGION" --project "$PROJECT"
 
       # ── Post-deploy smoke test ───────────────────────────────────────────────

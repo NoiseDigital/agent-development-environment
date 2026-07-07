@@ -73,9 +73,18 @@ terraform output    # state_buckets, artifact_registry, ci_deployer_sa_email, wo
 Each client = its own GCP project, modelled as a GitHub **Environment** named
 `<tenant>-<stage>` (e.g. `noise-sbx`). `deploy.yml` **fans out over every target
 listed in [`.github/deploy-targets.json`](.github/deploy-targets.json)** — a
-matrix leg per `<tenant>-<stage>`, each scoping `vars.*` to its Environment. On
-push to `main` every target with `"trigger": "push"` deploys; `workflow_dispatch`
-with an `environment` input deploys just that one (blank = all push targets).
+matrix leg per `<tenant>-<stage>`, each scoping `vars.*` to its Environment.
+Promotion is **trunk-based** (industry standard):
+
+- **`"trigger": "push"`** → auto-deploys on push to its `branch` (default `main`).
+  This is the integration stage — typically all `*-sbx`.
+- **`"trigger": "tag"`** → deploys only when the tag `deploy/<tenant>/<stage>/<version>`
+  is pushed (e.g. `git tag deploy/noise/prod/v1.4.0 && git push --tags`). Use for
+  `uat`/`prod`, and add **required reviewers** to that Environment so the run
+  pauses for approval. Tag + manual runs deploy *all* services (full promotion).
+- **`"trigger": "manual"`** → `workflow_dispatch` only. Any target can also be
+  dispatched on demand (blank input = all push targets on the selected branch).
+
 Adding a target is a data change (a registry row + `env/<stage>.tfvars` + the
 Environment) — **no workflow edit**. Set these as **Environment variables**
 (Settings → Environments → `<tenant>-<stage>`), *not* repo-level — they're
@@ -300,16 +309,20 @@ stage. (`prod`/`uat` auto-get deletion protection, regional SQL HA, and PITR.)
 
 Either way, wire the new stack into CI/CD (all data, no workflow edits):
 1. Add a row to [`.github/deploy-targets.json`](.github/deploy-targets.json):
-   `{ "tenant": "<tenant>", "stage": "<stage>", "trigger": "push" | "manual" }`.
-   Use `manual` for stages you don't want auto-deploying on merge.
+   `{ "tenant": "<tenant>", "stage": "<stage>", "trigger": "push" | "tag" | "manual" }`.
+   Use `push` for the integration stage (sbx), `tag` for prod/uat (promote via
+   `deploy/<tenant>/<stage>/<version>` tags), `manual` for dispatch-only.
 2. Create the GitHub Environment `<tenant>-<stage>` with that stack's variables
    (§1 checklist). For prod/uat, add **required reviewers** on the Environment so
    the run pauses for approval — gating is orthogonal to `trigger`.
-3. `node scripts/lint-tenants.mjs` validates the row (real tenant + a matching
-   `env/<stage>.tfvars`) — it also runs in CI, so a typo fails the PR, not a deploy.
+3. `node scripts/lint-tenants.mjs` validates the row — known trigger, real
+   tenant, and a matching `env/<stage>.tfvars`. It also runs in CI, so a typo
+   fails the PR, not a deploy.
 
-Push to `main` then deploys every `push` target; run one on demand via the
-`workflow_dispatch` `environment` input.
+Push to `main` deploys every `push` target; promote a higher stage with
+`git tag deploy/<tenant>/<stage>/<version> && git push --tags` (approve the run
+if the Environment gates it); or run one on demand via the `workflow_dispatch`
+`environment` input.
 
 ## Hardening follow-ups (not blocking)
 

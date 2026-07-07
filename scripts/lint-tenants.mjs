@@ -109,10 +109,12 @@ if (existsSync(DEPLOY_TARGETS)) {
     errors.push(`${where}: "targets" must be an array`);
   } else {
     const seen = new Set();
+    const TRIGGERS = ["push", "tag", "manual"];
     for (const t of dt.targets) {
       const env = `${t.tenant}-${t.stage}`;
       if (!t.tenant || !t.stage) errors.push(`${where}: each target needs "tenant" and "stage" (got ${JSON.stringify(t)})`);
-      if (t.trigger !== "push" && t.trigger !== "manual") errors.push(`${where}: ${env} trigger must be "push" or "manual"`);
+      if (!TRIGGERS.includes(t.trigger)) errors.push(`${where}: ${env} trigger must be one of ${TRIGGERS.join(", ")}`);
+      if (t.branch !== undefined && typeof t.branch !== "string") errors.push(`${where}: ${env} branch must be a string`);
       if (seen.has(env)) errors.push(`${where}: duplicate target ${env}`);
       seen.add(env);
       if (t.tenant && !tenantIds.has(t.tenant)) errors.push(`${where}: ${env} references unknown tenant "${t.tenant}" (no tenants/${t.tenant}.json)`);
