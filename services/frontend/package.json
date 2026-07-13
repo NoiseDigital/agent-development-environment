@@ -12,11 +12,11 @@
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.20",
-    "firebase": "^12.15.0",
-    "firebase-admin": "^14.0.0",
-    "google-auth-library": "^10.7.0",
+    "firebase": "^12.16.0",
+    "firebase-admin": "^14.1.0",
+    "google-auth-library": "^10.9.0",
     "html-to-image": "^1.11.13",
-    "next": "^16.2.9",
+    "next": "^16.2.10",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-grid-layout": "^2.2.3",
@@ -27,19 +27,19 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@next/bundle-analyzer": "^16.2.9",
+    "@next/bundle-analyzer": "^16.2.10",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^25",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^6.0.2",
+    "@vitejs/plugin-react": "^6.0.3",
     "eslint": "^9",
-    "eslint-config-next": "^16.2.9",
+    "eslint-config-next": "^16.2.10",
     "happy-dom": "^20.10.6",
     "tailwindcss": "^4",
     "typescript": "^6",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }
 }
