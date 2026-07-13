@@ -16,25 +16,25 @@ dependencies = [
     # cache config still loads and the `static_instruction → cache` plumbing
     # is intact. Don't relax the pin without re-testing both agent paths.
     "google-adk==1.32.0",
-    "fastapi>=0.137.2",
-    "uvicorn>=0.49.0",
+    "fastapi>=0.139.0",
+    "uvicorn>=0.51.0",
     "asyncpg>=0.30.0",
-    "toolbox-core>=1.1.0",
+    "toolbox-core>=1.2.0",
     # Mints OIDC ID tokens to authenticate to internal Cloud Run siblings
     # (mcp-toolbox). Pulled in transitively by google-adk, but the auth hop
     # depends on it directly — pin it so a dep bump can't silently drop it.
-    "google-auth>=2.55.0",
+    "google-auth>=2.55.2",
     "httpx>=0.27.0",
     # multipart parsing for ADK's artifact-upload endpoint (contextual files
     # within a chat); google-cloud-storage backs ADK's GcsArtifactService in prod.
     "python-multipart>=0.0.32",
-    "google-cloud-bigquery>=3.42.0",
+    "google-cloud-bigquery>=3.42.2",
     "a2a-sdk>=1.1.0",
-    "altair>=6.2.1",
+    "altair>=6.2.2",
     "pandas>=3.0.3",
-    "db-dtypes>=1.7.0",
+    "db-dtypes>=1.7.1",
     "tabulate>=0.10.0",
-    "google-cloud-storage>=3.12.0",
+    "google-cloud-storage>=3.12.1",
 ]
 
 [tool.setuptools]
@@ -45,7 +45,7 @@ include = ["api*", "shared*", "adk_agents*"]
 
 [dependency-groups]
 dev = [
-    "pytest>=9.1.0",
+    "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "pyyaml>=6.0.3",
 ]
