@@ -9,8 +9,8 @@ description = "API gateway for the NoiseOS frontend — owns auth, proxies agent
 readme = "README.md"
 requires-python = "==3.14.*"
 dependencies = [
-    "fastapi>=0.137.2",
-    "uvicorn>=0.49.0",
+    "fastapi>=0.139.2",
+    "uvicorn>=0.51.0",
     "httpx>=0.28.0",
     # Parses the MCP toolbox config (tools.yaml) for the query-catalog route
     # (api/tool_catalog.py), migrated from the agents service.
@@ -21,11 +21,11 @@ dependencies = [
     # BigQuery catalog browse.
     "python-multipart>=0.0.32",
     "openpyxl>=3.1.5",
-    "google-cloud-storage>=3.12.0",
-    "google-cloud-bigquery>=3.42.0",
+    "google-cloud-storage>=3.13.0",
+    "google-cloud-bigquery>=3.42.2",
     # Schema migrations for every platform-owned Postgres table. ADK manages
     # its own tables and ships its own migrations; we never touch those.
-    "alembic>=1.13.0",
+    "alembic>=1.18.5",
     "psycopg[binary]>=3.3.4",
     # Async driver for the platform's own runtime DB access (clients,
     # user_dashboards, share_links). Sync psycopg above is Alembic-only.
@@ -34,12 +34,12 @@ dependencies = [
     # talks to the toolbox concurrently for every tile. Same library the
     # agent service uses (sync flavour), so the SQL surface in tools.yaml
     # is shared. See services/backend/gateway/api/toolbox.py.
-    "toolbox-core>=0.5.4",
+    "toolbox-core>=1.2.0",
     # Mints OIDC ID tokens to authenticate to internal Cloud Run siblings
     # (agents, mcp-stats, mcp-toolbox). Pulled in transitively today, but the
     # service-to-service auth hop depends on it directly — pin it so a dep bump
     # can't silently drop it. See services/backend/gateway/api/_idtoken.py.
-    "google-auth>=2.55.0",
+    "google-auth>=2.56.0",
 ]
 
 [tool.setuptools]
@@ -50,7 +50,7 @@ include = ["api*"]
 
 [dependency-groups]
 dev = [
-    "pytest>=9.1.0",
+    "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
 ]
 
