@@ -2,22 +2,33 @@
 Agent definition
 """
 
-from .utils.constants import get_agent_name, get_agent_description, get_root_agent_model
-from .prompts.root_agent import get_root_agent_prompt
-from .tools.intacct_tools import (
-    get_user_docket_ids,
-    build_timesheet_xml,
-    submit_timesheet_xml,
-)
-from .tools.outlook_tools import get_outlook_calendar_events
-from .tools.asana_tools import get_asana_tasks
-from google.adk.agents import Agent
-from google.genai import types
-
+import os
 import sys
 from pathlib import Path
 
+from google.adk.agents import Agent
+from google.adk.tools.mcp_tool.mcp_session_manager import SseConnectionParams
+from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
+from google.genai import types
+
+from .prompts.root_agent import get_root_agent_prompt
+from .tools.asana_tools import get_asana_tasks
+from .tools.outlook_tools import get_outlook_calendar_events
+from .utils.constants import get_agent_description, get_agent_name, get_root_agent_model
+
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
+
+INTACCT_MCP_URL = os.getenv("INTACCT_MCP_URL", "http://mcp-sage-intacct:8080")
+
+intacct_toolset = MCPToolset(
+    connection_params=SseConnectionParams(url=f"{INTACCT_MCP_URL}/sse"),
+    tool_filter=[
+        "intacct_get_projects_and_tasks",
+        "intacct_submit_timesheet",
+        "intacct_get_timesheet",
+    ],
+    errlog=None,
+)
 
 AGENT_NAME = get_agent_name()
 DESCRIPTION = get_agent_description()
@@ -48,8 +59,6 @@ root_agent = Agent(
     tools=[
         get_asana_tasks,
         get_outlook_calendar_events,
-        get_user_docket_ids,
-        build_timesheet_xml,
-        submit_timesheet_xml,
+        intacct_toolset,
     ],
 )

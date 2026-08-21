@@ -21,6 +21,7 @@ services:
       - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
       - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-northamerica-northeast1}
       - TOOLBOX_ENDPOINT=${TOOLBOX_ENDPOINT:-http://mcp-toolbox:5000}
+      - INTACCT_MCP_URL=${INTACCT_MCP_URL:-http://mcp-sage-intacct:8080}
       - UV_LINK_MODE=copy
     depends_on:
       postgres:
@@ -89,6 +90,24 @@ services:
       - "${MATH_MCP_PORT:-5002}:8080"
     profiles:
       - math
+    stdin_open: true
+    tty: true
+
+  mcp-sage-intacct:
+    build:
+      context: ./services/backend/mcp/sage-intacct
+    env_file:
+      - path: ./.env
+        required: false
+      - path: ./services/backend/mcp/sage-intacct/.env
+        required: false
+    ports:
+      - "${INTACCT_MCP_PORT:-5004}:8080"
+    environment:
+      - INTACCT_MOCK_MODE=${INTACCT_MOCK_MODE:-true}
+      - SAGE_INTACCT_DEFAULT_EMPLOYEE_ID=${SAGE_INTACCT_DEFAULT_EMPLOYEE_ID:-EMP-1024}
+    profiles:
+      - sage-intacct
     stdin_open: true
     tty: true
 

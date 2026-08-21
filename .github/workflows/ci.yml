@@ -39,6 +39,35 @@ jobs:
       # - name: mypy
       #   run: mypy . --ignore-missing-imports --no-error-summary
 
+  # ── MCP server lint ────────────────────────────────────────────────────────
+  mcp-lint:
+    name: MCP — ruff (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - sage-intacct
+    defaults:
+      run:
+        working-directory: services/backend/mcp/${{ matrix.service }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: ruff check
+        run: ruff check .
+
+      - name: ruff format check
+        run: ruff format --check .
+
   # ── Frontend lint ──────────────────────────────────────────────────────────
   frontend-lint:
     name: Frontend — ESLint + TypeScript
