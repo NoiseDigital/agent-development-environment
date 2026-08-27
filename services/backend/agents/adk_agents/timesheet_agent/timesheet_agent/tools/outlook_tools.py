@@ -11,7 +11,6 @@ def get_outlook_calendar_events(
     Returns:
         dict: A dictionary containing mock Outlook calendar event data.
     """
-    # Docket/project IDs are embedded in the subject/title, as if pulled from Outlook
     events = [
         {
             "id": "evt-001",
